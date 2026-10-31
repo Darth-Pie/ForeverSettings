@@ -39,4 +39,5 @@ jobs:
         with:
           name: ForeverSettings-package
           path: .release/*.zip
+          include-hidden-files: true    # .release is a hidden folder
           retention-days: 7
