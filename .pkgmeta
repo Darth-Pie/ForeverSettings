@@ -1,10 +1,16 @@
 package-as: ForeverSettings
 
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 ignore:
   - tests
   - docs
   - tools
+  - .github
   - README.md
   - INSTALL.md
+  - RELEASING.md
   - .gitattributes
   - .gitignore

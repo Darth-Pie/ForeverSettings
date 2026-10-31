@@ -1,0 +1,42 @@
+name: Release
+
+# Pushing a version tag (for example v0.9.1) packages the addon and uploads it to Wago and to a GitHub release.
+# Running the workflow by hand is a dry run: it packages the addon, uploads nothing, and keeps the zip as a download.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # the packager reads the tags from the history
+
+      - name: Package (dry run, nothing is uploaded)
+        if: github.event_name == 'workflow_dispatch'
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -d -g forever
+
+      - name: Package and upload
+        if: github.event_name == 'push'
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -g forever
+        env:
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+          GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ForeverSettings-package
+          path: .release/*.zip
+          retention-days: 7
