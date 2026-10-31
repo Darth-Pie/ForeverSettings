@@ -1,0 +1,5 @@
+<Bindings>
+    <Binding name="FOREVERSETTINGS_TOGGLE" category="ForeverSettings">
+        SlashCmdList.FOREVERSETTINGS("profile toggle")
+    </Binding>
+</Bindings>

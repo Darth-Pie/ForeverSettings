@@ -1,0 +1,10 @@
+package-as: ForeverSettings
+
+ignore:
+  - tests
+  - docs
+  - tools
+  - README.md
+  - INSTALL.md
+  - .gitattributes
+  - .gitignore
