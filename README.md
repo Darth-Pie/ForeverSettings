@@ -78,4 +78,4 @@ bash run_all.sh                     # every suite, then the mutation table (long
 
 ## License
 
-None chosen yet: all rights reserved until one is.
+[MIT](LICENSE).
