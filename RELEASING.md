@@ -25,3 +25,4 @@ Actions tab, **Release**, **Run workflow**. This packages the addon, uploads not
 - The Wago project ID is in `ForeverSettings.toc` as `## X-Wago-ID:`.
 - An API key from the Wago developer account is stored as the repository secret `WAGO_API_TOKEN` (Settings, Secrets and variables, Actions).
 - The workflow packages for Forever only (`-g forever`). Remove that option once the addon has been tried on retail.
+- `-u` keeps the files' Unix line endings, so the zip holds exactly the files the tests ran against (the packager's default converts them to Windows line endings).
