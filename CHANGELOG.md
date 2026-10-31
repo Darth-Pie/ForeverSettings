@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1
+
+- Releases are now packaged and uploaded automatically. The addon itself is unchanged.
+
 ## 0.9.0
 
 - New profile **Maximum**: every setting at its highest level the addon has learned, from the minimap menu (with "about N fps" when your test measured it), `/fset profile maximum` or a Switch to Maximum button in My settings. It cannot be edited, says that the sharpest textures need plenty of graphics memory, and is worked out again at every loading screen, so levels learned later are picked up.

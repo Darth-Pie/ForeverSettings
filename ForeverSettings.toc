@@ -1,7 +1,7 @@
 ## Interface: 16001, 120105
 ## Title: ForeverSettings
 ## Notes: Keeps chosen CVars at the values you want, re-applied at every loading screen. Type /fset for help.
-## Version: 0.9.0
+## Version: 0.9.1
 ## X-Wago-ID: BKpEVPGE
 ## SavedVariables: ForeverSettingsDB
 
