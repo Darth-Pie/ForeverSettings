@@ -9,6 +9,7 @@ ignore:
   - docs
   - tools
   - .github
+  - .previews
   - README.md
   - INSTALL.md
   - RELEASING.md
