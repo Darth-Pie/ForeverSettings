@@ -1422,8 +1422,17 @@ end`],
   'settings-max-second-line-missing': ['Settings.lua', `            if level.cost then
                 local cost = take(p.costs)`, `            if false then
                 local cost = take(p.costs)`],
-  'settings-max-cost-width-wrong': ['Settings.lua', `local fs = skin.text(parent, "small", "dim", LEVEL_W)`, `local fs = skin.text(parent, "small", "dim", 100)`],
-  'settings-max-cost-offset-wrong': ['Settings.lua', `cost:SetPoint("TOPLEFT", p.area, "TOPLEFT", bx, -(by + LEVEL_H + 2))`, `cost:SetPoint("TOPLEFT", p.area, "TOPLEFT", bx, -(by + 5))`],
+  'settings-max-cost-width-wrong': ['Settings.lua', `local fs = skin.text(parent, "small", "dim", COST_W)`, `local fs = skin.text(parent, "small", "dim", 100)`],
+  'settings-max-cost-offset-wrong': ['Settings.lua', `bx - (COST_W - LEVEL_W) / 2, -(by + LEVEL_H + 2))`, `bx - (COST_W - LEVEL_W) / 2, -(by + 5))`],
+  'ui-level-width': ['Settings.lua', `local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 50, 22, 3, 14`, `local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 36, 22, 3, 14`],
+  'ui-cost-no-extra-width': ['Settings.lua', `local COST_W = LEVEL_W + 8`, `local COST_W = LEVEL_W`],
+  'ui-cost-uncentred': ['Settings.lua', `bx - (COST_W - LEVEL_W) / 2`, `bx`],
+  'ui-test-hub-stays': ['Settings.lua', `            ns.ui.openSaved(testKey)
+            settings.hide()`, `            ns.ui.openSaved(testKey)`],
+  'ui-show-hub-stays': ['Settings.lua', `            ns.ui.openSaved(showKey)
+            settings.hide()`, `            ns.ui.openSaved(showKey)`],
+  'ui-original-note-menu': ['Settings.lua', `Switch to Everyday or Crowded on the Home page to turn these on.`, `Switch to Everyday or Crowded in the menu to turn these on.`],
+  'ui-maximum-note-menu': ['Settings.lua', `Switch to Everyday or Crowded on the Home page to change these.`, `Switch to Everyday or Crowded in the menu to change these.`],
 
   // The live total in My settings ("Your Everyday settings: about N fps")
   'live-no-test-needed': ['Settings.lua', `if costs and est and type(est.fps) == "number" and (est.counted or 0) > 0 then`, `if est and type(est.fps) == "number" and (est.counted or 0) > 0 then`],
@@ -1548,7 +1557,7 @@ end`],
         paintRow(self)`, `        self.skinState.selected = on and true or false`],
 
   // The hub window: the shell and the settings pages
-  'hub-window-size': ['Settings.lua', `local WIDTH, HEIGHT = 780, 560`, `local WIDTH, HEIGHT = 780, 540`],
+  'hub-window-size': ['Settings.lua', `local WIDTH, HEIGHT = 860, 560`, `local WIDTH, HEIGHT = 860, 540`],
   'hub-nav-click-missing': ['Settings.lua', `        item:SetScript("OnClick", clicked)`, `        local _ = clicked`],
   'hub-nav-gap': ['Settings.lua', `-(10 + (i - 1) * 30 + (i > 4 and 14 or 0))`, `-(10 + (i - 1) * 30)`],
   'hub-nav-selected-unmarked': ['Settings.lua', `p.nav[i]:SetSelected(entry.selected)`, `p.nav[i]:SetSelected(false)`],
@@ -1589,7 +1598,7 @@ end`],
   'fix-keep-tick-raw': ['Settings.lua', `local now = ns.profiles.liveValue(cvar)`, `local now = GetCVar(cvar)`],
   'fix-name-wrap-ignored': ['Settings.lua', `local helpTop = top + math.max(18, heightOf(name, row.name) + 2)`, `local helpTop = top + 18`],
   'fix-name-wrap-no-gap': ['Settings.lua', `math.max(18, heightOf(name, row.name) + 2)`, `math.max(18, heightOf(name, row.name))`],
-  'fix-cost-wraps': ['Settings.lua', `        fs:SetWordWrap(false)                 -- "+136 fps"`, `        fs:SetWordWrap(true)                 -- "+136 fps"`],
+  'fix-cost-wraps': ['Settings.lua', `        fs:SetWordWrap(false)                 -- never wraps`, `        fs:SetWordWrap(true)                 -- never wraps`],
   'fix-refusal-unsaid': ['Settings.lua', `        if #refused > 0 then
             state.notice = "The game would not take " .. (REFUSED_WORDS[name] or "the level")`, `        if false then
             state.notice = "The game would not take " .. (REFUSED_WORDS[name] or "the level")`],

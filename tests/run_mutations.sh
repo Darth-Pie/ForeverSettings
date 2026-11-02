@@ -947,6 +947,13 @@ skin-nav-hover|test_skin|SK-6|killed
 skin-nav-pressed|test_skin|SK-6|killed
 skin-nav-bar-width|test_skin|SK-6|killed
 skin-nav-select-unpainted|test_skin|SK-6|killed
+ui-level-width|test_settings|S6-13|killed
+ui-cost-no-extra-width|test_settings|S6-13|killed
+ui-cost-uncentred|test_settings|S6-13|killed
+ui-test-hub-stays|test_settings|S8-6|killed
+ui-show-hub-stays|test_settings|S8-6|killed
+ui-original-note-menu|test_settings|S1-2|killed
+ui-maximum-note-menu|test_settings|S2-5|killed
 fix-live-value-ignores-boost|test_profiles|SZ-8|killed
 fix-live-uses-raw|test_profiles|SZ-8|killed
 fix-keep-tick-raw|test_settings|S4-10|killed

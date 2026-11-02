@@ -80,7 +80,7 @@ local function selectedOf(row)
 end
 
 local INTRO = "Choose how the game looks. Settings you tick are kept: the addon puts them back at every loading screen."
-local ORIGINAL_NOTE = "You're using your Original settings (hands off). Switch to Everyday or Crowded in the menu to turn these on."
+local ORIGINAL_NOTE = "You're using your Original settings (hands off). Switch to Everyday or Crowded on the Home page to turn these on."
 local COMBAT_TEXT = "You are in combat; try again afterwards."
 local BUSY_TEXT = "A test is running; try again afterwards."
 local RAW = { "graphicsShadowQuality", "graphicsSSAO", "groundEffectDensity", "RenderScale", "graphicsComputeEffects" }
@@ -244,7 +244,7 @@ test("S1-11 a profile switched from outside moves the in-use mark and the highli
     return before and after and highlighted, tostring(byKey(f, "tab:crowded")._text)
 end)
 
-test("S1-12 the window's pages: a tick and level buttons per setting on each page, 13 levels wrap to two lines, the X closes it, Escape is listed once, no raw names", function()
+test("S1-12 the window's pages: a tick and level buttons per setting on each page, 13 levels wrap onto three lines of six, the X closes it, Escape is listed once, no raw names", function()
     local e, s, db = boot()
     local b = e.ns.bench
     b.state().tiers.graphicsSSAO = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }
@@ -289,7 +289,7 @@ test("S1-12 the window's pages: a tick and level buttons per setting on each pag
     for _, name in ipairs(UISpecialFrames) do if name == "ForeverSettingsSettings" then listed = listed + 1 end end
     f.close:Click()
     return titled and keptNow and liveSelected and switched and not f:IsShown() and listed == 1 and not raw
-        and lightKeeps == 2 and lightLevels == 5 + 13 and ssaoLines == 2 and worldKeeps == 1 and worldLevels == 3
+        and lightKeeps == 2 and lightLevels == 5 + 13 and ssaoLines == 3 and worldKeeps == 1 and worldLevels == 3
         and sizeKeeps == 1 and sizeLevels == 6,
         tostring(lightKeeps) .. " " .. tostring(lightLevels) .. " " .. tostring(ssaoLines) .. " " .. tostring(worldKeeps) .. " "
             .. tostring(worldLevels) .. " " .. tostring(sizeKeeps) .. " " .. tostring(sizeLevels) .. " " .. tostring(listed) .. " " .. tostring(raw)
@@ -317,7 +317,7 @@ local COST_CROWD = "Costs from your crowd test. Measured in Stormwind City, 2 ho
 local COST_NONE = "Run Find my best settings to see what each level costs."
 local MATTERS_NOTE = [["Matters to the picture" is the addon's own judgement, not something it measured.]]
 local MAX_ON = "You're using Maximum (everything at its highest). It includes the sharpest textures, which need plenty of "
-    .. "graphics memory. Switch to Everyday or Crowded in the menu to change these."
+    .. "graphics memory. Switch to Everyday or Crowded on the Home page to change these."
 local LEFT_OUT_1 = "1 setting stays as it is: the addon has not learned its levels yet."
 local NOTHING = "Maximum has nothing to set yet: run Find my best settings once so the addon learns what each setting can do."
 local SKIPPED_3 = "The test skipped the highest levels of 3 settings, so there is no total yet. Run Find my best settings and choose Thorough."
@@ -382,7 +382,7 @@ local function costFor(f, cvar, value)
     local found
     walk(f, function(frame)
         for _, fs in ipairs(frame.fontStrings) do
-            if fs.shown and fs._text and fs._text ~= "" and fs._point and fs._point[4] == x
+            if fs.shown and fs._text and fs._text ~= "" and fs._point and fs._point[4] == x - 4
                 and -fs._point[5] > y + 23 and -fs._point[5] < y + 30 then
                 found = fs
             end
@@ -654,7 +654,7 @@ test("S2-9 the window draws the costs under the level buttons, the matters words
                 local text, fs = costFor(f, row.cvar, level.value)
                 if level.cost then
                     drawnCosts = drawnCosts + 1
-                    if text ~= level.cost or fs._width ~= 36 or fs._wordWrap ~= false then match = false end
+                    if text ~= level.cost or fs._width ~= 58 or fs._wordWrap ~= false then match = false end
                 elseif text ~= nil then
                     match = false
                 end
@@ -1057,7 +1057,7 @@ test("S4-9 on the Picture size page the block stands under the card: the label o
     local ok = label ~= nil and warn ~= nil and note ~= nil and slider ~= nil and back ~= nil and card ~= nil and your ~= nil
         and top(label) >= top(card) + 22 + 16 and top(slider) >= top(label) + STRINGHEIGHT(label)
         and top(warn) >= top(slider) + 16 and top(note) >= top(warn) + STRINGHEIGHT(warn)
-        and back._point[4] >= slider._point[4] + slider._width and back._point[4] + back._width <= 595
+        and back._point[4] >= slider._point[4] + slider._width and back._point[4] + back._width <= 675
         and 8 + top(note) + STRINGHEIGHT(note) <= 522 - (your._point[5] + STRINGHEIGHT(your))
     STRINGHEIGHT = nil
     return ok, tostring(ok)
@@ -1070,18 +1070,62 @@ test("S6-12 a card's name that wraps pushes its help line and levels down: the h
         local perLine = math.max(1, math.floor((fs._width or 520) / 9))
         return 14 * math.max(1, math.ceil(#text / perLine))
     end
-    s.open("light")
+    s.open("world")
     local f = window()
-    local name = fontStringWith(f, "Soft corner shadows")
-    local help = fontStringWith(f, "Soft darkening where things meet, like corners and under objects. Small visual gain, moderate cost.")
-    local button = byKey(f, "level:graphicsSSAO:0")
+    local name = fontStringWith(f, "Grass and plants (exact amount)")
+    local help = fontStringWith(f, "The same thing with a finer dial: 48 is sparse, 128 is lush.")
+    local button = byKey(f, "level:groundEffectDensity:48")
     local ok = name ~= nil and help ~= nil and button ~= nil and STRINGHEIGHT(name) == 28 and -help._point[5] == -name._point[5] + 30
         and -button._point[5] >= -help._point[5] + STRINGHEIGHT(help)
+    s.open("light")
+    f = window()
     local plain = fontStringWith(f, "Shadow detail")                  -- one line: the help stays where it was
     local helpOne = fontStringWith(f, "How sharp and detailed shadows look. Higher looks better and costs a lot of speed.")
     local tight = plain ~= nil and helpOne ~= nil and -helpOne._point[5] == -plain._point[5] + 18
     STRINGHEIGHT = nil
     return ok and tight, tostring(ok) .. tostring(tight)
+end)
+
+test("S6-13 a level button and its cost have room: 50 pixels for the label, 58 for the cost, centred under it; six levels share one line in two columns", function()
+    local e, s = bootWith(fullEntry())
+    s.open("size")
+    local f = window()
+    local xs, ys = {}, {}
+    for _, value in ipairs({ "0.5", "0.6", "0.7", "0.8", "0.9", "1" }) do
+        local button = byKey(f, "level:RenderScale:" .. value)
+        if button then
+            xs[#xs + 1] = button._point[4]
+            ys[button._point[5]] = true
+        end
+    end
+    local oneLine = #xs == 6 and next(ys, next(ys)) == nil
+    local button = byKey(f, "level:RenderScale:1")
+    local text, cost = costFor(f, "RenderScale", "1")
+    local roomy = button._width == 50 and button.label._width == 42 and text == "now" and cost._width == 58 and cost._wordWrap == false
+        and cost._point[4] == button._point[4] - 4 and button._text == "100%" and #button._text * 6.5 <= button.label._width
+    local widest = costFor(f, "RenderScale", "0.5")
+    return oneLine and roomy and widest ~= nil and #widest * 6 <= 58, tostring(oneLine) .. tostring(roomy) .. tostring(widest)
+end)
+
+test("S8-6 a test or result button hides the hub window so the window it opens does not sit on top of it; in combat nothing opens and the hub stays", function()
+    local e, s = bootWith(fullEntry())
+    local opened = {}
+    e.ns.ui.openSaved = function(kind) opened[#opened + 1] = kind end
+    e.ns.ui.buildContext = function() return { saved = { best = true, crowded = true } } end
+    e.ns.ui.savedResult = function() return { measuredLine = "Measured in Elwynn Forest, 2 days ago." } end
+    s.open("home")
+    local f = window()
+    byKey(f, "test:best"):Click()
+    local test = table.concat(opened, ",") == "best" and not f:IsShown()
+    s.open("tests")
+    byKey(f, "show:crowded"):Click()
+    local show = table.concat(opened, ",") == "best,crowded" and not f:IsShown()
+    COMBAT = true
+    s.open("home")
+    s.click("test:best")
+    COMBAT = false
+    local stays = #opened == 2 and f:IsShown()
+    return test and show and stays, tostring(test) .. tostring(show) .. tostring(stays)
 end)
 
 -- The Home page (spec 2026-11-02-flat-hub-window-design.md section 5).
@@ -1113,14 +1157,14 @@ test("S8-1 Home names the profile in use and shows four profile cards with their
     for key, pair in pairs(want) do
         local card = byKey(f, "profile:" .. key)
         local good = card ~= nil and card._text == pair[1] and card.note ~= nil and card.note._text:find(pair[2], 1, true) ~= nil
-            and card._width == 288 and card.label._point[1] == "CENTER" and card.label._justifyH == "CENTER" and card.note._justifyH == "CENTER"
+            and card._width == 328 and card.label._point[1] == "CENTER" and card.label._justifyH == "CENTER" and card.note._justifyH == "CENTER"
         if not good then bad[#bad + 1] = key end
     end
     ok = ok and #bad == 0 and byKey(f, "profile:everyday").skinState.selected == true and byKey(f, "profile:crowded").skinState.selected == false
         and byKey(f, "tab:everyday") == nil and byKey(f, "use") == nil and not hasText(f, "Everything at the highest")
     -- two by two: 306 pixels between the columns, 64 between the rows, each 56 tall
     local original, everyday, crowded = byKey(f, "profile:original"), byKey(f, "profile:everyday"), byKey(f, "profile:crowded")
-    local grid = everyday._point[4] - original._point[4] == 306 and everyday._point[5] == original._point[5]
+    local grid = everyday._point[4] - original._point[4] == 346 and everyday._point[5] == original._point[5]
         and -crowded._point[5] - -original._point[5] == 64 and crowded._point[4] == original._point[4] and original._height == 56
     s.click("page:light")
     local elsewhere = byKey(f, "profile:original") == nil and byKey(f, "test:best") == nil and not hasText(f, "In use now")
@@ -1397,7 +1441,7 @@ test("S6-1 the window is flat and 780 by 560, with the header, six page rows and
         local b = byKey(f, "page:" .. page.key)
         rows[#rows + 1] = b and b._text or "?"
     end
-    return f ~= nil and f.name == "ForeverSettingsSettings" and f.template == nil and f._width == 780 and f._height == 560
+    return f ~= nil and f.name == "ForeverSettingsSettings" and f.template == nil and f._width == 860 and f._height == 560
         and f.titleText._text == "ForeverSettings" and f.close ~= nil and scrolls == 0
         and table.concat(rows, "|") == "Home|Light and shadows|World detail|Picture size|Tests and results|About", table.concat(rows, "|")
 end)
@@ -1430,7 +1474,7 @@ test("S6-3 Light and shadows draws a card per setting of the page: tick, name, m
         and shadowsTick:GetChecked() == true and ssaoTick:GetChecked() == false
     local texts = hasText(f, "Shadow detail") and hasText(f, "matters: some") and hasText(f, "How sharp and detailed shadows look.")
     local first, last, now = byKey(f, "level:graphicsShadowQuality:0"), byKey(f, "level:graphicsShadowQuality:4"), byKey(f, "level:graphicsShadowQuality:2")
-    local levels = first ~= nil and last ~= nil and now ~= nil and first._text == "0" and last._text == "4" and first._width == 36
+    local levels = first ~= nil and last ~= nil and now ~= nil and first._text == "0" and last._text == "4" and first._width == 50
         and first._height == 22 and now.skinState.selected == true and first.skinState.selected == false
     local nowText, nowFs = costFor(f, "graphicsShadowQuality", "2")
     local costs = costFor(f, "graphicsShadowQuality", "0") == "+83 fps" and nowText == "now"
@@ -1462,7 +1506,7 @@ test("S6-4 a page is two columns of cards, three above six cards; a page with no
         return list
     end
     local two = xs()
-    local twoOk = #two == 2 and two[2] - two[1] == 306
+    local twoOk = #two == 2 and two[2] - two[1] == 346
     local e2, s2 = bootWith(fullEntry())
     injectSettings(e2, 6)                                   -- seven cards
     s2.open("world")
@@ -1476,7 +1520,7 @@ test("S6-4 a page is two columns of cards, three above six cards; a page with no
     local three = {}
     for x in pairs(seen) do three[#three + 1] = x end
     table.sort(three)
-    local threeOk = #three == 3 and three[2] - three[1] == 204 and three[3] - three[2] == 204
+    local threeOk = #three == 3 and three[2] - three[1] == 231 and three[3] - three[2] == 231
     local e3, s3 = bootWith(fullEntry())
     onlyRenderScale(e3)
     s3.open("light")

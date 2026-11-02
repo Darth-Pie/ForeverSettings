@@ -8,14 +8,14 @@ ns.settings = settings
 local GetCVar = C_CVar and C_CVar.GetCVar or _G.GetCVar
 
 local FRAME_NAME = "ForeverSettingsSettings"
-local WIDTH, HEIGHT = 780, 560
+local WIDTH, HEIGHT = 860, 560
 local REFRESH = 0.5            -- seconds of frame time between looks at what changed outside the window
 local NONE_TEXT = "None of these settings are in this client."
 
 local INTRO = "Choose how the game looks. Settings you tick are kept: the addon puts them back at every loading screen."
-local ORIGINAL_NOTE = "You're using your Original settings (hands off). Switch to Everyday or Crowded in the menu to turn these on."
+local ORIGINAL_NOTE = "You're using your Original settings (hands off). Switch to Everyday or Crowded on the Home page to turn these on."
 local MAXIMUM_NOTE = "You're using Maximum (everything at its highest). It includes the sharpest textures, which need plenty of "
-    .. "graphics memory. Switch to Everyday or Crowded in the menu to change these."
+    .. "graphics memory. Switch to Everyday or Crowded on the Home page to change these."
 local COST_NONE = "Run Find my best settings to see what each level costs."
 local MATTERS_NOTE = [["Matters to the picture" is the addon's own judgement, not something it measured.]]
 local NOTHING_TEXT = "Maximum has nothing to set yet: run Find my best settings once so the addon learns what each setting can do."
@@ -532,15 +532,22 @@ function settings.click(key)
         switchProfile(profileKey)
         return
     end
+    -- The guided test and the results window are their own windows: this one steps aside so they do not sit on top of it.
     local testKey = key:match("^test:(.+)$")
     if testKey then
-        if (testKey == "best" or testKey == "crowded") and ns.ui and ns.ui.openSaved then ns.ui.openSaved(testKey) end
+        if (testKey == "best" or testKey == "crowded") and ns.ui and ns.ui.openSaved then
+            ns.ui.openSaved(testKey)
+            settings.hide()
+        end
         return
     end
     local showKey = key:match("^show:(.+)$")                -- Show results: only for a result that is saved
     if showKey then
         local info = testsContext(nil)
-        if info.results[showKey] and ns.ui and ns.ui.openSaved then ns.ui.openSaved(showKey) end
+        if info.results[showKey] and ns.ui and ns.ui.openSaved then
+            ns.ui.openSaved(showKey)
+            settings.hide()
+        end
         return
     end
     local profile = state.tab
@@ -581,7 +588,8 @@ local AREA_X = NAV_WIDTH + 1 + PAD                 -- where the page area starts
 local AREA_W = WIDTH - 2 - AREA_X - PAD
 local PAGE_H = HEIGHT - 38                         -- the page frame: under the 36 pixel header, inside the 1 pixel border
 local CARD_GAP_X, CARD_GAP_Y = 18, 6
-local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 36, 22, 3, 14
+local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 50, 22, 3, 14
+local COST_W = LEVEL_W + 8                         -- the cost under a level button is a little wider than the button: "+136 fps"
 local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26
 local SUMMARY_GAP = 6
 local TAB_W = 120
@@ -725,9 +733,9 @@ local function build()
     end)
     -- The second line under a level button: what that level costs against the level held.
     p.costs = newPool(area, function(parent)
-        local fs = skin.text(parent, "small", "dim", LEVEL_W)
+        local fs = skin.text(parent, "small", "dim", COST_W)
         fs:SetJustifyH("CENTER")
-        fs:SetWordWrap(false)                 -- "+136 fps" is wider than the 36 pixel column: it overhangs, it never wraps
+        fs:SetWordWrap(false)                 -- never wraps: a figure wider than its column would otherwise break onto a second line
         return fs
     end)
 
@@ -897,7 +905,7 @@ function settings.render()
                 cost:SetText(level.cost)
                 cost:SetTextColor(skin.color(level.cost == "now" and "accentLight" or "dim"))
                 cost:ClearAllPoints()
-                cost:SetPoint("TOPLEFT", p.area, "TOPLEFT", bx, -(by + LEVEL_H + 2))
+                cost:SetPoint("TOPLEFT", p.area, "TOPLEFT", bx - (COST_W - LEVEL_W) / 2, -(by + LEVEL_H + 2))
             end
         end
         return (levelsTop - top) + math.ceil(#row.levels / perRow) * lineH
