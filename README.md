@@ -31,10 +31,18 @@ An addon for **WoW Forever**.
 
 ## See the price of every level
 
-**My settings** (minimap menu, or `/fset settings`) has a page list on the left. The settings pages list every setting with what each level costs in frames per second against the level you have, how much it matters to the picture, a total for your choices, and what everything at the highest would give. **Save as Everyday** and **Save as Crowded**, at the bottom of the page list, keep the settings you have in the game now. A Picture size page has a slider for picture sharpness, up to 200% for this session.
+**My settings** (minimap menu, or `/fset settings`) has a page list on the left. The settings pages list every setting with what each level costs in frames per second against the level you have, how much it matters to the picture, a total for your choices, and what everything at the highest would give. **Save as Everyday** and **Save as Crowded**, at the bottom of the page list, keep the settings you have in the game now.
 
 <p align="center">
-  <img src=".previews/minimap-menu.png" alt="The minimap menu with the four profiles" width="300">
+  <img src=".previews/my-settings.png" alt="My settings, Light and shadows page: Shadow detail, Soft corner shadows and Extra effects detail, with the fps cost under each level" width="720">
+</p>
+
+The **Home** page switches profile and starts the tests. The **Picture size** page has a slider for picture sharpness, up to 200% for this session only, with a warning that high values can crash some graphics cards.
+
+<p align="center">
+  <img src=".previews/home.png" alt="My settings, Home page: the four profiles and the two test buttons" width="355">
+  &nbsp;&nbsp;
+  <img src=".previews/picture-size.png" alt="My settings, Picture size page: the picture sharpness slider" width="355">
 </p>
 
 ## Profiles
@@ -47,6 +55,10 @@ An addon for **WoW Forever**.
 | **Maximum** | Everything at the highest level the addon has learned. It needs plenty of graphics memory. |
 
 Switch from the minimap button, or type `/fset profile everyday` (also `crowded`, `maximum`, `original`).
+
+<p align="center">
+  <img src=".previews/minimap-menu.png" alt="The minimap menu with the four profiles" width="300">
+</p>
 
 ## Good to know
 
