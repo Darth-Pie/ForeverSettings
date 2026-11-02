@@ -947,6 +947,15 @@ skin-nav-hover|test_skin|SK-6|killed
 skin-nav-pressed|test_skin|SK-6|killed
 skin-nav-bar-width|test_skin|SK-6|killed
 skin-nav-select-unpainted|test_skin|SK-6|killed
+dynamic-never-on|test_settings|S7-2|killed
+dynamic-zero-is-on|test_settings|S7-2|killed
+dynamic-absent-shown|test_settings|S7-2|killed
+dynamic-line-missing|test_settings|S7-1|killed
+dynamic-text-swapped|test_settings|S7-1|killed
+dynamic-on-text|test_settings|S7-1|killed
+dynamic-every-page|test_settings|S7-2|killed
+dynamic-line-not-placed|test_settings|S7-2|killed
+dynamic-colour-swapped|test_settings|S7-2|killed
 hub-window-size|test_settings|S6-1|killed
 hub-nav-click-missing|test_settings|S6-2|killed
 hub-nav-gap|test_settings|S6-2|killed

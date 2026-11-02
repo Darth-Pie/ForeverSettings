@@ -1577,6 +1577,18 @@ end`],
   'hub-footer-margin': ['Settings.lua', `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)`, `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + 4), 9)`],
   'hub-footer-use-width': ['Settings.lua', `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26`, `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 180, 160, 26`],
 
+  // The Picture size page: dynamic render scale
+  'dynamic-never-on': ['Settings.lua', `return { on = n ~= nil and n ~= 0 }`, `return { on = false }`],
+  'dynamic-zero-is-on': ['Settings.lua', `return { on = n ~= nil and n ~= 0 }`, `return { on = n ~= nil }`],
+  'dynamic-absent-shown': ['Settings.lua', `    if raw == nil then return nil end
+    local n = tonumber(raw)`, `    local n = tonumber(raw)`],
+  'dynamic-line-missing': ['Settings.lua', `if ctx.dynamicScale then view.dynamicLine =`, `if false then view.dynamicLine =`],
+  'dynamic-text-swapped': ['Settings.lua', `ctx.dynamicScale.on and DYNAMIC_ON or DYNAMIC_OFF`, `ctx.dynamicScale.on and DYNAMIC_OFF or DYNAMIC_ON`],
+  'dynamic-on-text': ['Settings.lua', `which spoils a test. Turn it off`, `which spoils tests. Turn it off`],
+  'dynamic-every-page': ['Settings.lua', `if view.page == "size" and view.dynamicLine then`, `if view.dynamicLine then`],
+  'dynamic-line-not-placed': ['Settings.lua', `        placeText(p.dynamicLine, view.dynamicLine)`, `        hideText(p.dynamicLine)`],
+  'dynamic-colour-swapped': ['Settings.lua', `ctx.dynamicScale.on and "warning" or "dim"`, `ctx.dynamicScale.on and "dim" or "warning"`],
+
   // The pages of the hub window
   'page-order-wrong': ['Settings.lua', `{ key = "light", text = "Light and shadows" }, { key = "world", text = "World detail" },`, `{ key = "world", text = "World detail" }, { key = "light", text = "Light and shadows" },`],
   'page-text-wrong': ['Settings.lua', `{ key = "size", text = "Picture size" }`, `{ key = "size", text = "Picture sizes" }`],

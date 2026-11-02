@@ -26,6 +26,8 @@ local SIZE_SLIDER_WIDTH, SIZE_BACK_WIDTH = 360, 140      -- pixels: the slider a
 local SIZE_NOTE = "Not saved: the game goes back to your normal setting when you log out."
 local SIZE_WARNING = "Above 100% the game draws more pixels than your screen has. That can cost a lot of frame rate and graphics memory, "
     .. "and some graphics cards crash at high values."
+local DYNAMIC_OFF = "Dynamic render scale is off."
+local DYNAMIC_ON = "Dynamic render scale is on. It changes the picture size by itself, which spoils a test. Turn it off in the game's graphics menu."
 local YOUR_TAIL = " (an estimate; settings affect each other)."
 local NOT_COUNTED = "the test didn't measure the level you chose."
 local LOCKED_TEXT = {
@@ -226,6 +228,8 @@ function settings.model(st, ctx)
             warning = size.percent > 100 and SIZE_WARNING or nil, enabled = locked == nil,
             canPutBack = (size.boosted and locked == nil) and true or false }
     end
+    -- Whether the game's dynamic render scale is on (it resizes the picture by itself and spoils a test); nil when the client lacks it.
+    if ctx.dynamicScale then view.dynamicLine = ctx.dynamicScale.on and DYNAMIC_ON or DYNAMIC_OFF end
     view.buttons[#view.buttons + 1] = { key = "use", text = USE_TEXT, enabled = locked == nil }
     if ctx.active ~= "maximum" then
         view.buttons[#view.buttons + 1] = { key = "maximum", text = MAXIMUM_TEXT, enabled = locked == nil }
@@ -320,6 +324,14 @@ local function sizeContext()
         before = before and math.floor(before * 100 + 0.5) or nil }
 end
 
+-- Whether the game's dynamic render scale (CVar dynamicRenderScale) is on, for the Picture size page; nil when the client lacks it.
+local function dynamicContext()
+    local raw = GetCVar("dynamicRenderScale")
+    if raw == nil then return nil end
+    local n = tonumber(raw)
+    return { on = n ~= nil and n ~= 0 }
+end
+
 -- The live facts the model needs; the costs only for a draw (they are not part of what the refresh looks at).
 local function context(withCosts)
     local db = ns.profiles and ns.profiles.state()
@@ -330,6 +342,7 @@ local function context(withCosts)
     local ctx = {
         active = db and db.active or "original", saved = saved, live = function(cvar) return GetCVar(cvar) end,
         resolved = ns.bench and ns.bench.resolve() or {}, locked = lockReason(), size = sizeContext(),
+        dynamicScale = dynamicContext(),
     }
     if withCosts then ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab) end
     return ctx
@@ -622,6 +635,7 @@ local function build()
     p.sizeBack:SetScript("OnClick", clicked)
     p.sizeWarn = skin.text(area, "small", "warning", AREA_W)
     p.sizeNote = skin.text(area, "small", "dim", AREA_W)
+    p.dynamicLine = skin.text(area, "small", "dim", AREA_W)
 
     -- The summary block above the footer, and the footer strip.
     p.your = skin.text(page, "small", "text", AREA_W)
@@ -808,6 +822,12 @@ function settings.render()
         hideText(p.sizeLabel)
         hideText(p.sizeWarn)
         hideText(p.sizeNote)
+    end
+    if view.page == "size" and view.dynamicLine then
+        p.dynamicLine:SetTextColor(skin.color(ctx.dynamicScale.on and "warning" or "dim"))
+        placeText(p.dynamicLine, view.dynamicLine)
+    else
+        hideText(p.dynamicLine)
     end
 
     -- The summary block, stacked up from the footer: the matters note, the total, then the line on this tab's levels.

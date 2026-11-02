@@ -1051,6 +1051,45 @@ test("S4-9 on the Picture size page the block stands under the card: the label o
     return ok, tostring(ok)
 end)
 
+-- The Picture size page and dynamic render scale (spec 2026-11-02-flat-hub-window-design.md section 5).
+local DYNAMIC_OFF = "Dynamic render scale is off."
+local DYNAMIC_ON = "Dynamic render scale is on. It changes the picture size by itself, which spoils a test. Turn it off in the game's graphics menu."
+
+test("S7-1 the model words the dynamic render scale line for both states and says nothing without the setting", function()
+    local e, s = boot()
+    local function line(dynamic) return s.model({ tab = "everyday" }, ctxOf(e, { dynamicScale = dynamic })).dynamicLine end
+    return line({ on = false }) == DYNAMIC_OFF and line({ on = true }) == DYNAMIC_ON and line(nil) == nil, tostring(line({ on = true }))
+end)
+
+test("S7-2 the Picture size page has the sharpness card, the slider block and the dynamic render scale line, read from the game; other pages do not show it", function()
+    local e, s = bootWith(fullEntry())
+    CVARS.dynamicRenderScale = "0"
+    s.open("size")
+    local f = window()
+    local page = byKey(f, "level:RenderScale:1") ~= nil and byKey(f, "size") ~= nil and byKey(f, "sizeback") ~= nil
+        and hasText(f, "Picture sharpness") and hasText(f, "Picture sharpness right now: 100%")
+    local warnR, warnG, warnB = e.ns.skin.color("warning")
+    local dimR, dimG, dimB = e.ns.skin.color("dim")
+    local offFs = fontStringWith(f, DYNAMIC_OFF)
+    local off = hasText(f, DYNAMIC_OFF) and not hasText(f, DYNAMIC_ON) and offFs._textColor[1] == dimR and offFs._textColor[2] == dimG
+        and offFs._textColor[3] == dimB
+    CVARS.dynamicRenderScale = "1"
+    s.open("size")
+    local onFs = fontStringWith(f, DYNAMIC_ON)
+    local on = hasText(f, DYNAMIC_ON) and not hasText(f, DYNAMIC_OFF) and onFs._textColor[1] == warnR and onFs._textColor[2] == warnG
+        and onFs._textColor[3] == warnB
+    CVARS.dynamicRenderScale = "2"
+    s.open("size")
+    local anyNumber = hasText(f, DYNAMIC_ON)
+    s.open("light")
+    local elsewhere = not hasText(f, DYNAMIC_ON) and not hasText(f, DYNAMIC_OFF)
+    local e2, s2 = bootWith(fullEntry())                        -- a client without the setting
+    s2.open("size")
+    local absent = not hasText(window(), "Dynamic render scale")
+    return page and off and on and anyNumber and elsewhere and absent, tostring(page) .. tostring(off) .. tostring(on) .. tostring(anyNumber)
+        .. tostring(elsewhere) .. tostring(absent)
+end)
+
 -- The pages of the hub window (spec 2026-11-02-flat-hub-window-design.md H5 and section 6).
 test("S5-1 the pages and their order; the model lists them with the current one selected, Home when none is chosen", function()
     local e, s = boot()
