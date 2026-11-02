@@ -1575,6 +1575,37 @@ end`],
   'hub-level-tip-short': ['Settings.lua', `button.tip = level.text`, `button.tip = level.short`],
   'hub-level-unmarked': ['Settings.lua', `button:SetSelected(level.selected)`, `button:SetSelected(false)`],
   'hub-level-never-greyed': ['Settings.lua', `button:SetEnabled(row.enabled)`, `button:SetEnabled(true)`],
+  // Save as Everyday / Save as Crowded at the bottom of the page list (owner request 2026-11-02)
+  'saveas-caption-text': ['Settings.lua', `local SAVE_CAPTION = "Save the game's current settings as:"`, `local SAVE_CAPTION = "Save the game's current settings as"`],
+  'saveas-model-label': ['Settings.lua', `text = "Save as " .. TAB_TEXT[key], enabled = locked == nil }`, `text = TAB_TEXT[key], enabled = locked == nil }`],
+  'saveas-model-never-greyed': ['Settings.lua', `text = "Save as " .. TAB_TEXT[key], enabled = locked == nil }`, `text = "Save as " .. TAB_TEXT[key], enabled = true }`],
+  'saveas-button-label': ['Settings.lua', `skin.button(page, "Save as " .. TAB_TEXT[key], SAVE_W, SAVE_H)`, `skin.button(page, TAB_TEXT[key], SAVE_W, SAVE_H)`],
+  'saveas-frame-never-greyed': ['Settings.lua', `p.saveButtons[i]:SetEnabled(spec.enabled)`, `p.saveButtons[i]:SetEnabled(true)`],
+  'saveas-key': ['Settings.lua', `button.key = "save:" .. key`, `button.key = "saveas:" .. key`],
+  'saveas-width': ['Settings.lua', `local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6`, `local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 12, 28, 6`],
+  'saveas-height': ['Settings.lua', `local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6`, `local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 24, 6`],
+  'saveas-gap': ['Settings.lua', `local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6`, `local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 10`],
+  'saveas-order': ['Settings.lua', `12 + (#TABS - i) * (SAVE_H + SAVE_GAP)`, `12 + (i - 1) * (SAVE_H + SAVE_GAP)`],
+  'saveas-anchor': ['Settings.lua', `button:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, 12 + (#TABS - i)`, `button:SetPoint("TOPLEFT", page, "BOTTOMLEFT", SAVE_X, 12 + (#TABS - i)`],
+  'saveas-click-missing': ['Settings.lua', `        button.key = "save:" .. key
+        button:SetScript("OnClick", clicked)`, `        button.key = "save:" .. key`],
+  'saveas-saves-to-tab': ['Settings.lua', `local count = ns.profiles.save(saveKey, true)`, `local count = ns.profiles.save(state.tab, true)`],
+  'saveas-loud': ['Settings.lua', `local count = ns.profiles.save(saveKey, true)`, `local count = ns.profiles.save(saveKey)`],
+  'saveas-message-period': ['Settings.lua', `" as " .. TAB_TEXT[saveKey] .. "." end`, `" as " .. TAB_TEXT[saveKey] end`],
+  'saveas-message-profile': ['Settings.lua', `" as " .. TAB_TEXT[saveKey] .. "." end`, `" as " .. TAB_TEXT[state.tab] .. "." end`],
+  'saveas-note-missing': ['Settings.lua', `    if view.saveBar.note then`, `    if false then`],
+  'saveas-note-sticky': ['Settings.lua', `    state.saved = nil                        -- so is what a save button said`, `    local _ = state.saved`],
+  'saveas-caption-stays': ['Settings.lua', `        p.saveNote:Show()
+        p.saveCaption:Hide()`, `        p.saveNote:Show()
+        p.saveCaption:Show()`],
+  'saveas-note-stays': ['Settings.lua', `        p.saveCaption:Show()
+        p.saveNote:Hide()`, `        p.saveCaption:Show()
+        p.saveNote:Show()`],
+  'saveas-caption-y': ['Settings.lua', `p.saveCaption:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, captionY)`, `p.saveCaption:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, 12)`],
+  'saveas-caption-covers': ['Settings.lua', `local captionY = 12 + #TABS * (SAVE_H + SAVE_GAP)`, `local captionY = 12 + (#TABS - 1) * (SAVE_H + SAVE_GAP)`],
+  'saveas-locked-saves': ['Settings.lua', `    if ctx.locked then
+        if key == "maximum" then draw() end`, `    if ctx.locked and not key:find("^save:") then
+        if key == "maximum" then draw() end`],
   'hub-level-key': ['Settings.lua', `button.key = "level:" .. row.cvar .. ":" .. level.value`, `button.key = "level:" .. row.cvar .. ":0"`],
   'hub-cost-now-colour': ['Settings.lua', `level.cost == "now" and "accentLight" or "dim"`, `"dim"`],
   'hub-two-columns-only': ['Settings.lua', `        local columns = settings.columnsFor(#rows)`, `        local columns = 2`],

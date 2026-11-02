@@ -1128,6 +1128,94 @@ test("S8-6 a test or result button hides the hub window so the window it opens d
     return test and show and stays, tostring(test) .. tostring(show) .. tostring(stays)
 end)
 
+-- Save as Everyday and Save as Crowded at the bottom of the page list (owner request 2026-11-02, spec H12).
+local SAVE_CAPTION = "Save the game's current settings as:"
+local function managedPresent(e)
+    local n = 0
+    for _, cvar in ipairs(e.ns.profiles.MANAGED) do
+        if CVARS[cvar] ~= nil then n = n + 1 end
+    end
+    return n
+end
+local function savedLine(n, name) return "Saved " .. n .. (n == 1 and " setting" or " settings") .. " as " .. name .. "." end
+
+test("S10-1 the page list ends with a caption and two buttons, Save as Everyday over Save as Crowded, on every page", function()
+    local e, s = bootWith(fullEntry())
+    local bad = {}
+    for _, page in ipairs({ "home", "light", "world", "size", "tests", "about" }) do
+        s.open(page)
+        local f = window()
+        local everyday, crowded = byKey(f, "save:everyday"), byKey(f, "save:crowded")
+        local good = everyday ~= nil and crowded ~= nil and everyday._text == "Save as Everyday" and crowded._text == "Save as Crowded"
+            and everyday._width == 126 and crowded._width == 126 and everyday._height == 28 and crowded._height == 28
+            and crowded._point[1] == "BOTTOMLEFT" and crowded._point[4] == 12 and crowded._point[5] == 12
+            and everyday._point[1] == "BOTTOMLEFT" and everyday._point[4] == 12 and everyday._point[5] == 46
+            and everyday.label._justifyH == "CENTER" and everyday.label._justifyV == "MIDDLE"
+            and crowded.label._justifyH == "CENTER" and crowded.label._justifyV == "MIDDLE" and hasText(f, SAVE_CAPTION)
+        if not good then bad[#bad + 1] = page end
+    end
+    local caption = fontStringWith(window(), SAVE_CAPTION)
+    local above = caption ~= nil and caption._point[1] == "BOTTOMLEFT" and caption._point[4] == 12 and caption._point[5] >= 46 + 28
+    return #bad == 0 and above, table.concat(bad, ",") .. tostring(above)
+end)
+
+test("S10-2 a save button keeps the game's current settings in that profile and says so beside the buttons, silently; a boosted sharpness is saved as it was", function()
+    local e, s, db = bootWith(fullEntry())
+    local n = managedPresent(e)
+    s.open("home")
+    CVARS.graphicsShadowQuality = "3"
+    OUT = {}
+    byKey(window(), "save:everyday"):Click()
+    local everyday = db.profiles.everyday.values.graphicsShadowQuality == "3" and hasText(window(), savedLine(n, "Everyday"))
+        and not hasText(window(), SAVE_CAPTION) and #OUT == 0
+    CVARS.graphicsShadowQuality = "1"
+    byKey(window(), "save:crowded"):Click()
+    local crowded = db.profiles.crowded.values.graphicsShadowQuality == "1" and hasText(window(), savedLine(n, "Crowded"))
+        and not hasText(window(), "as Everyday.") and db.profiles.everyday.values.graphicsShadowQuality == "3" and #OUT == 0
+    s.open("size")
+    drag(window(), 150)
+    byKey(window(), "save:crowded"):Click()
+    local boosted = db.profiles.crowded.values.RenderScale == "1" and CVARS.RenderScale == "1.5"
+    s.click("page:light")
+    local gone = not hasText(window(), "Saved " .. n) and hasText(window(), SAVE_CAPTION)
+    return everyday and crowded and boosted and gone, tostring(everyday) .. tostring(crowded) .. tostring(boosted) .. tostring(gone)
+end)
+
+test("S10-3 in combat the save buttons are greyed and a click saves nothing; an unknown save key does nothing", function()
+    local e, s, db = bootWith(fullEntry())
+    s.open("light")
+    local beforeE, beforeC = db.profiles.everyday.values.graphicsShadowQuality, db.profiles.crowded.values.graphicsShadowQuality
+    COMBAT = true
+    CVARS.graphicsShadowQuality = "4"
+    s.open("light")
+    local f = window()
+    local greyed = byKey(f, "save:everyday").enabled == false and byKey(f, "save:crowded").enabled == false
+    s.click("save:everyday")
+    s.click("save:crowded")
+    COMBAT = false
+    local quiet = db.profiles.everyday.values.graphicsShadowQuality == beforeE and db.profiles.crowded.values.graphicsShadowQuality == beforeC
+        and not hasText(window(), "Saved ")
+    s.click("save:maximum")
+    s.click("save:nosuchprofile")
+    local unknown = not hasText(window(), "Saved ") and db.profiles.maximum == nil and db.profiles.nosuchprofile == nil
+    return greyed and quiet and unknown, tostring(greyed) .. tostring(quiet) .. tostring(unknown)
+end)
+
+test("S10-4 the model offers the two save buttons on every page, greyed when locked, with the confirmation the last click left", function()
+    local e, s = boot()
+    local function bar(st, locked) return s.model(st, ctxOf(e, { locked = locked })).saveBar end
+    local plain = bar({ tab = "everyday", page = "home" })
+    local locked = bar({ tab = "everyday", page = "about" }, "combat")
+    local busy = bar({ tab = "crowded", page = "size" }, "busy")
+    local said = bar({ tab = "everyday", page = "light", saved = "Saved 3 settings as Crowded." })
+    return plain ~= nil and plain.caption == SAVE_CAPTION and #plain.buttons == 2 and plain.note == nil
+        and plain.buttons[1].key == "save:everyday" and plain.buttons[1].text == "Save as Everyday" and plain.buttons[1].enabled == true
+        and plain.buttons[2].key == "save:crowded" and plain.buttons[2].text == "Save as Crowded" and plain.buttons[2].enabled == true
+        and locked.buttons[1].enabled == false and locked.buttons[2].enabled == false
+        and busy.buttons[1].enabled == false and busy.buttons[2].enabled == false
+        and said.note == "Saved 3 settings as Crowded." and said.buttons[1].enabled == true, tostring(plain and plain.caption)
+end)
+
 -- The Home page (spec 2026-11-02-flat-hub-window-design.md section 5).
 test("S8-5 a Home profile click says what the game refused, or that the profile holds nothing, in the banner and not in chat", function()
     local e, s, db = bootWith(fullEntry())

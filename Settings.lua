@@ -36,6 +36,7 @@ local LOCKED_TEXT = {
 }
 local TABS = { "everyday", "crowded" }
 local TAB_TEXT = { everyday = "Everyday", crowded = "Crowded" }
+local SAVE_CAPTION = "Save the game's current settings as:"
 local PROFILE_KEYS = { "original", "everyday", "crowded", "maximum" }
 local TESTS_INTRO = "The test measures what each graphics setting costs on this PC. Run it in a quiet spot first, then in a busy place."
 local ABOUT_LINES = {
@@ -179,6 +180,11 @@ function settings.model(st, ctx)
     end
     if locked then view.locked = LOCKED_TEXT[locked] end
     view.refusal = st.notice
+    -- The two save buttons at the bottom of the page list, on every page; `st.saved` is what the last click said, shown once.
+    view.saveBar = { caption = SAVE_CAPTION, note = st.saved, buttons = {} }
+    for _, key in ipairs(TABS) do
+        view.saveBar.buttons[#view.saveBar.buttons + 1] = { key = "save:" .. key, text = "Save as " .. TAB_TEXT[key], enabled = locked == nil }
+    end
     -- A test whose costs there is nothing to read from (a run that measured nothing) is no test here.
     local costs = ctx.costs
     if costs and not (costs.fps and next(costs.fps.byCvar or {}) ~= nil) then costs = nil end
@@ -550,6 +556,14 @@ function settings.click(key)
         end
         return
     end
+    -- Save as Everyday / Save as Crowded: keeps the game's current settings in that profile, whatever page or tab is showing.
+    local saveKey = key:match("^save:(.+)$")
+    if saveKey then                          -- Original, Maximum and a name that is no profile are refused by save, quietly
+        local count = ns.profiles.save(saveKey, true)
+        if count then state.saved = "Saved " .. plural(count, "setting") .. " as " .. TAB_TEXT[saveKey] .. "." end
+        draw()
+        return
+    end
     local profile = state.tab
     if key == "use" then
         ns.profiles.save(profile, true)
@@ -593,6 +607,7 @@ local COST_W = LEVEL_W + 8                         -- the cost under a level but
 local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26
 local SUMMARY_GAP = 6
 local TAB_W = 120
+local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6       -- the save buttons at the bottom of the page list
 local HOME_CARD_W, HOME_CARD_H = math.floor((AREA_W - CARD_GAP_X) / 2), 56
 local HOME_TESTS_NOTE = "A highlighted button has a saved result."
 local SETTINGS_PAGE = { light = true, world = true, size = true }
@@ -687,6 +702,21 @@ local function build()
         item:SetScript("OnClick", clicked)
         p.nav[i] = item
     end
+    -- Under the page list, the last thing in it: Save as Everyday over Save as Crowded, with a line above them (or, for one
+    -- draw after a click, what was saved).
+    p.saveButtons = {}
+    for i, key in ipairs(TABS) do
+        local button = skin.button(page, "Save as " .. TAB_TEXT[key], SAVE_W, SAVE_H)
+        button.key = "save:" .. key
+        button:SetScript("OnClick", clicked)
+        button:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, 12 + (#TABS - i) * (SAVE_H + SAVE_GAP))
+        p.saveButtons[i] = button
+    end
+    local captionY = 12 + #TABS * (SAVE_H + SAVE_GAP)
+    p.saveCaption = skin.text(page, "small", "dim", SAVE_W)
+    p.saveCaption:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, captionY)
+    p.saveNote = skin.text(page, "small", "accentLight", SAVE_W)
+    p.saveNote:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, captionY)
     local rule = page:CreateTexture(nil, "BORDER")
     rule:SetColorTexture(skin.color("divider"))
     rule:SetWidth(1)
@@ -821,6 +851,7 @@ function settings.render()
     local ctx = context(true)
     local view = settings.model(state, ctx)
     state.notice = nil                       -- a refusal is shown once: until the next click or redraw
+    state.saved = nil                        -- so is what a save button said
     lastSignature = signature(ctx)
     local onSettings = SETTINGS_PAGE[view.page] == true
 
@@ -831,6 +862,16 @@ function settings.render()
         if entry.selected then title = entry.text end
     end
     p.title:SetText(title)
+    for i, spec in ipairs(view.saveBar.buttons) do p.saveButtons[i]:SetEnabled(spec.enabled) end
+    if view.saveBar.note then
+        p.saveNote:SetText(view.saveBar.note)
+        p.saveNote:Show()
+        p.saveCaption:Hide()
+    else
+        p.saveCaption:SetText(view.saveBar.caption)
+        p.saveCaption:Show()
+        p.saveNote:Hide()
+    end
     for i, tab in ipairs(view.tabs) do
         local button = p.tabs[i]
         button:SetLabel(tab.text)
