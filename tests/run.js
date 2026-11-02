@@ -1406,7 +1406,7 @@ end`],
   'settings-max-total-truncates': ['Settings.lua', `string.format("Everything at the highest: about %.0f fps.", max.fps)`, `"Everything at the highest: about " .. math.floor(max.fps) .. " fps."`],
   'settings-max-button-in-use': ['Settings.lua', `    if ctx.active ~= "maximum" then`, `    if true then`],
   'settings-max-button-in-combat': ['Settings.lua', `{ key = "maximum", text = MAXIMUM_TEXT, enabled = locked == nil }`, `{ key = "maximum", text = MAXIMUM_TEXT, enabled = true }`],
-  'settings-max-click-not-silent': ['Settings.lua', `ns.profiles.switch("maximum", true)`, `ns.profiles.switch("maximum")`],
+  'settings-max-click-not-silent': ['Settings.lua', `local ok, info = ns.profiles.switch(name, true)`, `local ok, info = ns.profiles.switch(name)`],
   'settings-max-click-locked-writes': ['Settings.lua', `    if ctx.locked then
         if key == "maximum" then draw() end`, `    if ctx.locked and key ~= "maximum" then
         if key == "maximum" then draw() end`],
@@ -1448,7 +1448,7 @@ end`],
   'settings-max-matters-over-total': ['Settings.lua', `        bottom = bottom + heightOf(fs, str) + 2`, `        bottom = bottom + 2`],
   'settings-max-footer-overlap': ['Settings.lua', `-(PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0))`, `-(PAD + (hasMaximum and 0 or 0))`],
   'settings-max-matters-line-missing': ['Settings.lua', `            worth:SetText("matters: " .. row.mattersWords)`, `            worth:SetText("")`],
-  'settings-max-cost-note-missing': ['Settings.lua', `    if onSettings then placeText(p.costNote, view.costNote) else hideText(p.costNote) end`, `    hideText(p.costNote)`],
+  'settings-max-cost-note-missing': ['Settings.lua', `    if onSettings or view.page == "home" then placeText(p.costNote, view.costNote) else hideText(p.costNote) end`, `    hideText(p.costNote)`],
   'settings-max-costs-not-released': ['Settings.lua', `    release(p.costs, true)`, `    local _ = p.costs`],
   'settings-max-button-not-hidden': ['Settings.lua', `        if hasMaximum then p.maximum:Show() else p.maximum:Hide() end`, `        p.maximum:Show()`],
 
@@ -1576,6 +1576,41 @@ end`],
   'hub-maximum-never-greyed': ['Settings.lua', `p.maximum:SetEnabled(button.enabled)`, `p.maximum:SetEnabled(true)`],
   'hub-footer-margin': ['Settings.lua', `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)`, `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + 4), 9)`],
   'hub-footer-use-width': ['Settings.lua', `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26`, `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 180, 160, 26`],
+
+  // The Home page
+  'home-inuse-label': ['Settings.lua', `labels[ctx.active] or tostring(ctx.active)`, `tostring(ctx.active)`],
+  'home-card-split': ['Settings.lua', `full:match("^([^:]+):%s*(.+)$")`, `full:match("^(.+)$")`],
+  'home-max-fps-missing': ['Settings.lua', `if key == "maximum" and type(home.maxFps) == "number" then`, `if false then`],
+  'home-max-fps-wrong-card': ['Settings.lua', `if key == "maximum" and type(home.maxFps) == "number" then`, `if key == "crowded" and type(home.maxFps) == "number" then`],
+  'home-card-unmarked': ['Settings.lua', `selected = ctx.active == key,
+            enabled = locked == nil }`, `selected = false,
+            enabled = locked == nil }`],
+  'home-card-never-greyed': ['Settings.lua', `selected = ctx.active == key,
+            enabled = locked == nil }`, `selected = ctx.active == key,
+            enabled = true }`],
+  'home-test-never-done': ['Settings.lua', `done = saved.best == true`, `done = false`],
+  'home-test-crowded-done': ['Settings.lua', `done = saved.crowded == true`, `done = saved.best == true`],
+  'home-test-never-greyed': ['Settings.lua', `{ key = "best", text = "Find my best settings", enabled = locked == nil,`, `{ key = "best", text = "Find my best settings", enabled = true,`],
+  'home-click-profile-missing': ['Settings.lua', `        switchProfile(profileKey)
+        return`, `        local _ = profileKey
+        return`],
+  'home-click-test-wrong-kind': ['Settings.lua', `ns.ui.openSaved(testKey)`, `ns.ui.openSaved("best")`],
+  'home-click-test-any-key': ['Settings.lua', `if (testKey == "best" or testKey == "crowded") and ns.ui and ns.ui.openSaved then`, `if ns.ui and ns.ui.openSaved then`],
+  'home-no-redraw-after-switch': ['Settings.lua', `    draw()
+end
+
+-- Shows the window on a page`, `end
+
+-- Shows the window on a page`],
+  'home-inuse-text': ['Settings.lua', `"In use now: " .. view.home.inUse`, `"In use: " .. view.home.inUse`],
+  'home-card-columns': ['Settings.lua', `col * (HOME_CARD_W + CARD_GAP_X)`, `col * HOME_CARD_W`],
+  'home-card-height': ['Settings.lua', `math.floor((AREA_W - CARD_GAP_X) / 2), 56`, `math.floor((AREA_W - CARD_GAP_X) / 2), 50`],
+  'home-tests-note-missing': ['Settings.lua', `        placeText(p.testsNote, HOME_TESTS_NOTE)`, `        hideText(p.testsNote)`],
+  'home-cards-not-hidden': ['Settings.lua', `        for _, card in ipairs(p.profileCards) do card:Hide() end`, `        local _ = p.profileCards`],
+  'home-tests-not-hidden': ['Settings.lua', `        for _, button in ipairs(p.testButtons) do button:Hide() end`, `        local _ = p.testButtons`],
+  'home-cost-note-missing': ['Settings.lua', `if onSettings or view.page == "home" then placeText(p.costNote`, `if onSettings then placeText(p.costNote`],
+  'home-context-missing': ['Settings.lua', `        ctx.home = homeContext()`, `        local _ = homeContext`],
+  'home-context-unguarded': ['Settings.lua', `local ok, home = pcall(ns.ui.buildContext)`, `local ok, home = true, ns.ui.buildContext()`],
 
   // The Picture size page: dynamic render scale
   'dynamic-never-on': ['Settings.lua', `return { on = n ~= nil and n ~= 0 }`, `return { on = false }`],

@@ -1051,6 +1051,99 @@ test("S4-9 on the Picture size page the block stands under the card: the label o
     return ok, tostring(ok)
 end)
 
+-- The Home page (spec 2026-11-02-flat-hub-window-design.md section 5).
+test("S8-1 Home names the profile in use and shows four profile cards with their notes, centred, the one in use marked, and the test the costs come from", function()
+    local e, s = bootWith(fullEntry())
+    s.open("home")
+    local f = window()
+    local want = { original = { "Original", "my own settings, hands off" }, everyday = { "Everyday", "normal play" },
+        crowded = { "Crowded", "raids and busy cities" }, maximum = { "Maximum", "everything at its highest" } }
+    local ok = hasText(f, "In use now: Everyday") and hasText(f, COST_QUIET)
+    local bad = {}
+    for key, pair in pairs(want) do
+        local card = byKey(f, "profile:" .. key)
+        local good = card ~= nil and card._text == pair[1] and card.note ~= nil and card.note._text:find(pair[2], 1, true) ~= nil
+            and card._width == 288 and card.label._point[1] == "CENTER" and card.label._justifyH == "CENTER" and card.note._justifyH == "CENTER"
+        if not good then bad[#bad + 1] = key end
+    end
+    ok = ok and #bad == 0 and byKey(f, "profile:everyday").skinState.selected == true and byKey(f, "profile:crowded").skinState.selected == false
+        and byKey(f, "tab:everyday") == nil and byKey(f, "use") == nil and not hasText(f, "Everything at the highest")
+    -- two by two: 306 pixels between the columns, 64 between the rows, each 56 tall
+    local original, everyday, crowded = byKey(f, "profile:original"), byKey(f, "profile:everyday"), byKey(f, "profile:crowded")
+    local grid = everyday._point[4] - original._point[4] == 306 and everyday._point[5] == original._point[5]
+        and -crowded._point[5] - -original._point[5] == 64 and crowded._point[4] == original._point[4] and original._height == 56
+    s.click("page:light")
+    local elsewhere = byKey(f, "profile:original") == nil and byKey(f, "test:best") == nil and not hasText(f, "In use now")
+    return ok and grid and elsewhere, table.concat(bad, ",") .. tostring(ok) .. tostring(grid) .. tostring(elsewhere)
+end)
+
+test("S8-2 Maximum shows about N fps only when the test measured it; with nothing to set a click says why in the banner", function()
+    local e, s = bootWith(fullEntry())
+    e.ns.ui.buildContext = function() return { saved = {}, maxFps = 151.5 } end
+    s.open("home")
+    local fps = byKey(window(), "profile:maximum").note._text == "everything at its highest (about 152 fps)"
+    e.ns.ui.buildContext = function() return { saved = {} } end
+    s.open("home")
+    local none = byKey(window(), "profile:maximum").note._text == "everything at its highest"
+    e.ns.ui.buildContext = function() error("boom") end        -- the menu's facts cannot be read: the page still draws, silently
+    OUT = {}
+    s.open("home")
+    local guarded = byKey(window(), "profile:maximum") ~= nil and byKey(window(), "profile:maximum").note._text == "everything at its highest"
+        and #OUT == 0
+    local e2 = H.boot({ graphicsShadowQuality = "2", graphicsSSAO = "1", vsync = "0" }, { fresh = true })     -- no levels learned here
+    local s2, db2 = e2.ns.settings, e2.ns.profiles.state()
+    local before = db2.active
+    s2.open("home")
+    SETLOG, OUT = {}, {}
+    s2.click("profile:maximum")
+    local refused = hasText(window(), NOTHING) and db2.active == before and #SETLOG == 0 and #OUT == 0
+    return fps and none and guarded and refused, tostring(fps) .. tostring(none) .. tostring(guarded) .. tostring(refused)
+end)
+
+test("S8-3 a profile click switches silently and the page follows; in combat the cards are greyed and a click does nothing", function()
+    local e, s, db = bootWith(fullEntry())
+    s.open("home")
+    local f = window()
+    OUT = {}
+    byKey(f, "profile:crowded"):Click()
+    local switched = db.active == "crowded" and byKey(f, "profile:crowded").skinState.selected == true
+        and byKey(f, "profile:everyday").skinState.selected == false and hasText(f, "In use now: Crowded") and #OUT == 0
+    byKey(f, "profile:original"):Click()
+    local original = db.active == "original" and hasText(f, "In use now: Original") and hasText(f, ORIGINAL_NOTE)
+    COMBAT = true
+    s.open("home")
+    local greyed = byKey(f, "profile:everyday").enabled == false and byKey(f, "profile:maximum").enabled == false
+    SETLOG = {}
+    s.click("profile:everyday")
+    local still = db.active == "original" and #SETLOG == 0
+    COMBAT = false
+    return switched and original and greyed and still, tostring(switched) .. tostring(original) .. tostring(greyed) .. tostring(still)
+end)
+
+test("S8-4 the test buttons open the existing windows, are marked when a result is saved, and are greyed in combat or during a test", function()
+    local e, s = bootWith(fullEntry())
+    local opened = {}
+    e.ns.ui.openSaved = function(kind) opened[#opened + 1] = kind end
+    e.ns.ui.buildContext = function() return { saved = { best = true, crowded = false } } end
+    s.open("home")
+    local f = window()
+    local best, crowded = byKey(f, "test:best"), byKey(f, "test:crowded")
+    local drawn = best ~= nil and crowded ~= nil and best._text == "Find my best settings" and crowded._text == "Find my crowded settings"
+        and best._width == 230 and best._height == 26 and best.skinState.selected == true and crowded.skinState.selected == false
+        and best.enabled == true and crowded.enabled == true
+    local noted = hasText(f, "A highlighted button has a saved result.")
+    best:Click()
+    crowded:Click()
+    s.click("test:nosuch")
+    local routed = table.concat(opened, ",") == "best,crowded"
+    COMBAT = true
+    s.open("home")
+    local greyed = byKey(f, "test:best").enabled == false and byKey(f, "test:crowded").enabled == false
+    s.click("test:best")
+    COMBAT = false
+    return drawn and noted and routed and greyed and #opened == 2, tostring(drawn) .. tostring(noted) .. tostring(routed) .. tostring(greyed) .. #opened
+end)
+
 -- The Picture size page and dynamic render scale (spec 2026-11-02-flat-hub-window-design.md section 5).
 local DYNAMIC_OFF = "Dynamic render scale is off."
 local DYNAMIC_ON = "Dynamic render scale is on. It changes the picture size by itself, which spoils a test. Turn it off in the game's graphics menu."

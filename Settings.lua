@@ -36,6 +36,7 @@ local LOCKED_TEXT = {
 }
 local TABS = { "everyday", "crowded" }
 local TAB_TEXT = { everyday = "Everyday", crowded = "Crowded" }
+local PROFILE_KEYS = { "original", "everyday", "crowded", "maximum" }
 
 -- The pages of the window (spec 2026-11-02-flat-hub-window-design.md H5) and the page each setting sits on; a setting this
 -- table does not know sits on World detail.
@@ -230,6 +231,24 @@ function settings.model(st, ctx)
     end
     -- Whether the game's dynamic render scale is on (it resizes the picture by itself and spoils a test); nil when the client lacks it.
     if ctx.dynamicScale then view.dynamicLine = ctx.dynamicScale.on and DYNAMIC_ON or DYNAMIC_OFF end
+    -- The Home page: the profile in use, the four profile cards, the two test buttons. ctx.home = the minimap menu's facts
+    -- ({saved = {best, crowded}, maxFps}); missing when the interface module is not there.
+    local home = ctx.home or {}
+    local labels = ns.profiles and ns.profiles.LABEL or {}
+    view.home = { inUse = labels[ctx.active] or tostring(ctx.active), profiles = {}, tests = {} }
+    for _, key in ipairs(PROFILE_KEYS) do
+        local full = (names.PROFILE and names.PROFILE[key]) or key
+        local title, note = full:match("^([^:]+):%s*(.+)$")
+        title, note = title or full, note or ""
+        if key == "maximum" and type(home.maxFps) == "number" then note = note .. string.format(" (about %.0f fps)", home.maxFps) end
+        view.home.profiles[#view.home.profiles + 1] = { key = key, title = title, note = note, selected = ctx.active == key,
+            enabled = locked == nil }
+    end
+    local saved = home.saved or {}
+    view.home.tests = {
+        { key = "best", text = "Find my best settings", enabled = locked == nil, done = saved.best == true },
+        { key = "crowded", text = "Find my crowded settings", enabled = locked == nil, done = saved.crowded == true },
+    }
     view.buttons[#view.buttons + 1] = { key = "use", text = USE_TEXT, enabled = locked == nil }
     if ctx.active ~= "maximum" then
         view.buttons[#view.buttons + 1] = { key = "maximum", text = MAXIMUM_TEXT, enabled = locked == nil }
@@ -332,6 +351,13 @@ local function dynamicContext()
     return { on = n ~= nil and n ~= 0 }
 end
 
+-- The minimap menu's facts for the Home page ({saved = {best, crowded}, maxFps, ...}); nil when the interface module is missing.
+local function homeContext()
+    if not (ns.ui and ns.ui.buildContext) then return nil end
+    local ok, home = pcall(ns.ui.buildContext)
+    return ok and home or nil
+end
+
 -- The live facts the model needs; the costs only for a draw (they are not part of what the refresh looks at).
 local function context(withCosts)
     local db = ns.profiles and ns.profiles.state()
@@ -344,7 +370,10 @@ local function context(withCosts)
         resolved = ns.bench and ns.bench.resolve() or {}, locked = lockReason(), size = sizeContext(),
         dynamicScale = dynamicContext(),
     }
-    if withCosts then ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab) end
+    if withCosts then
+        ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab)
+        ctx.home = homeContext()
+    end
     return ctx
 end
 
@@ -358,6 +387,23 @@ end
 
 function settings.state()
     return state
+end
+
+-- Switches to a profile from the window, silently: a refusal Maximum gives, or a level the game would not take, shows in the banner.
+local function switchProfile(name)
+    local ok, info = ns.profiles.switch(name, true)
+    if name == "maximum" then
+        if not ok and info == "nothing" then
+            state.notice = NOTHING_TEXT
+        elseif ok then
+            -- The switch stands, but a level the game would not take is said here, since nothing is said in chat.
+            local refused = refusedNames(info.mismatched)
+            if #refused > 0 then
+                state.notice = "The game would not take the highest level for: " .. table.concat(refused, ", ") .. "."
+            end
+        end
+    end
+    draw()
 end
 
 -- Shows the window on a page (the page last shown when none is given, Home the first time). `everyday` or `crowded` picks that
@@ -422,17 +468,18 @@ function settings.click(key)
         return
     end
     if key == "maximum" then
-        local ok, info = ns.profiles.switch("maximum", true)
-        if not ok and info == "nothing" then
-            state.notice = NOTHING_TEXT
-        elseif ok then
-            -- The switch stands, but a level the game would not take is said here, since nothing is said in chat.
-            local refused = refusedNames(info.mismatched)
-            if #refused > 0 then
-                state.notice = "The game would not take the highest level for: " .. table.concat(refused, ", ") .. "."
-            end
-        end
-        draw()
+        switchProfile("maximum")
+        return
+    end
+    -- The Home page: a profile card switches profile (as the minimap menu does), a test button opens the guided test or its saved result.
+    local profileKey = key:match("^profile:(.+)$")
+    if profileKey then
+        switchProfile(profileKey)
+        return
+    end
+    local testKey = key:match("^test:(.+)$")
+    if testKey then
+        if (testKey == "best" or testKey == "crowded") and ns.ui and ns.ui.openSaved then ns.ui.openSaved(testKey) end
         return
     end
     local profile = state.tab
@@ -477,6 +524,8 @@ local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 36, 22, 3, 14
 local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26
 local SUMMARY_GAP = 6
 local TAB_W = 120
+local HOME_CARD_W, HOME_CARD_H = math.floor((AREA_W - CARD_GAP_X) / 2), 56
+local HOME_TESTS_NOTE = "A highlighted button has a saved result."
 local SETTINGS_PAGE = { light = true, world = true, size = true }
 local PLACEHOLDER = "This page is coming in the next step."
 
@@ -637,6 +686,28 @@ local function build()
     p.sizeNote = skin.text(area, "small", "dim", AREA_W)
     p.dynamicLine = skin.text(area, "small", "dim", AREA_W)
 
+    -- The Home page: the profile in use, four profile cards (title and note, centred), the two test buttons.
+    p.inUse = skin.text(area, "normal", "bright", AREA_W)
+    p.profileCards = {}
+    for i = 1, #PROFILE_KEYS do
+        local card = skin.button(area, "", HOME_CARD_W, HOME_CARD_H)
+        card:SetScript("OnClick", clicked)
+        card.label:ClearAllPoints()
+        card.label:SetPoint("CENTER", card, "CENTER", 0, 10)
+        card.note = skin.text(card, "small", "dim", HOME_CARD_W - 16)
+        card.note:SetJustifyH("CENTER")
+        card.note:SetPoint("CENTER", card, "CENTER", 0, -10)
+        p.profileCards[i] = card
+    end
+    p.testButtons = {}
+    for i, key in ipairs({ "best", "crowded" }) do
+        local button = skin.button(area, "", FOOTER_USE_W, FOOTER_BTN_H)
+        button.key = "test:" .. key
+        button:SetScript("OnClick", clicked)
+        p.testButtons[i] = button
+    end
+    p.testsNote = skin.text(area, "small", "dim", AREA_W)
+
     -- The summary block above the footer, and the footer strip.
     p.your = skin.text(page, "small", "text", AREA_W)
     p.total = skin.text(page, "small", "text", AREA_W)
@@ -705,7 +776,7 @@ function settings.render()
         fs:Hide()
     end
     -- Which test the costs come from (or that there is none), under the title of a settings page.
-    if onSettings then placeText(p.costNote, view.costNote) else hideText(p.costNote) end
+    if onSettings or view.page == "home" then placeText(p.costNote, view.costNote) else hideText(p.costNote) end
     local notices = {}
     if view.notice then notices[#notices + 1] = view.notice end
     if view.locked then notices[#notices + 1] = view.locked end
@@ -769,7 +840,9 @@ function settings.render()
             if row.page == view.page then rows[#rows + 1] = row end
         end
     end
-    if not onSettings then
+    if view.page == "home" then
+        hideText(p.note)
+    elseif not onSettings then
         placeText(p.note, PLACEHOLDER)
     elseif #rows == 0 then
         placeText(p.note, NONE_TEXT)
@@ -798,6 +871,40 @@ function settings.render()
     release(p.helps, true)
     release(p.levels)
     release(p.costs, true)
+
+    -- The Home page.
+    if view.page == "home" then
+        placeText(p.inUse, "In use now: " .. view.home.inUse)
+        for i, profile in ipairs(view.home.profiles) do
+            local card = p.profileCards[i]
+            local col, line = (i - 1) % 2, math.floor((i - 1) / 2)
+            card.key = "profile:" .. profile.key
+            card:SetLabel(profile.title)
+            card.note:SetText(profile.note)
+            card:SetSelected(profile.selected)
+            card:SetEnabled(profile.enabled)
+            card:ClearAllPoints()
+            card:SetPoint("TOPLEFT", p.area, "TOPLEFT", col * (HOME_CARD_W + CARD_GAP_X), -(y + line * (HOME_CARD_H + 8)))
+            card:Show()
+        end
+        y = y + 2 * (HOME_CARD_H + 8) + 6
+        for i, test in ipairs(view.home.tests) do
+            local button = p.testButtons[i]
+            button:SetLabel(test.text)
+            button:SetSelected(test.done)
+            button:SetEnabled(test.enabled)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (FOOTER_USE_W + 12), -y)
+            button:Show()
+        end
+        y = y + FOOTER_BTN_H + 8
+        placeText(p.testsNote, HOME_TESTS_NOTE)
+    else
+        hideText(p.inUse)
+        hideText(p.testsNote)
+        for _, card in ipairs(p.profileCards) do card:Hide() end
+        for _, button in ipairs(p.testButtons) do button:Hide() end
+    end
 
     -- The picture sharpness block, under the card of the Picture size page.
     local size = view.size
