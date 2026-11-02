@@ -1144,6 +1144,65 @@ test("S8-4 the test buttons open the existing windows, are marked when a result 
     return drawn and noted and routed and greyed and #opened == 2, tostring(drawn) .. tostring(noted) .. tostring(routed) .. tostring(greyed) .. #opened
 end)
 
+-- The Tests and results page and the About page (spec 2026-11-02-flat-hub-window-design.md section 5).
+local TESTS_INTRO = "The test measures what each graphics setting costs on this PC. Run it in a quiet spot first, then in a busy place."
+
+test("S9-1 Tests and results: the two test buttons, a line and a Show results button for each saved result, and the progress line while a test runs", function()
+    local e, s = bootWith(fullEntry())
+    local opened = {}
+    e.ns.ui.openSaved = function(kind) opened[#opened + 1] = kind end
+    e.ns.ui.buildContext = function() return { saved = { best = true, crowded = false } } end
+    e.ns.ui.savedResult = function(kind)
+        if kind == "best" then return { measuredLine = "Measured in Highmountain, 3 days ago." } end
+    end
+    s.open("tests")
+    local f = window()
+    local drawn = hasText(f, TESTS_INTRO) and byKey(f, "test:best") ~= nil and byKey(f, "test:crowded") ~= nil
+        and hasText(f, "Quiet-spot test: Measured in Highmountain, 3 days ago.") and hasText(f, "Crowd test: not done yet.")
+        and byKey(f, "show:best") ~= nil and byKey(f, "show:best")._text == "Show results" and byKey(f, "show:crowded") == nil
+        and not hasText(f, "A test is running")
+    byKey(f, "show:best"):Click()
+    s.click("show:crowded")                                 -- nothing saved: nothing opens
+    local routed = table.concat(opened, ",") == "best"
+    e.ns.ui.savedResult = function() return { measuredLine = "Measured in Stormwind City, 2 hours ago." } end
+    s.open("tests")
+    byKey(f, "show:crowded"):Click()
+    routed = routed and table.concat(opened, ",") == "best,crowded" and hasText(f, "Crowd test: Measured in Stormwind City, 2 hours ago.")
+    e.ns.ui.buildContext = function()
+        return { saved = {}, active = true, progress = { phase = "sweep", label = "Shadows 3", cvar = "graphicsShadowQuality", value = "3", done = 12, total = 45 } }
+    end
+    s.open("tests")
+    local running = hasText(f, "A test is running: step 12 of 45 (Now testing: Shadow detail, level 3)")
+    e.ns.ui.savedResult = function() error("boom") end        -- the saved results cannot be read: the page still draws, silently
+    OUT = {}
+    s.open("tests")
+    local guarded = hasText(f, "Quiet-spot test: not done yet.") and #OUT == 0
+    s.click("page:light")
+    local elsewhere = byKey(f, "show:best") == nil and not hasText(f, TESTS_INTRO) and byKey(f, "test:best") == nil
+        and not hasText(f, "A test is running")
+    return drawn and routed and running and guarded and elsewhere,
+        tostring(drawn) .. tostring(routed) .. tostring(running) .. tostring(guarded) .. tostring(elsewhere)
+end)
+
+test("S9-2 About shows the version, what the addon does, the chat commands and the no-data sentence; the header carries the version", function()
+    GetAddOnMetadata = function() return "0.9.1" end
+    local e, s = bootWith(fullEntry())
+    s.open("about")
+    local f = window()
+    local drawn = hasText(f, "Version 0.9.1") and hasText(f, "ForeverSettings finds the graphics settings that fit your PC")
+        and hasText(f, "/fset settings") and hasText(f, "/fset profile") and hasText(f, "/fset size") and hasText(f, "/fset probe")
+        and hasText(f, "/fset reset") and hasText(f, "It doesn't collect or send anything.") and hasText(f, "open an issue on GitHub")
+        and f.versionText._text == "Version 0.9.1"
+    GetAddOnMetadata = nil
+    local e2, s2 = bootWith(fullEntry())
+    s2.open("about")
+    local f2 = window()
+    local unknown = hasText(f2, "Version unknown") and f2.versionText._text == ""
+    s2.click("page:light")
+    local elsewhere = not hasText(f2, "It doesn't collect or send anything.")
+    return drawn and unknown and elsewhere, tostring(drawn) .. tostring(unknown) .. tostring(elsewhere)
+end)
+
 -- The Picture size page and dynamic render scale (spec 2026-11-02-flat-hub-window-design.md section 5).
 local DYNAMIC_OFF = "Dynamic render scale is off."
 local DYNAMIC_ON = "Dynamic render scale is on. It changes the picture size by itself, which spoils a test. Turn it off in the game's graphics menu."

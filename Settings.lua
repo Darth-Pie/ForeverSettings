@@ -37,6 +37,29 @@ local LOCKED_TEXT = {
 local TABS = { "everyday", "crowded" }
 local TAB_TEXT = { everyday = "Everyday", crowded = "Crowded" }
 local PROFILE_KEYS = { "original", "everyday", "crowded", "maximum" }
+local TESTS_INTRO = "The test measures what each graphics setting costs on this PC. Run it in a quiet spot first, then in a busy place."
+local ABOUT_LINES = {
+    "ForeverSettings finds the graphics settings that fit your PC: it measures what each one costs, keeps the levels you choose in "
+        .. "profiles, and puts them back at every loading screen.",
+    "",
+    "Chat commands",
+    "/fset settings: open this window",
+    "/fset profile everyday, crowded, maximum or original: switch profile",
+    "/fset size 50 to 200, or off: the picture sharpness for this session",
+    "/fset probe: ask the game which settings it has",
+    "/fset reset: put back everything the addon changed",
+    "",
+    "It doesn't collect or send anything.",
+    "Problems or ideas: open an issue on GitHub (Darth-Pie/ForeverSettings).",
+}
+
+-- The addon's version from its TOC, or "unknown".
+local function addonVersion()
+    local get = C_AddOns and C_AddOns.GetAddOnMetadata or _G.GetAddOnMetadata
+    local version = get and get("ForeverSettings", "Version")
+    if type(version) == "string" and version ~= "" then return version end
+    return "unknown"
+end
 
 -- The pages of the window (spec 2026-11-02-flat-hub-window-design.md H5) and the page each setting sits on; a setting this
 -- table does not know sits on World detail.
@@ -244,6 +267,16 @@ function settings.model(st, ctx)
         view.home.profiles[#view.home.profiles + 1] = { key = key, title = title, note = note, selected = ctx.active == key,
             enabled = locked == nil }
     end
+    -- The Tests and results page: a line for each saved result with a Show results button, and the progress of a running test.
+    local tests = ctx.tests or {}
+    view.testsPage = { intro = TESTS_INTRO, results = {}, progress = tests.progress }
+    for _, kind in ipairs({ "best", "crowded" }) do
+        local label = kind == "best" and "Quiet-spot test" or "Crowd test"
+        local saved = tests.results and tests.results[kind]
+        view.testsPage.results[#view.testsPage.results + 1] = { kind = kind, label = label, canShow = saved ~= nil,
+            text = label .. ": " .. (saved and saved.line or "not done yet.") }
+    end
+    view.about = { version = addonVersion(), lines = ABOUT_LINES }
     local saved = home.saved or {}
     view.home.tests = {
         { key = "best", text = "Find my best settings", enabled = locked == nil, done = saved.best == true },
@@ -358,6 +391,24 @@ local function homeContext()
     return ok and home or nil
 end
 
+-- The saved results and the progress of a running test, for the Tests and results page: {results = {best = {line}, crowded = {line}},
+-- progress = "A test is running: step N of M (...)"}. Whatever cannot be read is left out.
+local function testsContext(home)
+    local info = { results = {} }
+    if ns.ui and ns.ui.savedResult then
+        for _, kind in ipairs({ "best", "crowded" }) do
+            local ok, saved = pcall(ns.ui.savedResult, kind)
+            if ok and saved then info.results[kind] = { line = saved.measuredLine or "" } end
+        end
+    end
+    local progress = home and home.progress
+    if progress then
+        info.progress = string.format("A test is running: step %d of %d (%s)", progress.done, progress.total,
+            ns.names and ns.names.progress(progress) or tostring(progress.label))
+    end
+    return info
+end
+
 -- The live facts the model needs; the costs only for a draw (they are not part of what the refresh looks at).
 local function context(withCosts)
     local db = ns.profiles and ns.profiles.state()
@@ -373,6 +424,7 @@ local function context(withCosts)
     if withCosts then
         ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab)
         ctx.home = homeContext()
+        ctx.tests = testsContext(ctx.home)
     end
     return ctx
 end
@@ -482,6 +534,12 @@ function settings.click(key)
         if (testKey == "best" or testKey == "crowded") and ns.ui and ns.ui.openSaved then ns.ui.openSaved(testKey) end
         return
     end
+    local showKey = key:match("^show:(.+)$")                -- Show results: only for a result that is saved
+    if showKey then
+        local info = testsContext(nil)
+        if info.results[showKey] and ns.ui and ns.ui.openSaved then ns.ui.openSaved(showKey) end
+        return
+    end
     local profile = state.tab
     if key == "use" then
         ns.profiles.save(profile, true)
@@ -527,7 +585,6 @@ local TAB_W = 120
 local HOME_CARD_W, HOME_CARD_H = math.floor((AREA_W - CARD_GAP_X) / 2), 56
 local HOME_TESTS_NOTE = "A highlighted button has a saved result."
 local SETTINGS_PAGE = { light = true, world = true, size = true }
-local PLACEHOLDER = "This page is coming in the next step."
 
 local function heightOf(fs, str)
     local h = fs:GetStringHeight()
@@ -559,13 +616,6 @@ local function release(pool, hasText)
 end
 
 local function clicked(self) settings.click(self.key) end
-
-local function versionText()
-    local get = C_AddOns and C_AddOns.GetAddOnMetadata or _G.GetAddOnMetadata
-    local version = get and get("ForeverSettings", "Version")
-    if type(version) == "string" and version ~= "" then return "Version " .. version end
-    return ""
-end
 
 -- The words of a level button that the button is too small for ("(lowest)" and "(highest)") show in a tooltip.
 local function showTip(self)
@@ -614,7 +664,8 @@ local function build()
     local page = f.page
     local p = {}
     f.close.key = "close"
-    f.versionText:SetText(versionText())
+    local version = addonVersion()
+    f.versionText:SetText(version == "unknown" and "" or "Version " .. version)
 
     -- The page list at the left, with a rule between it and the page area.
     p.nav = {}
@@ -707,6 +758,19 @@ local function build()
         p.testButtons[i] = button
     end
     p.testsNote = skin.text(area, "small", "dim", AREA_W)
+
+    -- The Tests and results page, and the About page.
+    p.testsIntro = skin.text(area, "normal", "dim", AREA_W)
+    p.resultLines, p.resultButtons = {}, {}
+    for i = 1, 2 do
+        p.resultLines[i] = skin.text(area, "normal", "text", AREA_W - 150)
+        local show = skin.button(area, "Show results", 140, 24)
+        show:SetScript("OnClick", clicked)
+        p.resultButtons[i] = show
+    end
+    p.progressLine = skin.text(area, "normal", "accentLight", AREA_W)
+    p.aboutVersion = skin.text(area, "normal", "bright", AREA_W)
+    p.aboutText = skin.text(area, "normal", "text", AREA_W)
 
     -- The summary block above the footer, and the footer strip.
     p.your = skin.text(page, "small", "text", AREA_W)
@@ -840,10 +904,8 @@ function settings.render()
             if row.page == view.page then rows[#rows + 1] = row end
         end
     end
-    if view.page == "home" then
+    if not onSettings then
         hideText(p.note)
-    elseif not onSettings then
-        placeText(p.note, PLACEHOLDER)
     elseif #rows == 0 then
         placeText(p.note, NONE_TEXT)
     else
@@ -872,6 +934,20 @@ function settings.render()
     release(p.levels)
     release(p.costs, true)
 
+    -- The two test buttons (Home and the Tests and results page), in a row at the current height.
+    local function placeTestButtons()
+        for i, test in ipairs(view.home.tests) do
+            local button = p.testButtons[i]
+            button:SetLabel(test.text)
+            button:SetSelected(test.done)
+            button:SetEnabled(test.enabled)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (FOOTER_USE_W + 12), -y)
+            button:Show()
+        end
+        y = y + FOOTER_BTN_H + 8
+    end
+
     -- The Home page.
     if view.page == "home" then
         placeText(p.inUse, "In use now: " .. view.home.inUse)
@@ -888,22 +964,50 @@ function settings.render()
             card:Show()
         end
         y = y + 2 * (HOME_CARD_H + 8) + 6
-        for i, test in ipairs(view.home.tests) do
-            local button = p.testButtons[i]
-            button:SetLabel(test.text)
-            button:SetSelected(test.done)
-            button:SetEnabled(test.enabled)
-            button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (FOOTER_USE_W + 12), -y)
-            button:Show()
-        end
-        y = y + FOOTER_BTN_H + 8
+        placeTestButtons()
         placeText(p.testsNote, HOME_TESTS_NOTE)
     else
         hideText(p.inUse)
         hideText(p.testsNote)
         for _, card in ipairs(p.profileCards) do card:Hide() end
+    end
+
+    -- The Tests and results page: the two test buttons, a line and a Show results button for each result, the progress of a test.
+    if view.page == "tests" then
+        placeText(p.testsIntro, view.testsPage.intro)
+        placeTestButtons()
+        for i, result in ipairs(view.testsPage.results) do
+            p.resultLines[i]:SetText(result.text)
+            p.resultLines[i]:ClearAllPoints()
+            p.resultLines[i]:SetPoint("TOPLEFT", p.area, "TOPLEFT", 0, -(y + 4))
+            p.resultLines[i]:Show()
+            local show = p.resultButtons[i]
+            show.key = "show:" .. result.kind
+            show:ClearAllPoints()
+            show:SetPoint("TOPRIGHT", p.area, "TOPRIGHT", 0, -y)
+            if result.canShow then show:Show() else show:Hide() end
+            y = y + 30
+        end
+        if view.testsPage.progress then placeText(p.progressLine, view.testsPage.progress) else hideText(p.progressLine) end
+    else
+        hideText(p.testsIntro)
+        hideText(p.progressLine)
+        for i = 1, 2 do
+            hideText(p.resultLines[i])
+            p.resultButtons[i]:Hide()
+        end
+    end
+    if view.page ~= "home" and view.page ~= "tests" then
         for _, button in ipairs(p.testButtons) do button:Hide() end
+    end
+
+    -- The About page.
+    if view.page == "about" then
+        placeText(p.aboutVersion, "Version " .. view.about.version)
+        placeText(p.aboutText, table.concat(view.about.lines, "\n"))
+    else
+        hideText(p.aboutVersion)
+        hideText(p.aboutText)
     end
 
     -- The picture sharpness block, under the card of the Picture size page.

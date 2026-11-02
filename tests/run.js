@@ -1577,6 +1577,33 @@ end`],
   'hub-footer-margin': ['Settings.lua', `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)`, `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + 4), 9)`],
   'hub-footer-use-width': ['Settings.lua', `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26`, `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 180, 160, 26`],
 
+  // The Tests and results page, and the About page
+  'tests-intro-text': ['Settings.lua', `local TESTS_INTRO = "The test measures what`, `local TESTS_INTRO = "A test measures what`],
+  'tests-result-label': ['Settings.lua', `local label = kind == "best" and "Quiet-spot test" or "Crowd test"`, `local label = kind == "best" and "Crowd test" or "Quiet-spot test"`],
+  'tests-not-done-text': ['Settings.lua', `(saved and saved.line or "not done yet.")`, `(saved and saved.line or "none yet.")`],
+  'tests-can-always-show': ['Settings.lua', `canShow = saved ~= nil,`, `canShow = true,`],
+  'tests-saved-unguarded': ['Settings.lua', `local ok, saved = pcall(ns.ui.savedResult, kind)`, `local ok, saved = true, ns.ui.savedResult(kind)`],
+  'tests-progress-missing': ['Settings.lua', `    if progress then
+        info.progress = string.format(`, `    if false then
+        info.progress = string.format(`],
+  'tests-progress-text': ['Settings.lua', `"A test is running: step %d of %d (%s)"`, `"Running: step %d of %d (%s)"`],
+  'tests-show-without-result': ['Settings.lua', `if info.results[showKey] and ns.ui and ns.ui.openSaved then`, `if ns.ui and ns.ui.openSaved then`],
+  'tests-show-wrong-kind': ['Settings.lua', `ns.ui.openSaved(showKey)`, `ns.ui.openSaved("best")`],
+  'tests-page-everywhere': ['Settings.lua', `    if view.page == "tests" then
+        placeText(p.testsIntro`, `    if true then
+        placeText(p.testsIntro`],
+  'tests-buttons-not-hidden': ['Settings.lua', `    if view.page ~= "home" and view.page ~= "tests" then`, `    if false then`],
+  'about-version-unknown': ['Settings.lua', `    return "unknown"
+end`, `    return ""
+end`],
+  'about-header-version': ['Settings.lua', `f.versionText:SetText(version == "unknown" and "" or "Version " .. version)`, `f.versionText:SetText("Version " .. version)`],
+  'about-no-data-sentence': ['Settings.lua', `"It doesn't collect or send anything."`, `"It collects nothing."`],
+  'about-probe-command': ['Settings.lua', `    "/fset probe: ask the game which settings it has",
+`, ``],
+  'about-page-everywhere': ['Settings.lua', `    if view.page == "about" then
+        placeText(p.aboutVersion`, `    if true then
+        placeText(p.aboutVersion`],
+
   // The Home page
   'home-inuse-label': ['Settings.lua', `labels[ctx.active] or tostring(ctx.active)`, `tostring(ctx.active)`],
   'home-card-split': ['Settings.lua', `full:match("^([^:]+):%s*(.+)$")`, `full:match("^(.+)$")`],
