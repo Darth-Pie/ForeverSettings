@@ -1426,6 +1426,26 @@ end`],
         fs:SetJustifyH("CENTER")`, `        fs:SetWidth(BUTTON_WIDTH * 2)
         fs:SetJustifyH("CENTER")`],
   'settings-max-cost-offset-wrong': ['Settings.lua', `cost:SetPoint("TOPLEFT", p.content, "TOPLEFT", x, -(top + 25))`, `cost:SetPoint("TOPLEFT", p.content, "TOPLEFT", x, -(top + 5))`],
+
+  // The live total in My settings ("Your Everyday settings: about N fps")
+  'live-no-test-needed': ['Settings.lua', `if costs and est and type(est.fps) == "number" and (est.counted or 0) > 0 then`, `if est and type(est.fps) == "number" and (est.counted or 0) > 0 then`],
+  'live-counted-zero': ['Settings.lua', `type(est.fps) == "number" and (est.counted or 0) > 0 then`, `type(est.fps) == "number" then`],
+  'live-note-dropped': ['Settings.lua', `        if (est.notCounted or 0) > 0 then`, `        if false then`],
+  'live-note-plural': ['Settings.lua', `plural(est.notCounted, "setting")`, `(est.notCounted .. " settings")`],
+  'live-tab-name': ['Settings.lua', `TAB_TEXT[st.tab] or ""`, `"Everyday"`],
+  'live-whole-number': ['Settings.lua', `"Your %s settings: about %.0f fps"`, `"Your %s settings: about %.1f fps"`],
+  'live-tail-missing': ['Settings.lua', `est.fps) .. YOUR_TAIL`, `est.fps)`],
+  'live-held-live-always': ['Settings.lua', `        if live then value = GetCVar(entry.cvar) else value = db.profiles[tab].values[entry.cvar] end`, `        value = GetCVar(entry.cvar)`],
+  'live-held-saved-always': ['Settings.lua', `        if live then value = GetCVar(entry.cvar) else value = db.profiles[tab].values[entry.cvar] end`, `        value = db.profiles[tab].values[entry.cvar]`],
+  'live-guard-removed': ['Settings.lua', `local okHeld, yours = pcall(ns.recommend.estimateFps, source.entry, held)`, `local okHeld, yours = true, ns.recommend.estimateFps(source.entry, held)`],
+  'live-count-ignores-missing': ['Settings.lua', `counted = heldCount - #yours.missing`, `counted = heldCount`],
+  'live-not-counted-zero': ['Settings.lua', `notCounted = #yours.missing }`, `notCounted = 0 }`],
+  'live-context-dropped': ['Settings.lua', `ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab)`, `ctx.costs, ctx.maximum = costsAndMaximum(state.tab)`],
+  'live-line-not-stacked': ['Settings.lua', `    stack(p.your, view.yourLine)
+`, ``],
+  'live-stack-order': ['Settings.lua', `    stack(p.total, view.totalLine)
+    stack(p.your, view.yourLine)`, `    stack(p.your, view.yourLine)
+    stack(p.total, view.totalLine)`],
   'settings-max-row-height-same': ['Settings.lua', `if level.cost then pitch = 28 + COST_HEIGHT end`, `if level.cost then pitch = 28 end`],
   'settings-max-total-over-buttons': ['Settings.lua', `    local bottom = 44`, `    local bottom = 20`],
   'settings-max-matters-over-total': ['Settings.lua', `        bottom = bottom + heightOf(fs, str) + 4`, `        bottom = bottom + 4`],

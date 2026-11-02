@@ -833,7 +833,8 @@ test("S2-10 no raw setting name in any text this change adds", function()
     local e, s = bootWith(fullEntry())
     CVARS.graphicsComputeEffects = "1"
     local function names(view)
-        local list = { view.costNote or "", view.mattersNote or "", view.totalLine or "", view.notice or "", view.locked or "" }
+        local list = { view.costNote or "", view.mattersNote or "", view.totalLine or "", view.yourLine or "", view.notice or "",
+            view.locked or "" }
         for _, row in ipairs(view.rows) do
             list[#list + 1] = row.matters or ""
             for _, level in ipairs(row.levels) do list[#list + 1] = level.cost or "" end
@@ -842,7 +843,8 @@ test("S2-10 no raw setting name in any text this change adds", function()
         return table.concat(list, "\n")
     end
     local costs = costsOf(e, fullEntry())
-    local text = names(s.model({ tab = "everyday" }, ctxOf(e, { costs = costs, maximum = { fps = 151.5, skipped = 0, leftOut = 2 } })))
+    local text = names(s.model({ tab = "everyday" }, ctxOf(e, { costs = costs, maximum = { fps = 151.5, skipped = 0, leftOut = 2 },
+        estimate = { fps = 94.4, counted = 2, notCounted = 2 } })))
         .. names(s.model({ tab = "everyday" }, ctxOf(e, { active = "maximum", costs = costs, maximum = { skipped = 3, leftOut = 1 } })))
         .. names(s.model({ tab = "crowded", notice = NOTHING }, ctxOf(e, {})))
     local raw
@@ -850,6 +852,124 @@ test("S2-10 no raw setting name in any text this change adds", function()
         if text:find(name, 1, true) then raw = name end
     end
     return raw == nil, tostring(raw)
+end)
+
+-- The live total (agreed 2026-11-02): "Your <tab> settings: about N fps", the estimate for the levels the tab holds.
+local YOUR_TAIL = " (an estimate; settings affect each other)."
+local NOT_COUNTED = "the test didn't measure the level you chose."
+local function yourFS(f)
+    local found
+    walk(f, function(frame)
+        for _, fs in ipairs(frame.fontStrings) do
+            if fs.shown and fs._text and fs._text:find("^Your %a+ settings: about") then found = fs end
+        end
+    end)
+    return found
+end
+local function yourText(f)
+    local fs = f and yourFS(f)
+    return fs and fs._text
+end
+
+test("S3-1 the live total line: the tab's name, a whole number, the not-counted note in the singular and the plural; nothing without a test or a counted setting", function()
+    local e, s = boot()
+    local costs = costsOf(e, quietEntry())
+    local function line(tab, estimate, withCosts)
+        return s.model({ tab = tab }, ctxOf(e, { costs = withCosts, estimate = estimate })).yourLine
+    end
+    local ok = line("everyday", { fps = 94.4, counted = 3, notCounted = 0 }, costs) == "Your Everyday settings: about 94 fps" .. YOUR_TAIL
+        and line("crowded", { fps = 94.6, counted = 1, notCounted = 0 }, costs) == "Your Crowded settings: about 95 fps" .. YOUR_TAIL
+        and line("everyday", { fps = 94.4, counted = 2, notCounted = 1 }, costs) == "Your Everyday settings: about 94 fps" .. YOUR_TAIL
+            .. " 1 setting not counted: " .. NOT_COUNTED
+        and line("everyday", { fps = 94.4, counted = 1, notCounted = 3 }, costs) == "Your Everyday settings: about 94 fps" .. YOUR_TAIL
+            .. " 3 settings not counted: " .. NOT_COUNTED
+    local none = line("everyday", { fps = 94.4, counted = 3, notCounted = 0 }, nil) == nil          -- no test to read
+        and line("everyday", { fps = 94.4, counted = 0, notCounted = 2 }, costs) == nil               -- the tab holds nothing the test measured
+        and line("everyday", nil, costs) == nil
+        and line("everyday", { fps = 94.4, counted = 3, notCounted = 0 }, { kind = "quiet", fps = { nowFps = 250, byCvar = {} } }) == nil
+    return ok and none, tostring(line("everyday", { fps = 94.4, counted = 2, notCounted = 1 }, costs))
+end)
+
+test("S3-2 through the window the estimate is recommend's for the levels the tab holds: live ones on the tab in use, saved ones on the other, and it follows every click", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    -- in the game: Shadows 2 (now), SSAO 1 (-0.3 ms), clutter 64 (now), render scale 1 (now): 3.7 ms on a 4.0 ms baseline
+    local start = yourText(f) == "Your Everyday settings: about 270 fps" .. YOUR_TAIL
+    s.click("level:graphicsShadowQuality:4")                  -- +1.2 ms: 4.9 ms
+    local one = yourText(f) == "Your Everyday settings: about 204 fps" .. YOUR_TAIL
+    s.click("level:graphicsSSAO:4")                           -- +0.8 ms with the Shadows above: 6.0 ms
+    local two = yourText(f) == "Your Everyday settings: about 167 fps" .. YOUR_TAIL
+    s.click("tab:crowded")                                    -- the Crowded profile keeps Shadows 0 only: 3.0 ms
+    local other = yourText(f) == "Your Crowded settings: about 333 fps" .. YOUR_TAIL
+    s.click("level:graphicsSSAO:0")                           -- stored only: -0.6 ms more, 2.4 ms
+    local stored = yourText(f) == "Your Crowded settings: about 417 fps" .. YOUR_TAIL and CVARS.graphicsSSAO == "4"
+    return start and one and two and other and stored and #OUT == 0,
+        tostring(start) .. tostring(one) .. tostring(two) .. tostring(other) .. tostring(stored) .. tostring(yourText(f)) .. outText()
+end)
+
+test("S3-3 a setting the test did not measure at the held level is left out of the estimate and counted in the note", function()
+    local e, s = bootWith(fullEntry())
+    CVARS.RenderScale = "0.75"                                -- the test has 0.5 and 1 only
+    s.open("everyday")
+    local one = yourText(window()) == "Your Everyday settings: about 270 fps" .. YOUR_TAIL .. " 1 setting not counted: " .. NOT_COUNTED
+    local e2, s2 = bootWith(quietEntry())                     -- clutter and render scale are not in this test at all
+    s2.open("everyday")
+    local two = yourText(window()) == "Your Everyday settings: about 270 fps" .. YOUR_TAIL .. " 2 settings not counted: " .. NOT_COUNTED
+    return one and two, tostring(one) .. tostring(two) .. tostring(yourText(window()))
+end)
+
+test("S3-4 no line without a test or for a tab that keeps nothing, and the rest of the window still draws", function()
+    local e, s = bootWith(nil)
+    s.open("everyday")
+    local noTest = not hasText(window(), "Your Everyday settings") and hasText(window(), COST_NONE)
+    local e2, s2, db2 = bootWith(fullEntry())
+    db2.profiles.crowded.values = {}
+    s2.open("crowded")
+    local f = window()
+    local empty = not hasText(f, "Your Crowded settings") and hasText(f, COST_QUIET) and hasText(f, "Everything at the highest")
+    s2.click("tab:everyday")
+    local back = yourText(f) == "Your Everyday settings: about 270 fps" .. YOUR_TAIL
+    db2.profiles.crowded.values = { RenderScale = "0.75" }               -- a level the test never measured: nothing to add up
+    s2.click("tab:crowded")
+    local unmeasured = not hasText(f, "Your Crowded settings") and hasText(f, COST_QUIET)
+    return noTest and empty and back and unmeasured and #OUT == 0,
+        tostring(noTest) .. tostring(empty) .. tostring(back) .. tostring(unmeasured) .. outText()
+end)
+
+test("S3-5 an estimate that cannot be made leaves the window drawn, without the line and without a message", function()
+    local e, s = bootWith(fullEntry())
+    local real = e.ns.recommend.estimateFps
+    e.ns.recommend.estimateFps = function(entry, values)
+        if values.graphicsSSAO == "1" then error("boom") end          -- the held levels only: the Maximum estimate still works
+        return real(entry, values)
+    end
+    s.open("everyday")
+    local f = window()
+    return f ~= nil and yourText(f) == nil and hasText(f, "Everything at the highest: about 152 fps.") and hasText(f, COST_QUIET)
+        and #OUT == 0, tostring(yourText(f)) .. outText()
+end)
+
+test("S3-6 the line stacks between the matters note and the total, each clear of the next, and the rows keep their room", function()
+    local e, s = bootWith(fullEntry())
+    STRINGHEIGHT = function(fs)
+        local text = fs._text or ""
+        local perLine = math.max(1, math.floor((fs._width or 520) / 9))
+        return 14 * math.max(1, math.ceil(#text / perLine))
+    end
+    s.open("everyday")
+    local f = window()
+    local mine = yourFS(f)
+    local total = fontStringWith(f, "Everything at the highest: about 152 fps.")
+    local matters = fontStringWith(f, MATTERS_NOTE)
+    local scroll
+    walk(f, function(frame) if frame.kind == "ScrollFrame" then scroll = frame end end)
+    local scrollBottom = scroll and scroll._point and scroll._point[5] or 0
+    local stacked = mine ~= nil and total ~= nil and matters ~= nil and mine._point[1] == "BOTTOMLEFT" and total._point[5] >= 38
+        and mine._point[5] >= total._point[5] + STRINGHEIGHT(total) and matters._point[5] >= mine._point[5] + STRINGHEIGHT(mine)
+    local clear = matters ~= nil and scrollBottom >= matters._point[5] + STRINGHEIGHT(matters)
+    STRINGHEIGHT = nil
+    return stacked and clear, tostring(stacked) .. tostring(clear)
 end)
 
 return H.results()

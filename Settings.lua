@@ -25,6 +25,8 @@ local MATTERS_NOTE = [["Matters to the picture" is the addon's own judgement, no
 local NOTHING_TEXT = "Maximum has nothing to set yet: run Find my best settings once so the addon learns what each setting can do."
 local USE_TEXT = "Use what I have in the game now"
 local MAXIMUM_TEXT = "Switch to Maximum"
+local YOUR_TAIL = " (an estimate; settings affect each other)."
+local NOT_COUNTED = "the test didn't measure the level you chose."
 local LOCKED_TEXT = {
     combat = "You are in combat; try again afterwards.",
     busy = "A test is running; try again afterwards.",
@@ -98,8 +100,8 @@ end
 
 -- What the window shows, with no frames (spec 3.4 and 2026-10-30-maximum-and-costs-design.md section 3.2).
 -- state = {tab, notice}; ctx = {active, saved = {everyday, crowded}, live(cvar), resolved, locked = nil | "combat" | "busy",
--- costs = {kind = "quiet" | "crowd", measuredLine, fps = recommend.levelFps(entry)}, maximum = {fps, skipped, leftOut}}; the
--- last two are missing when no test can be read.
+-- costs = {kind = "quiet" | "crowd", measuredLine, fps = recommend.levelFps(entry)}, maximum = {fps, skipped, leftOut},
+-- estimate = {fps, counted, notCounted}}; the last three are missing when no test can be read.
 function settings.model(st, ctx)
     local names = ns.names
     local locked = ctx.locked
@@ -174,6 +176,15 @@ function settings.model(st, ctx)
                 .. ", so there is no total yet. Run Find my best settings and choose Thorough."
         end
     end
+    -- The estimate for the levels this tab holds (live total, 2026-11-02): none without a test to read, and none for a tab that
+    -- holds no level the test measured, where it would only repeat today's frame rate.
+    local est = ctx.estimate
+    if costs and est and type(est.fps) == "number" and (est.counted or 0) > 0 then
+        view.yourLine = string.format("Your %s settings: about %.0f fps", TAB_TEXT[st.tab] or "", est.fps) .. YOUR_TAIL
+        if (est.notCounted or 0) > 0 then
+            view.yourLine = view.yourLine .. " " .. plural(est.notCounted, "setting") .. " not counted: " .. NOT_COUNTED
+        end
+    end
     view.buttons[#view.buttons + 1] = { key = "use", text = USE_TEXT, enabled = locked == nil }
     if ctx.active ~= "maximum" then
         view.buttons[#view.buttons + 1] = { key = "maximum", text = MAXIMUM_TEXT, enabled = locked == nil }
@@ -214,9 +225,24 @@ local function costSource(tab)
     return { kind = "quiet", entry = quiet, measuredLine = line }
 end
 
--- ctx.costs and ctx.maximum for a tab: what each level costs against the test, and what everything at the highest would give
--- ({fps, skipped, leftOut}: fps only when the test measured the highest level of every setting Maximum would set). A test the
--- recommender cannot read is no test: the window must still draw.
+-- The levels a tab holds, for the live total: the game's own values on the tab in use, the saved ones on the other.
+local function heldValues(tab)
+    local values = {}
+    local db = ns.profiles and ns.profiles.state()
+    if not db then return values end
+    local live = db.active == tab
+    for _, entry in ipairs(ns.bench and ns.bench.resolve() or {}) do
+        local value
+        if live then value = GetCVar(entry.cvar) else value = db.profiles[tab].values[entry.cvar] end
+        if value ~= nil then values[entry.cvar] = value end
+    end
+    return values
+end
+
+-- ctx.costs, ctx.maximum and ctx.estimate for a tab: what each level costs against the test, what everything at the highest
+-- would give ({fps, skipped, leftOut}: fps only when the test measured the highest level of every setting Maximum would set),
+-- and what the levels the tab holds would give ({fps, counted, notCounted}). A test the recommender cannot read is no test:
+-- the window must still draw, with or without the last.
 local function costsAndMaximum(tab)
     local values, leftOut = {}, {}
     if ns.profiles then values, leftOut = ns.profiles.maxValues() end
@@ -235,7 +261,12 @@ local function costsAndMaximum(tab)
             if #estimate.missing > 0 then maximum.skipped = #estimate.missing else maximum.fps = estimate.fps end
         end
     end
-    return { kind = source.kind, measuredLine = source.measuredLine, fps = fps }, maximum
+    local held, heldCount = heldValues(tab), 0
+    for _ in pairs(held) do heldCount = heldCount + 1 end
+    local okHeld, yours = pcall(ns.recommend.estimateFps, source.entry, held)
+    local mine
+    if okHeld and yours then mine = { fps = yours.fps, counted = heldCount - #yours.missing, notCounted = #yours.missing } end
+    return { kind = source.kind, measuredLine = source.measuredLine, fps = fps }, maximum, mine
 end
 
 -- The live facts the model needs; the costs only for a draw (they are not part of what the refresh looks at).
@@ -249,7 +280,7 @@ local function context(withCosts)
         active = db and db.active or "original", saved = saved, live = function(cvar) return GetCVar(cvar) end,
         resolved = ns.bench and ns.bench.resolve() or {}, locked = lockReason(),
     }
-    if withCosts then ctx.costs, ctx.maximum = costsAndMaximum(state.tab) end
+    if withCosts then ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab) end
     return ctx
 end
 
@@ -442,6 +473,7 @@ local function build()
     p.notice:SetTextColor(1, 0.2, 0.2)
     p.mattersNote = text(f, "GameFontDisableSmall", WIDTH - 40)
     p.total = text(f, "GameFontNormal", WIDTH - 40)
+    p.your = text(f, "GameFontNormal", WIDTH - 40)
     p.tabs = {}
     for i, key in ipairs(TABS) do
         local button = makeButton(f, 180)
@@ -552,7 +584,8 @@ function settings.render()
     if view.refusal then notices[#notices + 1] = view.refusal end
     if #notices > 0 then place(p.notice, table.concat(notices, "\n"), 6) else p.notice:SetText(""); p.notice:Hide() end
 
-    -- Above the footer buttons, stacked up from them: the total, then the note on "matters to the picture".
+    -- Above the footer buttons, stacked up from them: the total, the line on what this tab's levels give, then the note on
+    -- "matters to the picture".
     local bottom = 44
     local function stack(fs, str)
         if not str then
@@ -567,6 +600,7 @@ function settings.render()
         bottom = bottom + heightOf(fs, str) + 4
     end
     stack(p.total, view.totalLine)
+    stack(p.your, view.yourLine)
     stack(p.mattersNote, view.mattersNote)
 
     p.scroll:ClearAllPoints()
