@@ -100,6 +100,16 @@ local function makeFrame(kind, name, parent, template)
     function f:UnlockHighlight() self.locked = false end
     function f:SetChecked(on) self.checked = on and true or false end
     function f:GetChecked() return self.checked end
+    -- A slider keeps its range and value; changing the value in code runs OnValueChanged with userInput false, as the client's
+    -- does (a test fires the script itself, with userInput true, to play a drag).
+    function f:SetMinMaxValues(lo, hi) self._min, self._max = lo, hi end
+    function f:SetValueStep(step) self._step = step end
+    function f:SetValue(v)
+        local changed = self._value ~= v
+        self._value = v
+        if changed and self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, v, false) end
+    end
+    function f:GetValue() return self._value end
     -- A click on an enabled button runs its OnClick script; a check button flips first, as the client's does.
     function f:Click()
         if not self.enabled then return end

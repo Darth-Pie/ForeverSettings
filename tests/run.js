@@ -1285,7 +1285,7 @@ end`],
     local leftOut`],
   'mx-back-keeps-maximum': ['Profiles.lua', `    if db.active == "original" and name ~= "original" then`, `    if name ~= "original" then`],
   'mx-setvalue-edits-maximum': ['Profiles.lua', `    if db.active == "maximum" then return false, maximumRefusal(silent) end
-    if db.original.values[cvar] == nil then`, `    if db.original.values[cvar] == nil then`],
+    if boostState and boostState.cvar:lower() == cvar:lower() then boostState = nil end    -- the chosen level takes over`, `    if boostState and boostState.cvar:lower() == cvar:lower() then boostState = nil end    -- the chosen level takes over`],
   'mx-unsetvalue-edits-maximum': ['Profiles.lua', `    if db.active == "maximum" then return false, maximumRefusal(silent) end
     local profile = db.profiles[db.active]`, `    local profile = db.profiles[db.active]`],
   'mx-save-maximum-stores': ['Profiles.lua', `    if name == "maximum" then return nil, maximumRefusal(silent) end`, `    local _ = name`],
@@ -1479,7 +1479,7 @@ end`],
   'probe-writes': ['ForeverSettings.lua', `            local okDefault, default = false, nil`, `            pcall(SetCVar, name, now)
             local okDefault, default = false, nil`],
   'probe-not-routed': ['ForeverSettings.lua', `    elseif cmd == "probe" then`, `    elseif cmd == "probe-off" then`],
-  'probe-commands-line': ['ForeverSettings.lua', `dump <text>, probe [names], profile`, `dump <text>, profile`],
+  'probe-commands-line': ['ForeverSettings.lua', `dump <text>, probe [names], size`, `dump <text>, size`],
   'probe-list-typo': ['ForeverSettings.lua', `"overridefarclip", "farclip", "horizonfarclip"`, `"overridefarclip", "farclp", "horizonfarclip"`],
   'probe-list-duplicate': ['ForeverSettings.lua', `"overridefarclip", "farclip", "horizonfarclip"`, `"overridefarclip", "farclip", "FarClip", "horizonfarclip"`],
   'probe-width-unbounded': ['ForeverSettings.lua', `local PROBE_WIDTH = 200`, `local PROBE_WIDTH = 100000`],
@@ -1496,6 +1496,104 @@ end`],
   'probe-get-unguarded': ['ForeverSettings.lua', `local ok, now = pcall(GetCVar, name)`, `local ok, now = true, GetCVar(name)`],
   'probe-default-unguarded': ['ForeverSettings.lua', `okDefault, default = pcall(GetCVarDefault, name) end`, `okDefault, default = true, GetCVarDefault(name) end`],
   'probe-default-no-mark': ['ForeverSettings.lua', `tostring(default) or "?")`, `tostring(default) or "")`],
+
+  // The picture sharpness slider, this session only (spec 2026-11-02-picture-sharpness-slider-design.md)
+  'size-range-low': ['Profiles.lua', `fraction < BOOST_MIN or fraction > BOOST_MAX then`, `fraction < 0 or fraction > BOOST_MAX then`],
+  'size-range-high': ['Profiles.lua', `fraction < BOOST_MIN or fraction > BOOST_MAX then`, `fraction < BOOST_MIN or fraction > 4 then`],
+  'size-combat-ignored': ['Profiles.lua', `    if InCombatLockdown() then
+        speak(silent, "in combat; try again afterwards")
+        return false, "combat"
+    end
+    if busy() then
+        speak(silent, "benchmark running; try again afterwards")
+        return false, "busy"
+    end
+    local active = profiles.boosted()`, `    if busy() then
+        speak(silent, "benchmark running; try again afterwards")
+        return false, "busy"
+    end
+    local active = profiles.boosted()`],
+  'size-busy-ignored': ['Profiles.lua', `    if InCombatLockdown() then
+        speak(silent, "in combat; try again afterwards")
+        return false, "combat"
+    end
+    if busy() then
+        speak(silent, "benchmark running; try again afterwards")
+        return false, "busy"
+    end
+    local active = profiles.boosted()`, `    if InCombatLockdown() then
+        speak(silent, "in combat; try again afterwards")
+        return false, "combat"
+    end
+    local active = profiles.boosted()`],
+  'size-unavailable-ignored': ['Profiles.lua', `    if now == nil then
+        speak(silent, "this client has no picture sharpness setting")
+        return false, "unavailable"
+    end`, `    local _ = now`],
+  'size-before-forgotten': ['Profiles.lua', `local before = active and active.before or now`, `local before = now`],
+  'size-clamp-unnoticed': ['Profiles.lua', `local refused = not sameValue(held, fraction)`, `local refused = false`],
+  'size-unchanged-kept': ['Profiles.lua', `    if sameValue(held, before) then
+        boostState = nil`, `    if false then
+        boostState = nil`],
+  'size-message-missing': ['Profiles.lua', `speak(silent, "picture sharpness is " .. percent(held) .. " for this session; it goes back to " .. percent(before)`, `speak(silent, "" .. percent(before)`],
+  'size-stale-boost': ['Profiles.lua', `if boostState and sameValue(GetCVar(boostState.cvar), boostState.value) then return boostState end`, `if boostState then return boostState end`],
+  'size-unboost-stale-writes': ['Profiles.lua', `    local state = profiles.boosted()
+    if not state then return false, "none" end`, `    local state = boostState
+    if not state then return false, "none" end`],
+  'size-unboost-silent': ['Profiles.lua', `speak(silent, "picture sharpness is back to " .. percent(state.before))`, `local _ = silent`],
+  'size-unboost-unchecked': ['Profiles.lua', `if not sameValue(GetCVar(state.cvar), state.before) then`, `if false then`],
+  'size-switch-keeps-boost': ['Profiles.lua', `    if boostState and plan.writes[boostState.cvar] ~= nil then boostState = nil end         -- the profile's level takes over`, `    local _ = boostState`],
+  'size-setvalue-keeps-boost': ['Profiles.lua', `    if boostState and boostState.cvar:lower() == cvar:lower() then boostState = nil end    -- the chosen level takes over`, `    local _ = boostState`],
+  'size-enforced-over-boost': ['ForeverSettings.lua', `if boost and name:lower() == boost.cvar:lower() then`, `if false then`],
+  'size-enforce-skips-all': ['ForeverSettings.lua', `if boost and name:lower() == boost.cvar:lower() then`, `if boost then`],
+  'size-logout-off': ['ForeverSettings.lua', `    elseif event == "PLAYER_LOGOUT" then`, `    elseif event == "PLAYER_LOGOUT-off" then`],
+  'size-logout-unguarded': ['ForeverSettings.lua', `if ns.profiles and ns.profiles.unboost then pcall(ns.profiles.unboost, true) end`, `if ns.profiles and ns.profiles.unboost then ns.profiles.unboost(true) end`],
+  'size-logout-unregistered': ['ForeverSettings.lua', `frame:RegisterEvent("PLAYER_LOGOUT")`, `local _ = frame`],
+  'size-cmd-not-routed': ['ForeverSettings.lua', `    elseif cmd == "size" then`, `    elseif cmd == "size-off" then`],
+  'size-cmd-words': ['ForeverSettings.lua', `word == "off" or word == "normal" or word == "back"`, `word == "off"`],
+  'size-cmd-percent-sign': ['ForeverSettings.lua', `local number = tonumber((word:gsub("%%$", "")))`, `local number = tonumber(word)`],
+  'size-cmd-fraction': ['ForeverSettings.lua', `ns.profiles.boost(number / 100)`, `ns.profiles.boost(number)`],
+  'size-cmd-status-session': ['ForeverSettings.lua', `        elseif active then`, `        elseif false then`],
+  'size-cmd-none-silent': ['ForeverSettings.lua', `if not ok and why == "none" then say("picture sharpness is not changed this session") end`, `if false then say("picture sharpness is not changed this session") end`],
+  'size-cmd-unavailable-silent': ['ForeverSettings.lua', `            say("this client has no picture sharpness setting")
+        elseif active then`, `            local _ = live
+        elseif active then`],
+  'size-cmd-no-profiles': ['ForeverSettings.lua', `if not (ns.profiles and ns.profiles.boost) then say("profiles module not loaded") return end`, `if not (ns.profiles and ns.profiles.boost) then say("") return end`],
+  'size-commands-line': ['ForeverSettings.lua', `probe [names], size [percent], profile`, `probe [names], profile`],
+  'size-release-check': ['Bench.lua', `    releaseBoost()
+    local resolved = bench.resolve()`, `    local resolved = bench.resolve()`],
+  'size-release-run': ['Bench.lua', `    releaseBoost()
+    local currents = currentsOf(resolved)`, `    local currents = currentsOf(resolved)`],
+  'size-release-crowd': ['Bench.lua', `    releaseBoost()
+    local currents = currentsOf(bench.resolve())`, `    local currents = currentsOf(bench.resolve())`],
+  'size-release-verify': ['Bench.lua', `    if #names == 0 then return onDone({ ok = false, reason = "nothing to check" }) end
+    releaseBoost()`, `    if #names == 0 then return onDone({ ok = false, reason = "nothing to check" }) end`],
+  'size-release-unguarded': ['Bench.lua', `pcall(ns.profiles.unboost, true)`, `ns.profiles.unboost(true)`],
+  'size-no-setting': ['Settings.lua', `    if live == nil then return nil end
+    local boost = ns.profiles`, `    live = live or 1
+    local boost = ns.profiles`],
+  'size-warning-at-100': ['Settings.lua', `warning = size.percent > 100 and SIZE_WARNING or nil`, `warning = size.percent >= 100 and SIZE_WARNING or nil`],
+  'size-warning-never': ['Settings.lua', `warning = size.percent > 100 and SIZE_WARNING or nil`, `warning = nil`],
+  'size-normal-not-said': ['Settings.lua', `if size.boosted and size.before then label`, `if false then label`],
+  'size-putback-always': ['Settings.lua', `canPutBack = (size.boosted and locked == nil) and true or false`, `canPutBack = locked == nil`],
+  'size-enabled-ignores-lock': ['Settings.lua', `warning = size.percent > 100 and SIZE_WARNING or nil, enabled = locked == nil,`, `warning = size.percent > 100 and SIZE_WARNING or nil, enabled = true,`],
+  'size-value-unclamped': ['Settings.lua', `value = math.max(SIZE_MIN, math.min(SIZE_MAX, size.percent))`, `value = size.percent`],
+  'size-round-down': ['Settings.lua', `math.floor((tonumber(value) or SIZE_MIN) / SIZE_STEP + 0.5) * SIZE_STEP`, `math.floor((tonumber(value) or SIZE_MIN) / SIZE_STEP) * SIZE_STEP`],
+  'size-applies-while-dragging': ['Settings.lua', `p.sizeLabel:SetText(settings.sizeLabel(roundToStep(value)))`, `settings.click("size:" .. roundToStep(value))`],
+  'size-notice-missing': ['Settings.lua', `if ok and info.refused then`, `if false then`],
+  'size-back-missing': ['Settings.lua', `if key == "sizeback" then`, `if key == "sizeback-off" then`],
+  'size-click-pattern': ['Settings.lua', `key:match("^size:(%d+)$")`, `key:match("^size:(%d%d)$")`],
+  'size-range-max': ['Settings.lua', `slider:SetMinMaxValues(SIZE_MIN, SIZE_MAX)`, `slider:SetMinMaxValues(SIZE_MIN, 150)`],
+  'size-step': ['Settings.lua', `slider:SetValueStep(SIZE_STEP)`, `slider:SetValueStep(1)`],
+  'size-stack-order': ['Settings.lua', `    stack(p.sizeNote, size and size.note)
+    stack(p.sizeWarn, size and size.warning)`, `    stack(p.sizeWarn, size and size.warning)
+    stack(p.sizeNote, size and size.note)`],
+  'size-label-not-stacked': ['Settings.lua', `    stack(p.sizeLabel, size and size.label)
+`, ``],
+  'size-value-not-set': ['Settings.lua', `        p.sizeSlider:SetValue(size.value)
+`, ``],
+  'size-back-always-enabled': ['Settings.lua', `p.sizeBack:SetEnabled(size.canPutBack)`, `p.sizeBack:SetEnabled(true)`],
+  'size-slider-never-greyed': ['Settings.lua', `if p.sizeSlider.SetEnabled then p.sizeSlider:SetEnabled(size.enabled) end`, `local _ = size`],
 
   // Maximum and costs, review fix pass: Maximum is re-derived at a loading screen, the window names a level the game refused
   'mx-refresh-always': ['Profiles.lua', `    if db and db.active == "maximum" then db.want = profiles.plan("maximum").want end`, `    if db then db.want = profiles.plan("maximum").want end`],

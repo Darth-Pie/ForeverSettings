@@ -748,6 +748,12 @@ local function snapshotNames(resolved, control)
     return names
 end
 
+-- A picture sharpness boost is for looking, not measuring: a test starts from the normal size, and reads the control
+-- setting's value only after that.
+local function releaseBoost()
+    if ns.profiles and ns.profiles.unboost then pcall(ns.profiles.unboost, true) end
+end
+
 local function beginRun(extraNames)
     local originals = restore.capture()
     if next(originals) == nil then
@@ -788,6 +794,7 @@ function bench.check(onDone)
         return onDone({ ok = false, reason = "preflight", problems = problems })
     end
     ns.say("close browsers, streaming and VR software before measuring")
+    releaseBoost()
     local resolved = bench.resolve()
     local control = bench.pickControl(resolved, currentsOf(resolved))
     if not control then
@@ -1076,6 +1083,7 @@ function bench.run(onDone, opts)
         say("nothing to measure: no setting has both a CVar in this client and known tiers")
         return onDone({ ok = false, reason = "nothing to measure" })
     end
+    releaseBoost()
     local currents = currentsOf(resolved)
     local control = bench.pickControl(resolved, currents)
     if not control then
@@ -1354,6 +1362,7 @@ function bench.crowd(quiet, onDone, opts)
         say("nothing to measure: the quiet-spot test holds no setting that can be lowered further")
         return onDone({ ok = false, reason = "nothing to measure" })
     end
+    releaseBoost()
     local currents = currentsOf(bench.resolve())
     local names = {}
     for _, item in ipairs(plan) do names[#names + 1] = item.cvar end
@@ -1503,6 +1512,7 @@ function bench.verify(values, onDone, opts)
     local names = {}
     for cvar in pairs(values or {}) do names[#names + 1] = cvar end
     if #names == 0 then return onDone({ ok = false, reason = "nothing to check" }) end
+    releaseBoost()
     local originals = beginRun(names)
     if not originals then return onDone({ ok = false, reason = "no snapshot" }) end
 

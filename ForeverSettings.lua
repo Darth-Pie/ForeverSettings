@@ -10,6 +10,7 @@
 --   /fset dump <text>          list CVars whose name contains <text>, with current and default values
 --   /fset probe [names]        ask the client which of these CVars exist (the beyond-Ultra macros' when none are given);
 --                              changes nothing
+--   /fset size [percent | off] the picture sharpness (Render scale), 50 to 200, for this session only
 
 local _, ns = ...
 
@@ -164,10 +165,14 @@ local function applyAll(manual, silent)
     end
     pending = false
     local changed = 0
+    -- A picture sharpness boost holds its setting for the session: a loading screen must not undo it.
+    local boost = ns.profiles and ns.profiles.boosted and ns.profiles.boosted()
     for _, name in ipairs(orderedKeys(db.want)) do
         local value = db.want[name]
         local current = GetCVar(name)
-        if current == nil then
+        if boost and name:lower() == boost.cvar:lower() then
+            -- left as the boost has it
+        elseif current == nil then
             if not warned[name] then
                 warned[name] = true
                 say("unknown CVar '" .. name .. "', skipped (find the right name with /fset dump <part of it>)")
@@ -200,7 +205,7 @@ local function showList()
         local flag = (current ~= nil and same(current, db.want[name])) and "" or "  <- differs"
         say(name .. ": want " .. db.want[name] .. ", now " .. tostring(current) .. flag)
     end
-    say("commands: set, unset, apply, reset, dump <text>, probe [names], profile, bench, minimap")
+    say("commands: set, unset, apply, reset, dump <text>, probe [names], size [percent], profile, bench, minimap")
 end
 
 local function dump(needle)
@@ -295,6 +300,35 @@ local function probe(rest)
     if #missing > 0 then sayPacked("not here:", missing, ", ") end
 end
 
+local function percentOf(value)
+    return string.format("%.0f%%", tonumber(value) * 100)
+end
+
+-- /fset size [percent | off]: the picture sharpness for this session only (Profiles.lua holds the boost and puts the old
+-- value back at logout).
+local function size(rest)
+    if not (ns.profiles and ns.profiles.boost) then say("profiles module not loaded") return end
+    local word = (rest:lower():gsub("%s+", ""))
+    if word == "" then
+        local live = GetCVar("RenderScale")
+        local active = ns.profiles.boosted()
+        if live == nil then
+            say("this client has no picture sharpness setting")
+        elseif active then
+            say("picture sharpness is " .. percentOf(live) .. " for this session; it goes back to " .. percentOf(active.before) .. " when you log out")
+        else
+            say("picture sharpness is " .. percentOf(live))
+        end
+    elseif word == "off" or word == "normal" or word == "back" then
+        local ok, why = ns.profiles.unboost()
+        if not ok and why == "none" then say("picture sharpness is not changed this session") end
+    else
+        local number = tonumber((word:gsub("%%$", "")))
+        if number == nil then say("usage: /fset size 50 to 200, or /fset size off") return end
+        ns.profiles.boost(number / 100)
+    end
+end
+
 local function handleSlash(msg)
     local cmd, rest = trim(msg or ""):match("^(%S*)%s*(.*)$")
     cmd = cmd:lower()
@@ -319,6 +353,8 @@ local function handleSlash(msg)
         dump(rest)
     elseif cmd == "probe" then
         probe(rest)
+    elseif cmd == "size" then
+        size(rest)
     elseif cmd == "bench" then
         if ns.bench and ns.bench.handle then
             ns.bench.handle(rest)
@@ -369,6 +405,7 @@ local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+frame:RegisterEvent("PLAYER_LOGOUT")
 frame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
         if arg1 ~= "ForeverSettings" then return end
@@ -399,6 +436,9 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         applyAll(false)
     elseif event == "PLAYER_REGEN_ENABLED" then
         if pending then applyAll(false) end
+    elseif event == "PLAYER_LOGOUT" then
+        -- A picture sharpness boost is for this session: the game writes its settings on this exit, so the old value goes back first.
+        if ns.profiles and ns.profiles.unboost then pcall(ns.profiles.unboost, true) end
     end
 end)
 

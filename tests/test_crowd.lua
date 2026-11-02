@@ -543,4 +543,22 @@ test("QT-9 a silent check of a recommendation prints nothing on success and on a
         and refusedText == "" and loud and loud.reason == "preflight" and has("cannot check: "), okText .. " / " .. refusedText
 end)
 
+-- A picture sharpness boost (spec 2026-11-02-picture-sharpness-slider-design.md) ends when any test starts: it measures the
+-- normal size (7 ms a frame on the fake renderer, against 9 ms at 150%) and the game ends there.
+test("CZ-1 a crowd test starts from the normal picture sharpness", function()
+    local e, b = newRun()
+    e.ns.profiles.boost(1.5, true)
+    local r = doCrowd(e, b, quietEntry())[1]
+    return r and r.valid and near(r.baselineMs, 7.0, 0.2) and CVARS.RenderScale == "1" and e.ns.profiles.boosted() == nil,
+        tostring(r and r.baselineMs)
+end)
+
+test("CZ-2 the check of a recommendation starts from the normal picture sharpness", function()
+    local e, b = newRun()
+    e.ns.profiles.boost(1.5, true)
+    local r = doVerify(e, b, { graphicsShadowQuality = "0" })[1]
+    return r and r.ok and near(r.baselineMs, 7.0, 0.2) and CVARS.RenderScale == "1" and e.ns.profiles.boosted() == nil,
+        tostring(r and r.baselineMs) .. " " .. tostring(r and r.reason)
+end)
+
 return H.results()

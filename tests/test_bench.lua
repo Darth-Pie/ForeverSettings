@@ -670,6 +670,23 @@ test("B6-1 check: baseline and spread printed, the control responds, everything 
         and CVARS.RenderScale == "1" and e.ns.suspended == false and b.active() == false and pendingOf(b) == nil, outText()
 end)
 
+test("B6-1b a picture sharpness boost ends when a test starts: it measures the normal size and the game ends there", function()
+    local e, b = newBench(checkCvars())
+    e.ns.profiles.boost(1.5, true)
+    local started = CVARS.RenderScale == "1.5" and e.ns.profiles.boosted() ~= nil
+    local results = runCheck(e, b)
+    local r = results[1]
+    return started and #results == 1 and r.ok and near(r.baselineMs, 8.0, 0.01) and CVARS.RenderScale == "1"
+        and e.ns.profiles.boosted() == nil and pendingOf(b) == nil, outText()
+end)
+
+test("B6-1c a boost that cannot be put back does not stop a test from starting", function()
+    local e, b = newBench(checkCvars())
+    e.ns.profiles.unboost = function() error("boom") end
+    local results = runCheck(e, b)
+    return #results == 1 and results[1].ok and CVARS.RenderScale == "1", outText()
+end)
+
 test("B6-2 a frame time that does not follow the control ends the check with 'did not respond'", function()
     local e, b = newBench(checkCvars())
     local results = runCheck(e, b, function() return 0.008 end)
@@ -808,6 +825,14 @@ local function rowsOf(entry, cvar)
 end
 local function reportText(b, entry) return table.concat(b.report(entry), "\n") end
 local function copyOf(t) local c = {} for k, v in pairs(t) do c[k] = v end return c end
+
+test("B7-0 a picture sharpness boost ends when a run starts: the baseline is the normal size and the game ends there", function()
+    local e, b = newRun()
+    e.ns.profiles.boost(1.5, true)                       -- 9 ms a frame on the fake renderer, against 7 ms at the normal size
+    local entry = doRun(e, b)[1]
+    return entry and entry.valid and near(entry.baselineMs, 7.0, 0.2) and CVARS.RenderScale == "1" and e.ns.profiles.boosted() == nil,
+        tostring(entry and entry.baselineMs)
+end)
 
 test("B7-1 every tier's delta matches the model, and the starting tier has delta 0", function()
     local e, b = newRun()

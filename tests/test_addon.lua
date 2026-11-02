@@ -437,4 +437,89 @@ OUT = {}
 local okNd = pcall(e_nd.slash, "probe farclip")
 check("TP-6 no default to give: the value is listed with a question mark", okNd and count("farclip = 1600 / ?") == 1, out())
 
+-- TS: the picture sharpness boost in the addon's own wiring (spec 2026-11-02-picture-sharpness-slider-design.md): a loading
+-- screen leaves a boosted setting alone, logout puts the old value back, and /fset size does it from chat.
+local function tsGame(extra)
+    local cv = { RenderScale = "1", graphicsSSAO = "3", accountName = "x" }
+    for k, v in pairs(extra or {}) do cv[k] = v end
+    return boot(cv, { fresh = true, defaults = false })
+end
+
+local et = tsGame()
+et.slash("profile everyday")
+et.slash("set RenderScale 0.8")
+et.slash("set graphicsSSAO 2")
+et.ns.profiles.boost(1.5, true)
+CVARS.graphicsSSAO = "3"                                  -- something else drifts away
+et.fire("PLAYER_ENTERING_WORLD")
+check("TS-1 a loading screen leaves a boosted setting alone and still puts the others back", CVARS.RenderScale == "1.5" and CVARS.graphicsSSAO == "2",
+    tostring(CVARS.RenderScale) .. " / " .. tostring(CVARS.graphicsSSAO))
+CVARS.RenderScale = "0.9"                                 -- changed elsewhere: the boost is over and the profile's level is enforced again
+et.fire("PLAYER_ENTERING_WORLD")
+check("TS-1 once the game holds another value the profile's level is enforced again", CVARS.RenderScale == "0.8", CVARS.RenderScale)
+
+local el = tsGame()
+el.ns.profiles.boost(1.5, true)
+OUT, SETLOG = {}, {}
+el.fire("PLAYER_LOGOUT")
+check("TS-2 logout puts the value from before back, silently", CVARS.RenderScale == "1" and el.ns.profiles.boosted() == nil and #OUT == 0
+    and next(ForeverSettingsDB.want) == nil, tostring(CVARS.RenderScale) .. " " .. out())
+SETLOG = {}
+el.fire("PLAYER_LOGOUT")
+check("TS-2 logout with no boost writes nothing", #SETLOG == 0, #SETLOG)
+el.ns.profiles.boost(1.5, true)
+CVARS.RenderScale = "0.7"                                 -- the player set another value since
+SETLOG = {}
+el.fire("PLAYER_LOGOUT")
+check("TS-2 logout leaves a value the player set since alone", #SETLOG == 0 and CVARS.RenderScale == "0.7", #SETLOG)
+el.ns.profiles.unboost = function() error("boom") end
+local okLogout = pcall(el.fire, "PLAYER_LOGOUT")
+check("TS-2 a failing put-back does not escape the logout", okLogout, "error escaped")
+
+local es = tsGame()
+OUT = {}
+es.slash("size")
+check("TS-3 /fset size says the current size", count("picture sharpness is 100%") == 1 and count("for this session") == 0, out())
+OUT = {}
+es.slash("size 150")
+check("TS-3 /fset size 150 boosts to 150% and says what it goes back to", CVARS.RenderScale == "1.5"
+    and count("picture sharpness is 150% for this session; it goes back to 100% when you log out") == 1, tostring(CVARS.RenderScale) .. " " .. out())
+OUT = {}
+es.slash("size")
+check("TS-3 /fset size says a boost is for this session", count("picture sharpness is 150% for this session; it goes back to 100% when you log out") == 1, out())
+OUT = {}
+es.slash("size 175%")
+check("TS-3 a percent sign is accepted", CVARS.RenderScale == "1.75", CVARS.RenderScale)
+OUT = {}
+es.slash("size 201")
+check("TS-3 a size out of range is refused and nothing changes", count("50% to 200%") == 1 and CVARS.RenderScale == "1.75", tostring(CVARS.RenderScale) .. " " .. out())
+OUT = {}
+es.slash("size abc")
+check("TS-3 something that is not a number shows the usage", count("usage: /fset size") == 1 and CVARS.RenderScale == "1.75", out())
+OUT = {}
+es.slash("size off")
+check("TS-3 /fset size off puts the value from before back", CVARS.RenderScale == "1" and count("picture sharpness is back to 100%") == 1, tostring(CVARS.RenderScale) .. " " .. out())
+OUT = {}
+es.slash("size off")
+check("TS-3 /fset size off with nothing to put back says so", count("picture sharpness is not changed this session") == 1, out())
+es.slash("size 150")
+es.slash("size normal")
+local viaNormal = CVARS.RenderScale == "1"
+es.slash("size 150")
+es.slash("size back")
+check("TS-3 normal and back mean the same as off", viaNormal and CVARS.RenderScale == "1", tostring(CVARS.RenderScale))
+OUT = {}
+es.slash("")
+check("TS-3 the command list names size", count("size [percent]") == 1, out())
+
+local en = boot({ graphicsSSAO = "3", accountName = "x" }, { fresh = true, defaults = false })
+OUT = {}
+en.slash("size")
+en.slash("size 150")
+check("TS-3 a client without the setting says so", count("this client has no picture sharpness setting") == 2, out())
+local ep = boot({ RenderScale = "1", accountName = "x" }, { fresh = true, defaults = false, profiles = false })
+OUT = {}
+ep.slash("size 150")
+check("TS-3 without the profiles module /fset size says so", count("profiles module not loaded") == 1 and CVARS.RenderScale == "1", out())
+
 return H.results()

@@ -8,7 +8,7 @@ ns.settings = settings
 local GetCVar = C_CVar and C_CVar.GetCVar or _G.GetCVar
 
 local FRAME_NAME = "ForeverSettingsSettings"
-local WIDTH, HEIGHT = 580, 540
+local WIDTH, HEIGHT = 580, 620
 local CONTENT_WIDTH = 520
 local REFRESH = 0.5            -- seconds of frame time between looks at what changed outside the window
 local BUTTON_WIDTH, BUTTON_GAP = 100, 4
@@ -25,6 +25,11 @@ local MATTERS_NOTE = [["Matters to the picture" is the addon's own judgement, no
 local NOTHING_TEXT = "Maximum has nothing to set yet: run Find my best settings once so the addon learns what each setting can do."
 local USE_TEXT = "Use what I have in the game now"
 local MAXIMUM_TEXT = "Switch to Maximum"
+local SIZE_MIN, SIZE_MAX, SIZE_STEP = 50, 200, 5          -- percent: the picture sharpness slider (this session only)
+local SIZE_SLIDER_WIDTH, SIZE_BACK_WIDTH = 360, 140
+local SIZE_NOTE = "Not saved: the game goes back to your normal setting when you log out."
+local SIZE_WARNING = "Above 100% the game draws more pixels than your screen has. That can cost a lot of frame rate and graphics memory, "
+    .. "and some graphics cards crash at high values."
 local YOUR_TAIL = " (an estimate; settings affect each other)."
 local NOT_COUNTED = "the test didn't measure the level you chose."
 local LOCKED_TEXT = {
@@ -96,6 +101,11 @@ local function refusedNames(mismatched)
         if name ~= "" then list[#list + 1] = name end
     end
     return list
+end
+
+-- "Picture sharpness right now: 150%".
+function settings.sizeLabel(percent)
+    return "Picture sharpness right now: " .. percent .. "%"
 end
 
 -- What the window shows, with no frames (spec 3.4 and 2026-10-30-maximum-and-costs-design.md section 3.2).
@@ -185,6 +195,16 @@ function settings.model(st, ctx)
             view.yourLine = view.yourLine .. " " .. plural(est.notCounted, "setting") .. " not counted: " .. NOT_COUNTED
         end
     end
+    -- The picture sharpness block (spec 2026-11-02-picture-sharpness-slider-design.md); ctx.size = {percent, boosted, before}.
+    local size = ctx.size
+    if size then
+        local label = settings.sizeLabel(size.percent)
+        if size.boosted and size.before then label = label .. " (normal: " .. size.before .. "%)" end
+        view.size = { percent = size.percent, value = math.max(SIZE_MIN, math.min(SIZE_MAX, size.percent)), min = SIZE_MIN,
+            max = SIZE_MAX, step = SIZE_STEP, label = label, note = SIZE_NOTE,
+            warning = size.percent > 100 and SIZE_WARNING or nil, enabled = locked == nil,
+            canPutBack = (size.boosted and locked == nil) and true or false }
+    end
     view.buttons[#view.buttons + 1] = { key = "use", text = USE_TEXT, enabled = locked == nil }
     if ctx.active ~= "maximum" then
         view.buttons[#view.buttons + 1] = { key = "maximum", text = MAXIMUM_TEXT, enabled = locked == nil }
@@ -269,6 +289,16 @@ local function costsAndMaximum(tab)
     return { kind = source.kind, measuredLine = source.measuredLine, fps = fps }, maximum, mine
 end
 
+-- The picture sharpness now and whether a session-only change holds it, for the slider; nil when the client has no such setting.
+local function sizeContext()
+    local live = tonumber(GetCVar("RenderScale"))
+    if live == nil then return nil end
+    local boost = ns.profiles and ns.profiles.boosted and ns.profiles.boosted()
+    local before = boost and tonumber(boost.before)
+    return { percent = math.floor(live * 100 + 0.5), boosted = boost ~= nil and boost ~= false,
+        before = before and math.floor(before * 100 + 0.5) or nil }
+end
+
 -- The live facts the model needs; the costs only for a draw (they are not part of what the refresh looks at).
 local function context(withCosts)
     local db = ns.profiles and ns.profiles.state()
@@ -278,7 +308,7 @@ local function context(withCosts)
     end
     local ctx = {
         active = db and db.active or "original", saved = saved, live = function(cvar) return GetCVar(cvar) end,
-        resolved = ns.bench and ns.bench.resolve() or {}, locked = lockReason(),
+        resolved = ns.bench and ns.bench.resolve() or {}, locked = lockReason(), size = sizeContext(),
     }
     if withCosts then ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab) end
     return ctx
@@ -326,6 +356,22 @@ function settings.click(key)
         return
     end
     if not ns.profiles then return end
+    -- The picture sharpness slider (this session only): size:<percent> when the mouse button is let go, sizeback.
+    local percent = key:match("^size:(%d+)$")
+    if percent then
+        local ok, info = ns.profiles.boost(tonumber(percent) / 100, true)
+        if ok and info.refused then
+            state.notice = "The game kept picture sharpness at " .. string.format("%.0f%%", tonumber(info.held) * 100)
+                .. " (you asked for " .. percent .. "%)."
+        end
+        draw()
+        return
+    end
+    if key == "sizeback" then
+        ns.profiles.unboost(true)
+        draw()
+        return
+    end
     if key == "maximum" then
         local ok, info = ns.profiles.switch("maximum", true)
         if not ok and info == "nothing" then
@@ -436,6 +482,35 @@ local function makeCheck(parent)
     return box
 end
 
+-- The picture sharpness slider: dragging moves the label, letting go applies the size (rebuilding the game's render targets at
+-- every step of a drag would stutter), and a change made in code never applies anything (only the release does).
+local function roundToStep(value)
+    local stepped = math.floor((tonumber(value) or SIZE_MIN) / SIZE_STEP + 0.5) * SIZE_STEP
+    return math.max(SIZE_MIN, math.min(SIZE_MAX, stepped))
+end
+
+local function makeSlider(parent, p)
+    local slider, templated = make("Slider", FRAME_NAME .. "Size", parent, "OptionsSliderTemplate")
+    slider.key = "size"
+    slider:SetSize(SIZE_SLIDER_WIDTH, 17)
+    slider:SetOrientation("HORIZONTAL")
+    slider:SetMinMaxValues(SIZE_MIN, SIZE_MAX)
+    slider:SetValueStep(SIZE_STEP)
+    if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
+    if not templated then slider:SetThumbTexture("Interface/Buttons/UI-SliderBar-Button-Horizontal") end
+    local low, high, title = _G[FRAME_NAME .. "SizeLow"], _G[FRAME_NAME .. "SizeHigh"], _G[FRAME_NAME .. "SizeText"]
+    if low then low:SetText(SIZE_MIN .. "%") end
+    if high then high:SetText(SIZE_MAX .. "%") end
+    if title then title:SetText("") end
+    slider:SetScript("OnValueChanged", function(_, value)
+        p.sizeLabel:SetText(settings.sizeLabel(roundToStep(value)))        -- a draw sets the label right after moving the slider
+    end)
+    slider:SetScript("OnMouseUp", function(self)
+        settings.click("size:" .. roundToStep(self:GetValue()))
+    end)
+    return slider
+end
+
 -- A signature of everything the window shows that can change outside it.
 local function signature(ctx)
     local list = { tostring(ctx.active), tostring(ctx.locked), state.tab }
@@ -474,6 +549,14 @@ local function build()
     p.mattersNote = text(f, "GameFontDisableSmall", WIDTH - 40)
     p.total = text(f, "GameFontNormal", WIDTH - 40)
     p.your = text(f, "GameFontNormal", WIDTH - 40)
+    p.sizeLabel = text(f, "GameFontNormal", WIDTH - 40)
+    p.sizeNote = text(f, "GameFontHighlightSmall", WIDTH - 40)
+    p.sizeWarn = text(f, "GameFontNormal", WIDTH - 40)
+    p.sizeWarn:SetTextColor(1, 0.6, 0.2)
+    p.sizeSlider = makeSlider(f, p)
+    p.sizeBack = makeButton(f, SIZE_BACK_WIDTH)
+    p.sizeBack.key = "sizeback"
+    p.sizeBack:SetText("Back to normal")
     p.tabs = {}
     for i, key in ipairs(TABS) do
         local button = makeButton(f, 180)
@@ -599,6 +682,27 @@ function settings.render()
         fs:Show()
         bottom = bottom + heightOf(fs, str) + 4
     end
+    -- The picture sharpness block comes first from the footer: the note, the warning above 100%, the slider with Back to
+    -- normal beside it, then its label.
+    local size = view.size
+    stack(p.sizeNote, size and size.note)
+    stack(p.sizeWarn, size and size.warning)
+    if size then
+        p.sizeSlider:ClearAllPoints()
+        p.sizeSlider:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 24, bottom + 14)
+        p.sizeSlider:SetValue(size.value)
+        if p.sizeSlider.SetEnabled then p.sizeSlider:SetEnabled(size.enabled) end
+        p.sizeSlider:Show()
+        p.sizeBack:ClearAllPoints()
+        p.sizeBack:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 24 + SIZE_SLIDER_WIDTH + 20, bottom + 6)
+        p.sizeBack:SetEnabled(size.canPutBack)
+        p.sizeBack:Show()
+        bottom = bottom + 14 + 17 + 6
+    else
+        p.sizeSlider:Hide()
+        p.sizeBack:Hide()
+    end
+    stack(p.sizeLabel, size and size.label)
     stack(p.total, view.totalLine)
     stack(p.your, view.yourLine)
     stack(p.mattersNote, view.mattersNote)

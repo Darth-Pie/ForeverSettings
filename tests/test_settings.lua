@@ -823,7 +823,7 @@ test("S2-9b a client that wraps at 9 pixels a letter still has every note above 
     walk(f, function(frame) if frame.kind == "ScrollFrame" then scroll = frame end end)
     local scrollBottom = scroll and scroll._point and scroll._point[5] or 0
     local clear = mattersNote ~= nil and scrollBottom >= mattersNote._point[5] + STRINGHEIGHT(mattersNote)
-    local room = 540 - scrollBottom - headerBottom
+    local room = 620 - scrollBottom - headerBottom
     STRINGHEIGHT = nil
     return ordered and bottomUp and clear and room >= 120 and buttons ~= nil,
         tostring(ordered) .. tostring(bottomUp) .. tostring(clear) .. " header " .. tostring(headerBottom) .. " room " .. tostring(room)
@@ -970,6 +970,157 @@ test("S3-6 the line stacks between the matters note and the total, each clear of
     local clear = matters ~= nil and scrollBottom >= matters._point[5] + STRINGHEIGHT(matters)
     STRINGHEIGHT = nil
     return stacked and clear, tostring(stacked) .. tostring(clear)
+end)
+
+-- The picture sharpness block (spec 2026-11-02-picture-sharpness-slider-design.md): a slider for this session only.
+local SIZE_NOTE = "Not saved: the game goes back to your normal setting when you log out."
+local SIZE_WARNING = "Above 100% the game draws more pixels than your screen has. That can cost a lot of frame rate and graphics memory, "
+    .. "and some graphics cards crash at high values."
+local function drag(f, value)                       -- plays a drag to `value` and the release of the mouse button
+    local slider = byKey(f, "size")
+    slider._value = value
+    slider.scripts.OnValueChanged(slider, value, true)
+    slider.scripts.OnMouseUp(slider)
+end
+
+test("S4-1 the picture sharpness block: label, range, note, the warning above 100%, Back to normal only while changed, greyed when locked, absent without the setting", function()
+    local e, s = boot()
+    local function size(over, locked)
+        return s.model({ tab = "everyday" }, ctxOf(e, { size = over, locked = locked })).size
+    end
+    local normal = size({ percent = 100, boosted = false })
+    local up = size({ percent = 150, boosted = true, before = 100 })
+    local down = size({ percent = 80, boosted = true, before = 100 })
+    local near105 = size({ percent = 105, boosted = true, before = 100 })
+    local locked = size({ percent = 150, boosted = true, before = 100 }, "combat")
+    local low, high = size({ percent = 30, boosted = false }), size({ percent = 250, boosted = false })
+    return normal ~= nil and normal.label == "Picture sharpness right now: 100%" and normal.min == 50 and normal.max == 200
+        and normal.step == 5 and normal.value == 100 and normal.note == SIZE_NOTE and normal.warning == nil
+        and normal.canPutBack == false and normal.enabled == true
+        and up.label == "Picture sharpness right now: 150% (normal: 100%)" and up.warning == SIZE_WARNING and up.canPutBack == true
+        and down.label == "Picture sharpness right now: 80% (normal: 100%)" and down.warning == nil
+        and near105.warning == SIZE_WARNING and locked.enabled == false and locked.canPutBack == false
+        and low.value == 50 and low.label == "Picture sharpness right now: 30%" and high.value == 200
+        and s.model({ tab = "everyday" }, ctxOf(e, {})).size == nil, tostring(up and up.label)
+end)
+
+test("S4-2 the window draws the block; letting go of the slider applies the size, Back to normal puts it back, and nothing prints", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    local slider = byKey(f, "size")
+    local back = byKey(f, "sizeback")
+    local first = slider ~= nil and slider.kind == "Slider" and slider._min == 50 and slider._max == 200 and slider._step == 5
+        and slider._value == 100 and hasText(f, "Picture sharpness right now: 100%") and hasText(f, SIZE_NOTE)
+        and not hasText(f, SIZE_WARNING) and back ~= nil and back.enabled == false and back._text == "Back to normal"
+    SETLOG = {}
+    drag(f, 150)
+    local up = CVARS.RenderScale == "1.5" and hasText(f, "Picture sharpness right now: 150% (normal: 100%)") and hasText(f, SIZE_WARNING)
+        and byKey(f, "sizeback").enabled == true and byKey(f, "size")._value == 150 and #SETLOG == 1 and SETLOG[1] == "RenderScale"
+    byKey(f, "sizeback"):Click()
+    local down = CVARS.RenderScale == "1" and hasText(f, "Picture sharpness right now: 100%") and not hasText(f, "(normal:")
+        and not hasText(f, SIZE_WARNING) and byKey(f, "sizeback").enabled == false and byKey(f, "size")._value == 100
+    return first and up and down and #OUT == 0, tostring(first) .. tostring(up) .. tostring(down) .. outText()
+end)
+
+test("S4-3 dragging only moves the label; nothing is written until the mouse button is released", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    local slider = byKey(f, "size")
+    SETLOG = {}
+    slider._value = 175
+    slider.scripts.OnValueChanged(slider, 175, true)
+    local dragging = hasText(f, "Picture sharpness right now: 175%") and #SETLOG == 0 and CVARS.RenderScale == "1"
+    slider.scripts.OnMouseUp(slider)
+    return dragging and CVARS.RenderScale == "1.75" and #SETLOG == 1, tostring(dragging) .. tostring(CVARS.RenderScale)
+end)
+
+test("S4-4 drawing the window never writes: a size between steps, or out of the slider's range, only moves the slider", function()
+    local e, s = bootWith(fullEntry())
+    CVARS.RenderScale = "1.3"
+    SETLOG = {}
+    s.open("everyday")
+    local f = window()
+    local mid = byKey(f, "size")._value == 130 and hasText(f, "Picture sharpness right now: 130%")
+    CVARS.RenderScale = "0.3"
+    s.open("everyday")
+    local under = byKey(f, "size")._value == 50 and hasText(f, "Picture sharpness right now: 30%")
+    return mid and under and #SETLOG == 0 and #OUT == 0, tostring(mid) .. tostring(under) .. #SETLOG
+end)
+
+test("S4-5 the release rounds to the nearest step of 5", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    drag(f, 152)
+    local a = CVARS.RenderScale == "1.5"
+    drag(f, 153)
+    local b = CVARS.RenderScale == "1.55"
+    return a and b, tostring(CVARS.RenderScale)
+end)
+
+test("S4-6 in combat or during a test the slider and Back to normal are greyed, and a stray click writes nothing", function()
+    local e, s = bootWith(fullEntry())
+    CVARS.RenderScale = "1"
+    s.open("everyday")
+    local f = window()
+    drag(f, 150)
+    COMBAT = true
+    s.open("everyday")
+    local greyed = byKey(f, "size").enabled == false and byKey(f, "sizeback").enabled == false
+    SETLOG = {}
+    s.click("size:200")
+    s.click("sizeback")
+    local still = #SETLOG == 0 and CVARS.RenderScale == "1.5"
+    COMBAT = false
+    return greyed and still, tostring(greyed) .. tostring(still) .. tostring(CVARS.RenderScale)
+end)
+
+test("S4-7 a client with no picture sharpness setting has no block", function()
+    local e5 = H.boot({ graphicsShadowQuality = "2", graphicsSSAO = "1", vsync = "0" }, { fresh = true })
+    e5.ns.bench.now = function() return NOW end
+    e5.ns.bench.state().history[1] = quietEntry()
+    e5.ns.settings.open("everyday")
+    local f = window()
+    return f ~= nil and byKey(f, "size") == nil and byKey(f, "sizeback") == nil and not hasText(f, "Picture sharpness right now")
+        and not hasText(f, SIZE_NOTE)
+end)
+
+test("S4-8 a size the game will not take is said in the window, in plain words, and the slider shows what the game holds", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    SETFAIL.RenderScale = "clamp"
+    drag(f, 150)
+    return hasText(f, "The game kept picture sharpness at 100% (you asked for 150%).") and CVARS.RenderScale == "1"
+        and byKey(f, "size")._value == 100 and #OUT == 0, outText()
+end)
+
+test("S4-9 the block stands above the footer, the label over the slider over the warning over the note, and the total over them all", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f0 = window()
+    drag(f0, 150)
+    STRINGHEIGHT = function(fs)
+        local text = fs._text or ""
+        local perLine = math.max(1, math.floor((fs._width or 520) / 9))
+        return 14 * math.max(1, math.ceil(#text / perLine))
+    end
+    s.open("everyday")
+    local f = window()
+    local note, warn = fontStringWith(f, SIZE_NOTE), fontStringWith(f, SIZE_WARNING)
+    local label = fontStringWith(f, "Picture sharpness right now: 150% (normal: 100%)")
+    local total = fontStringWith(f, "Everything at the highest: about 152 fps.")
+    local slider, back = byKey(f, "size"), byKey(f, "sizeback")
+    local ok = note ~= nil and warn ~= nil and label ~= nil and total ~= nil and slider ~= nil and back ~= nil
+        and note._point[1] == "BOTTOMLEFT" and note._point[5] >= 38
+        and warn._point[5] >= note._point[5] + STRINGHEIGHT(note)
+        and slider._point[5] >= warn._point[5] + STRINGHEIGHT(warn)
+        and label._point[5] >= slider._point[5] + 17 and total._point[5] >= label._point[5] + STRINGHEIGHT(label)
+        and back._point[4] >= slider._point[4] + slider._width and back._point[4] + back._width <= 580
+    STRINGHEIGHT = nil
+    return ok, tostring(ok)
 end)
 
 return H.results()

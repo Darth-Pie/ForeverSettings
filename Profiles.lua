@@ -234,6 +234,79 @@ local function busy()
     return (ns.suspended or (ns.bench and ns.bench.active and ns.bench.active())) and true or false
 end
 
+-- The picture sharpness boost (spec 2026-11-02-picture-sharpness-slider-design.md): RenderScale changed in the live game only,
+-- for this session. It is never written into a profile or the saved list, so a crash cannot repeat at the next login; the
+-- value from before is put back when the boost ends and at logout.
+local BOOST_CVAR, BOOST_MIN, BOOST_MAX = "RenderScale", 0.5, 2
+local boostState                                    -- {cvar, value (what the game holds), before}, or nil
+
+local function percent(value)
+    return string.format("%.0f%%", tonumber(value) * 100)
+end
+
+-- The boost while the game still holds its value; nil once the player or a profile has set something else since.
+function profiles.boosted()
+    if boostState and sameValue(GetCVar(boostState.cvar), boostState.value) then return boostState end
+    boostState = nil
+    return nil
+end
+
+-- Sets the picture sharpness to `value` (a fraction: 1.5 is 150%) in the live game only. Returns true and {held, refused}
+-- (what the game holds, and whether that is not what was asked), or false and "range", "unavailable", "combat" or "busy".
+function profiles.boost(value, silent)
+    local fraction = tonumber(value)
+    if fraction == nil or fraction < BOOST_MIN or fraction > BOOST_MAX then
+        speak(silent, "picture sharpness goes from 50% to 200%")
+        return false, "range"
+    end
+    local now = GetCVar(BOOST_CVAR)
+    if now == nil then
+        speak(silent, "this client has no picture sharpness setting")
+        return false, "unavailable"
+    end
+    if InCombatLockdown() then
+        speak(silent, "in combat; try again afterwards")
+        return false, "combat"
+    end
+    if busy() then
+        speak(silent, "benchmark running; try again afterwards")
+        return false, "busy"
+    end
+    local active = profiles.boosted()
+    local before = active and active.before or now
+    pcall(SetCVar, BOOST_CVAR, string.format("%.4g", fraction))
+    local held = GetCVar(BOOST_CVAR)
+    local refused = not sameValue(held, fraction)
+    if refused then
+        speak(silent, "the game kept picture sharpness at " .. percent(held) .. " (wanted " .. percent(fraction) .. ")")
+    end
+    if sameValue(held, before) then
+        boostState = nil
+    else
+        boostState = { cvar = BOOST_CVAR, value = held, before = before }
+        if not refused then
+            speak(silent, "picture sharpness is " .. percent(held) .. " for this session; it goes back to " .. percent(before)
+                .. " when you log out")
+        end
+    end
+    return true, { held = held, refused = refused }
+end
+
+-- Ends the boost: the value from before goes back. False and "none" when there is no boost (or the game holds another
+-- value now, which is left alone), "failed" when the game would not take the old value back.
+function profiles.unboost(silent)
+    local state = profiles.boosted()
+    if not state then return false, "none" end
+    pcall(SetCVar, state.cvar, state.before)
+    if not sameValue(GetCVar(state.cvar), state.before) then
+        speak(silent, "the game would not put picture sharpness back to " .. percent(state.before))
+        return false, "failed"
+    end
+    boostState = nil
+    speak(silent, "picture sharpness is back to " .. percent(state.before))
+    return true
+end
+
 function profiles.active()
     local db = profiles.state()
     return db and db.active or "original"
@@ -301,6 +374,7 @@ function profiles.switch(name, silent)
             mismatched[#mismatched + 1] = { cvar = cvar, wanted = plan.writes[cvar], now = now }
         end
     end
+    if boostState and plan.writes[boostState.cvar] ~= nil then boostState = nil end         -- the profile's level takes over
     db.active = name
     db.want = plan.want
     for _, m in ipairs(mismatched) do
@@ -349,6 +423,7 @@ function profiles.setValue(cvar, value, silent)
         return false, "original"
     end
     if db.active == "maximum" then return false, maximumRefusal(silent) end
+    if boostState and boostState.cvar:lower() == cvar:lower() then boostState = nil end    -- the chosen level takes over
     if db.original.values[cvar] == nil then
         local live = GetCVar(cvar)
         if live ~= nil then db.original.values[cvar] = live end
