@@ -1965,4 +1965,27 @@ test("QT-6 the words of the warnings are the ones in the list preflight returns"
     return okV and wV[1] == VSYNC and okM and wM[1] == FPSCAP
 end)
 
+local DYNAMIC_WARNING = "Dynamic render scale is on, so the game changes the picture size by itself during the test and spoils the numbers. "
+    .. "Turn it off in the game's graphics options and run the test again."
+
+test("QT-7 dynamic render scale being on adds a plain warning that reaches the player even in a silent run and does not refuse; off or missing says nothing", function()
+    local function warned(change)
+        local cv = runCvars()
+        for k, v in pairs(change) do cv[k] = v end
+        local e, b = newRun(cv)
+        local entry = doRunWith(e, b, { levels = "quick", kind = "setup", silent = true })[1]
+        return entry, outText()
+    end
+    local onEntry, on = warned({ dynamicRenderScale = "1" })
+    local _, two = warned({ dynamicRenderScale = "2" })
+    local _, off = warned({ dynamicRenderScale = "0" })
+    local _, absent = warned({})
+    local cv = runCvars()
+    cv.dynamicRenderScale = "1"
+    local _, b = newBench(cv)
+    local okOn, _, wOn = b.preflight()
+    return onEntry and onEntry.valid == true and contains(on, DYNAMIC_WARNING) and contains(two, DYNAMIC_WARNING) and off == "" and absent == ""
+        and okOn and wOn[1] == DYNAMIC_WARNING and not contains(on, "dynamicRenderScale"), on .. " / " .. off .. " / " .. absent
+end)
+
 return H.results()

@@ -1577,6 +1577,14 @@ end`],
   'hub-footer-margin': ['Settings.lua', `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)`, `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + 4), 9)`],
   'hub-footer-use-width': ['Settings.lua', `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26`, `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 180, 160, 26`],
 
+  // The dynamic render scale warning of the test's preflight
+  'dynwarn-never': ['Bench.lua', `    if dynamic and dynamic ~= 0 then`, `    if false then`],
+  'dynwarn-zero': ['Bench.lua', `    if dynamic and dynamic ~= 0 then`, `    if dynamic then`],
+  'dynwarn-only-one': ['Bench.lua', `    if dynamic and dynamic ~= 0 then`, `    if dynamic == 1 then`],
+  'dynwarn-text': ['Bench.lua', `"Dynamic render scale is on, so the game changes the picture size`, `"Dynamic scale is on, so the game changes the picture size`],
+  'dynwarn-absent': ['Bench.lua', `local dynamic = tonumber(GetCVar("dynamicRenderScale") or "")`, `local dynamic = tonumber(GetCVar("dynamicRenderScale") or "1")`],
+  'dynwarn-refuses': ['Bench.lua', `        warnings[#warnings + 1] = "Dynamic render scale is on`, `        problems[#problems + 1] = "Dynamic render scale is on`],
+
   // The Tests and results page, and the About page
   'tests-intro-text': ['Settings.lua', `local TESTS_INTRO = "The test measures what`, `local TESTS_INTRO = "A test measures what`],
   'tests-result-label': ['Settings.lua', `local label = kind == "best" and "Quiet-spot test" or "Crowd test"`, `local label = kind == "best" and "Crowd test" or "Quiet-spot test"`],

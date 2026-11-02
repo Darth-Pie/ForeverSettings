@@ -947,6 +947,12 @@ skin-nav-hover|test_skin|SK-6|killed
 skin-nav-pressed|test_skin|SK-6|killed
 skin-nav-bar-width|test_skin|SK-6|killed
 skin-nav-select-unpainted|test_skin|SK-6|killed
+dynwarn-never|test_bench|QT-7|killed
+dynwarn-zero|test_bench|QT-7|killed
+dynwarn-only-one|test_bench|QT-7|killed
+dynwarn-text|test_bench|QT-7|killed
+dynwarn-absent|test_bench|QT-7|killed
+dynwarn-refuses|test_bench|QT-7|killed
 tests-intro-text|test_settings|S9-1|killed
 tests-result-label|test_settings|S9-1|killed
 tests-not-done-text|test_settings|S9-1|killed

@@ -681,6 +681,12 @@ function bench.preflight()
         warnings[#warnings + 1] = "A frame-rate limit is set in the game, so the test cannot see what settings cost above that limit. "
             .. "Raise or remove the limit and run the test again."
     end
+    -- The game's own dynamic render scale resizes the picture during the test (Forever has it as dynamicRenderScale, off by default).
+    local dynamic = tonumber(GetCVar("dynamicRenderScale") or "")
+    if dynamic and dynamic ~= 0 then
+        warnings[#warnings + 1] = "Dynamic render scale is on, so the game changes the picture size by itself during the test and spoils "
+            .. "the numbers. Turn it off in the game's graphics options and run the test again."
+    end
     return #problems == 0, problems, warnings, env
 end
 
