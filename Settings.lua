@@ -39,7 +39,21 @@ local LOCKED_TEXT = {
 local TABS = { "everyday", "crowded" }
 local TAB_TEXT = { everyday = "Everyday", crowded = "Crowded" }
 
-local state = { tab = "everyday" }
+-- The pages of the window (spec 2026-11-02-flat-hub-window-design.md H5) and the page each setting sits on; a setting this
+-- table does not know sits on World detail.
+settings.PAGES = {
+    { key = "home", text = "Home" }, { key = "light", text = "Light and shadows" }, { key = "world", text = "World detail" },
+    { key = "size", text = "Picture size" }, { key = "tests", text = "Tests and results" }, { key = "about", text = "About" },
+}
+local PAGE_KEYS = {}
+for _, page in ipairs(settings.PAGES) do PAGE_KEYS[page.key] = true end
+settings.PAGE_OF = {
+    graphicsshadowquality = "light", graphicsssao = "light", graphicscomputeeffects = "light", giquality = "light",
+    graphicslightmode = "light", graphicsgroundclutter = "world", groundeffectdensity = "world", graphicsliquiddetail = "world",
+    graphicstextureresolution = "world", renderscale = "size",
+}
+
+local state = { tab = "everyday", page = "home" }
 
 local function sameValue(a, b)
     if a == b then return true end
@@ -116,6 +130,11 @@ function settings.model(st, ctx)
     local names = ns.names
     local locked = ctx.locked
     local view = { title = "My settings", intro = INTRO, tabs = {}, rows = {}, buttons = {} }
+    view.page = PAGE_KEYS[st.page] and st.page or "home"
+    view.pages = {}
+    for _, page in ipairs(settings.PAGES) do
+        view.pages[#view.pages + 1] = { key = page.key, text = page.text, selected = page.key == view.page, enabled = true }
+    end
     for _, key in ipairs(TABS) do
         local inUse = ctx.active == key
         view.tabs[#view.tabs + 1] = {
@@ -149,7 +168,7 @@ function settings.model(st, ctx)
         local cvar = entry.cvar
         local _, line = names.get(cvar)
         local row = { cvar = cvar, name = names.label(cvar, entry.label), line = line, kept = saved[cvar] ~= nil,
-            levels = {}, enabled = locked == nil }
+            levels = {}, enabled = locked == nil, page = settings.PAGE_OF[cvar:lower()] or "world" }
         local words = ranking[cvar] and names.matters(ranking[cvar].weight)
         if words then
             row.matters = "Matters to the picture: " .. words .. "."
@@ -326,9 +345,16 @@ function settings.state()
     return state
 end
 
--- Shows the window on `tab` (Everyday or Crowded), else on the profile in use.
-function settings.open(tab)
-    if tab == "everyday" or tab == "crowded" then state.tab = tab else state.tab = defaultTab() end
+-- Shows the window on a page (the page last shown when none is given, Home the first time). `everyday` or `crowded` picks that
+-- tab and the first settings page; anything else shows the tab of the profile in use.
+function settings.open(which)
+    if which == "everyday" or which == "crowded" then
+        state.tab = which
+        state.page = "light"
+    else
+        state.tab = defaultTab()
+        if PAGE_KEYS[which] then state.page = which end
+    end
     guarded(function()
         settings.render()
         settings.show()
@@ -340,6 +366,14 @@ end
 function settings.click(key)
     if key == "close" then
         settings.hide()
+        return
+    end
+    local pageKey = key:match("^page:(.+)$")
+    if pageKey then                          -- turning a page is not a change: it works in combat and during a test
+        if PAGE_KEYS[pageKey] then
+            state.page = pageKey
+            draw()
+        end
         return
     end
     local ctx = context()

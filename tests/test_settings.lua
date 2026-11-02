@@ -1123,4 +1123,77 @@ test("S4-9 the block stands above the footer, the label over the slider over the
     return ok, tostring(ok)
 end)
 
+-- The pages of the hub window (spec 2026-11-02-flat-hub-window-design.md H5 and section 6).
+test("S5-1 the pages and their order; the model lists them with the current one selected, Home when none is chosen", function()
+    local e, s = boot()
+    local keys, texts = {}, {}
+    for _, p in ipairs(s.PAGES) do keys[#keys + 1] = p.key texts[#texts + 1] = p.text end
+    local function selected(view)
+        local list = {}
+        for _, p in ipairs(view.pages) do if p.selected then list[#list + 1] = p.key end end
+        return table.concat(list, ",")
+    end
+    local none = s.model({ tab = "everyday" }, ctxOf(e, {}))
+    local size = s.model({ tab = "everyday", page = "size" }, ctxOf(e, {}))
+    local bogus = s.model({ tab = "everyday", page = "nosuchpage" }, ctxOf(e, {}))
+    local listed = {}
+    for _, p in ipairs(size.pages) do listed[#listed + 1] = p.key .. ":" .. p.text end
+    return table.concat(keys, ",") == "home,light,world,size,tests,about"
+        and table.concat(texts, "|") == "Home|Light and shadows|World detail|Picture size|Tests and results|About"
+        and table.concat(listed, "|") == "home:Home|light:Light and shadows|world:World detail|size:Picture size|tests:Tests and results|about:About"
+        and none.page == "home" and selected(none) == "home" and size.page == "size" and selected(size) == "size"
+        and bogus.page == "home" and selected(bogus) == "home", table.concat(listed, "|")
+end)
+
+test("S5-2 every known setting sits on exactly one page by the table, and a setting the table does not know sits on World detail", function()
+    local e, s = boot()
+    local want = { graphicsShadowQuality = "light", graphicsSSAO = "light", graphicsComputeEffects = "light", giQuality = "light",
+        graphicsLightMode = "light", graphicsGroundClutter = "world", groundEffectDensity = "world", graphicsLiquidDetail = "world",
+        graphicsTextureResolution = "world", RenderScale = "size" }
+    local wrong = {}
+    for cvar, page in pairs(want) do
+        if s.PAGE_OF[cvar:lower()] ~= page then wrong[#wrong + 1] = cvar end
+    end
+    local resolved = e.ns.bench.resolve()
+    resolved[#resolved + 1] = { cvar = "someUnknownSetting", label = "Something", tiers = { "0", "1" } }
+    local view = s.model({ tab = "everyday" }, ctxOf(e, { resolved = resolved }))
+    local pages = {}
+    for _, row in ipairs(view.rows) do pages[row.cvar] = row.page end
+    return #wrong == 0 and pages.graphicsShadowQuality == "light" and pages.graphicsSSAO == "light" and pages.groundEffectDensity == "world"
+        and pages.RenderScale == "size" and pages.someUnknownSetting == "world", table.concat(wrong, ",")
+end)
+
+test("S5-3 open takes a page, a tab, or nothing: a tab picks its first settings page, nothing keeps the last page (Home the first time)", function()
+    local e, s = boot()
+    s.open()
+    local first = s.state().page == "home"
+    s.open("size")
+    local sized = s.state().page == "size"
+    s.open()
+    local kept = s.state().page == "size"
+    s.open("crowded")
+    local crowded = s.state().tab == "crowded" and s.state().page == "light"
+    s.open("everyday")
+    local everyday = s.state().tab == "everyday" and s.state().page == "light"
+    s.open("nosuchpage")
+    local bogus = s.state().page == "light"
+    return first and sized and kept and crowded and everyday and bogus and #OUT == 0, tostring(first) .. tostring(sized) .. tostring(kept)
+        .. tostring(crowded) .. tostring(everyday) .. tostring(bogus)
+end)
+
+test("S5-4 a click on a page changes the page and writes nothing, even in combat; an unknown page is ignored", function()
+    local e, s = boot()
+    s.open()
+    SETLOG, OUT = {}, {}
+    s.click("page:world")
+    local moved = s.state().page == "world"
+    COMBAT = true
+    s.click("page:about")
+    local locked = s.state().page == "about"
+    COMBAT = false
+    s.click("page:nosuchpage")
+    local ignored = s.state().page == "about"
+    return moved and locked and ignored and #SETLOG == 0 and #OUT == 0, tostring(moved) .. tostring(locked) .. tostring(ignored)
+end)
+
 return H.results()

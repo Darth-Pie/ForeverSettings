@@ -1535,6 +1535,29 @@ end`],
   'skin-text-width': ['Skin.lua', `    if width then fs:SetWidth(width) end`, `    local _ = width`],
   'skin-template': ['Skin.lua', `local b = CreateFrame("Button", nil, parent)`, `local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")`],
 
+  // The pages of the hub window
+  'page-order-wrong': ['Settings.lua', `{ key = "light", text = "Light and shadows" }, { key = "world", text = "World detail" },`, `{ key = "world", text = "World detail" }, { key = "light", text = "Light and shadows" },`],
+  'page-text-wrong': ['Settings.lua', `{ key = "size", text = "Picture size" }`, `{ key = "size", text = "Picture sizes" }`],
+  'page-selected-wrong': ['Settings.lua', `selected = page.key == view.page, enabled = true`, `selected = false, enabled = true`],
+  'page-default-wrong': ['Settings.lua', `view.page = PAGE_KEYS[st.page] and st.page or "home"`, `view.page = PAGE_KEYS[st.page] and st.page or "light"`],
+  'page-bogus-accepted': ['Settings.lua', `view.page = PAGE_KEYS[st.page] and st.page or "home"`, `view.page = st.page or "home"`],
+  'page-of-wrong': ['Settings.lua', `graphicsssao = "light"`, `graphicsssao = "world"`],
+  'page-of-size-wrong': ['Settings.lua', `renderscale = "size",`, `renderscale = "world",`],
+  'page-unknown-not-world': ['Settings.lua', `settings.PAGE_OF[cvar:lower()] or "world"`, `settings.PAGE_OF[cvar:lower()] or "light"`],
+  'page-open-tab-page': ['Settings.lua', `        state.tab = which
+        state.page = "light"`, `        state.tab = which`],
+  'page-open-ignores-page': ['Settings.lua', `        if PAGE_KEYS[which] then state.page = which end`, `        local _ = which`],
+  'page-open-bogus': ['Settings.lua', `        if PAGE_KEYS[which] then state.page = which end`, `        if which then state.page = which end`],
+  'page-click-ignored': ['Settings.lua', `        if PAGE_KEYS[pageKey] then
+            state.page = pageKey`, `        if false then
+            state.page = pageKey`],
+  'page-click-bogus': ['Settings.lua', `        if PAGE_KEYS[pageKey] then
+            state.page = pageKey`, `        if pageKey then
+            state.page = pageKey`],
+  'page-click-locked': ['Settings.lua', `        if PAGE_KEYS[pageKey] then
+            state.page = pageKey`, `        if PAGE_KEYS[pageKey] and not InCombatLockdown() then
+            state.page = pageKey`],
+
   // The picture sharpness slider, this session only (spec 2026-11-02-picture-sharpness-slider-design.md)
   'size-range-low': ['Profiles.lua', `fraction < BOOST_MIN or fraction > BOOST_MAX then`, `fraction < 0 or fraction > BOOST_MAX then`],
   'size-range-high': ['Profiles.lua', `fraction < BOOST_MIN or fraction > BOOST_MAX then`, `fraction < BOOST_MIN or fraction > 4 then`],
