@@ -132,6 +132,7 @@ local RULES = {
     "", "Before you start:", "- Stand still somewhere quiet, not a busy city.",
     "- Pick a view with some trees, water or buildings in it, and leave the camera there.",
     "- Close browsers, video, recording and streaming programs.", "- Make sure you are not in combat.",
+    "- Turn off dynamic scaling in the graphics menu, if there is one. It changes the picture size during the test and spoils the numbers.",
     "", "While it runs, please don't:", "- Move, jump or turn the camera.", "- Open the game menu, the settings or the map.",
     "- Switch to another window (alt-tab).", "- Change any graphics setting.", "- Log out or reload.",
 }
@@ -1102,6 +1103,7 @@ test("G9-2 the crowd Intro has its title, first line, target prompt and rules, a
         and table.concat(small.targets.list, ",") == "60,90,120,144,165,240" and small.targets.selected == 60
         and text:find("Before you start:", 1, true) ~= nil and text:find("While it runs, please don't:", 1, true) ~= nil
         and text:find("somewhere quiet", 1, true) == nil and text:find("Stand still somewhere busy", 1, true) ~= nil
+        and text:find("Turn off dynamic scaling", 1, true) ~= nil
         and startEnabled(false, 60) == false and startEnabled(true, nil) == false and startEnabled(true, 60) == true
         and hasText(f, "This takes about 2 minutes. Stand somewhere busy"), shownText(f)
 end)

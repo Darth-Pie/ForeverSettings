@@ -405,6 +405,7 @@ crowd-invalid-hands-off|test_guide|G9-6|killed
 crowd-opens-report|test_guide|G9-7|killed
 crowd-targets-always|test_guide|G9-8|killed
 crowd-rules-quiet|test_guide|G9-2|killed
+rules-no-dynamic-scaling|test_guide|G3-1|killed
 crowd-estimate-fixed|test_guide|G9-2|killed
 crowd-start-without-quiet|test_guide|G9-10|killed
 check-skipped|test_guide|G10-1|killed

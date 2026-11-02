@@ -655,6 +655,8 @@ end
             view.targets = {`, `        if true then
             view.targets = {`],
   'crowd-rules-quiet': ['Guide.lua', `CROWD_RULES[3] = "- Stand still somewhere busy, such as a city's main square."`, `CROWD_RULES[3] = RULES[3]`],
+  'rules-no-dynamic-scaling': ['Guide.lua', `    "- Turn off dynamic scaling in the graphics menu, if there is one. It changes the picture size during the test and spoils the numbers.",
+`, ``],
   'crowd-estimate-fixed': ['Guide.lua', `        ctx.windows = ns.bench.estimateCrowdWindows(guide.findQuiet())`, `        ctx.windows = 17`],
   'crowd-start-without-quiet': ['Guide.lua', `        if not quiet then
             state = { view = "stopped", kind = kind, reason = "no quiet result", target = target }`, `        if false then

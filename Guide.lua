@@ -107,6 +107,7 @@ local RULES = {
     "", "Before you start:", "- Stand still somewhere quiet, not a busy city.",
     "- Pick a view with some trees, water or buildings in it, and leave the camera there.",
     "- Close browsers, video, recording and streaming programs.", "- Make sure you are not in combat.",
+    "- Turn off dynamic scaling in the graphics menu, if there is one. It changes the picture size during the test and spoils the numbers.",
     "", "While it runs, please don't:", "- Move, jump or turn the camera.", "- Open the game menu, the settings or the map.",
     "- Switch to another window (alt-tab).", "- Change any graphics setting.", "- Log out or reload.",
 }
