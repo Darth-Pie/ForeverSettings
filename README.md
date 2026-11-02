@@ -31,11 +31,9 @@ An addon for **WoW Forever**.
 
 ## See the price of every level
 
-**My settings** (minimap menu) lists every setting with what each level costs in frames per second against the level you have, how much it matters to the picture, and what everything at the highest would give.
+**My settings** (minimap menu, or `/fset settings`) has a page list on the left. The settings pages list every setting with what each level costs in frames per second against the level you have, how much it matters to the picture, a total for your choices, and what everything at the highest would give. **Save as Everyday** and **Save as Crowded**, at the bottom of the page list, keep the settings you have in the game now. A Picture size page has a slider for picture sharpness, up to 200% for this session.
 
 <p align="center">
-  <img src=".previews/my-settings.png" alt="My settings: Shadow detail and Soft corner shadows, with the fps cost under each level" width="430">
-  &nbsp;&nbsp;
   <img src=".previews/minimap-menu.png" alt="The minimap menu with the four profiles" width="300">
 </p>
 
@@ -55,7 +53,7 @@ Switch from the minimap button, or type `/fset profile everyday` (also `crowded`
 - Nothing is forced on a first install.
 - It never changes a setting during combat or while a test is running.
 - It doesn't collect or send anything.
-- `/fset reset` puts back everything the addon changed. `/fset settings` opens My settings, and `/fset minimap` hides or shows the button.
+- `/fset reset` puts back everything the addon changed. `/fset settings` opens My settings, `/fset size 50` to `/fset size 200` sets the picture sharpness for this session, and `/fset minimap` hides or shows the button.
 - Built for and tried on WoW Forever. Retail is untested.
 
 ## Problems and ideas

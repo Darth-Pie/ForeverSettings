@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0
+
+- **My settings** is a new flat window with rounded corners and a page list on the left: Home, Light and shadows, World detail, Picture size, Tests and results and About. Nothing scrolls. Home switches profile and starts or shows the tests, and the Everyday and Crowded switch sits above the settings pages.
+- **Save as Everyday** and **Save as Crowded** buttons at the bottom of the page list keep the settings you have in the game now.
+- **Picture size**: a slider from 50% to 200% for picture sharpness (also `/fset size 50` to `/fset size 200`, and `/fset size off`). It lasts for this session only: the game goes back to your normal setting when you log out. Above 100% it warns that some graphics cards crash at high values. The page also says whether the game's dynamic render scale is on.
+- My settings shows a live total under the list: "Your Everyday settings: about N fps".
+- A test warns when dynamic render scale is on, because it changes the picture size during a test and spoils the numbers. The "Before you start" list says to turn it off.
+- `/fset probe` asks the game which settings it has.
+
 ## 0.9.1
 
 - Releases are now packaged and uploaded automatically. The addon itself is unchanged.
