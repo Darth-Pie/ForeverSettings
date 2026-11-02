@@ -117,6 +117,57 @@ function skin.button(parent, text, width, height)
     return b
 end
 
+-- A row of the page list: no edge, its label at the left; the selected row has the selected fill and a two pixel accent bar.
+local function paintRow(row)
+    local state = row.skinState
+    local fillName, alpha, text = "fill", 0, "text"
+    if state.pressed then
+        fillName, alpha = "pressed", 1
+    elseif state.selected then
+        fillName, alpha, text = "selected", 1, "accentLight"
+    elseif state.hover then
+        fillName, alpha = "hover", 1
+    end
+    local r, g, b = skin.color(fillName)
+    row.bg:SetColorTexture(r, g, b, alpha)
+    if state.selected then row.bar:Show() else row.bar:Hide() end
+    row.label:SetTextColor(skin.color(text))
+end
+
+function skin.navItem(parent, text, width, height)
+    local row = CreateFrame("Button", nil, parent)
+    row:SetSize(width, height)
+    row.navItem = true
+    row.skinState = { hover = false, pressed = false, selected = false }
+    row.bg = row:CreateTexture(nil, "BACKGROUND")
+    row.bg:SetAllPoints()
+    row.bar = row:CreateTexture(nil, "ARTWORK")
+    row.bar:SetColorTexture(skin.color("accent"))
+    row.bar:SetWidth(2)
+    row.bar:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
+    local label = row:CreateFontString(nil, "OVERLAY", FONTS.normal)
+    label:SetPoint("LEFT", row, "LEFT", 14, 0)
+    label:SetWidth(width - 20)
+    label:SetJustifyH("LEFT")
+    label:SetJustifyV("MIDDLE")
+    label:SetWordWrap(false)
+    row.label = label
+    row:SetFontString(label)
+    row:SetText(text)
+    row:SetScript("OnEnter", function(self) self.skinState.hover = true paintRow(self) end)
+    row:SetScript("OnLeave", function(self) self.skinState.hover = false paintRow(self) end)
+    row:SetScript("OnMouseDown", function(self) self.skinState.pressed = true paintRow(self) end)
+    row:SetScript("OnMouseUp", function(self) self.skinState.pressed = false paintRow(self) end)
+    function row:SetSelected(on)
+        self.skinState.selected = on and true or false
+        paintRow(self)
+    end
+    function row:SetLabel(text2) self:SetText(text2) end
+    paintRow(row)
+    return row
+end
+
 -- A check box: a 16 pixel square with an accent mark when ticked.
 function skin.check(parent)
     local box = CreateFrame("CheckButton", nil, parent)

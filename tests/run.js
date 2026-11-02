@@ -1422,10 +1422,8 @@ end`],
   'settings-max-second-line-missing': ['Settings.lua', `            if level.cost then
                 local cost = take(p.costs)`, `            if false then
                 local cost = take(p.costs)`],
-  'settings-max-cost-width-wrong': ['Settings.lua', `        fs:SetWidth(BUTTON_WIDTH)
-        fs:SetJustifyH("CENTER")`, `        fs:SetWidth(BUTTON_WIDTH * 2)
-        fs:SetJustifyH("CENTER")`],
-  'settings-max-cost-offset-wrong': ['Settings.lua', `cost:SetPoint("TOPLEFT", p.content, "TOPLEFT", x, -(top + 25))`, `cost:SetPoint("TOPLEFT", p.content, "TOPLEFT", x, -(top + 5))`],
+  'settings-max-cost-width-wrong': ['Settings.lua', `local fs = skin.text(parent, "small", "dim", LEVEL_W)`, `local fs = skin.text(parent, "small", "dim", 100)`],
+  'settings-max-cost-offset-wrong': ['Settings.lua', `cost:SetPoint("TOPLEFT", p.area, "TOPLEFT", bx, -(by + LEVEL_H + 2))`, `cost:SetPoint("TOPLEFT", p.area, "TOPLEFT", bx, -(by + 5))`],
 
   // The live total in My settings ("Your Everyday settings: about N fps")
   'live-no-test-needed': ['Settings.lua', `if costs and est and type(est.fps) == "number" and (est.counted or 0) > 0 then`, `if est and type(est.fps) == "number" and (est.counted or 0) > 0 then`],
@@ -1446,17 +1444,13 @@ end`],
   'live-stack-order': ['Settings.lua', `    stack(p.total, view.totalLine)
     stack(p.your, view.yourLine)`, `    stack(p.your, view.yourLine)
     stack(p.total, view.totalLine)`],
-  'settings-max-row-height-same': ['Settings.lua', `if level.cost then pitch = 28 + COST_HEIGHT end`, `if level.cost then pitch = 28 end`],
-  'settings-max-total-over-buttons': ['Settings.lua', `    local bottom = 44`, `    local bottom = 20`],
-  'settings-max-matters-over-total': ['Settings.lua', `        bottom = bottom + heightOf(fs, str) + 4`, `        bottom = bottom + 4`],
-  'settings-max-scroll-over-block': ['Settings.lua', `math.max(56, bottom + 2)`, `56`],
-  'settings-max-footer-overlap': ['Settings.lua', `        x = x + w + FOOTER_GAP`, `        x = x + w`],
-  'settings-max-matters-line-missing': ['Settings.lua', `        if row.matters then
-            local worth = take(p.matters)`, `        if false then
-            local worth = take(p.matters)`],
-  'settings-max-cost-note-missing': ['Settings.lua', `    place(p.costNote, view.costNote, 6)`, `    local _ = view.costNote`],
+  'settings-max-total-over-buttons': ['Settings.lua', `    local bottom = FOOTER_H + SUMMARY_GAP`, `    local bottom = 20`],
+  'settings-max-matters-over-total': ['Settings.lua', `        bottom = bottom + heightOf(fs, str) + 2`, `        bottom = bottom + 2`],
+  'settings-max-footer-overlap': ['Settings.lua', `-(PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0))`, `-(PAD + (hasMaximum and 0 or 0))`],
+  'settings-max-matters-line-missing': ['Settings.lua', `            worth:SetText("matters: " .. row.mattersWords)`, `            worth:SetText("")`],
+  'settings-max-cost-note-missing': ['Settings.lua', `    if onSettings then placeText(p.costNote, view.costNote) else hideText(p.costNote) end`, `    hideText(p.costNote)`],
   'settings-max-costs-not-released': ['Settings.lua', `    release(p.costs, true)`, `    local _ = p.costs`],
-  'settings-max-button-not-hidden': ['Settings.lua', `    p.maximum:Hide()`, `    local _ = p.maximum`],
+  'settings-max-button-not-hidden': ['Settings.lua', `        if hasMaximum then p.maximum:Show() else p.maximum:Hide() end`, `        p.maximum:Show()`],
 
   // The step count of a guided test grows when a reading is repeated: the window says why
   'bench-repeats-not-counted': ['Bench.lua', `progressState.total = progressState.total + #tiers + 1
@@ -1534,6 +1528,54 @@ end`],
   'skin-text-colour': ['Skin.lua', `fs:SetTextColor(skin.color(colorName or "text"))`, `fs:SetTextColor(skin.color("text"))`],
   'skin-text-width': ['Skin.lua', `    if width then fs:SetWidth(width) end`, `    local _ = width`],
   'skin-template': ['Skin.lua', `local b = CreateFrame("Button", nil, parent)`, `local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")`],
+
+  'skin-nav-label-centred': ['Skin.lua', `label:SetJustifyH("LEFT")`, `label:SetJustifyH("CENTER")`],
+  'skin-nav-label-point': ['Skin.lua', `label:SetPoint("LEFT", row, "LEFT", 14, 0)`, `label:SetPoint("CENTER", row, "CENTER", 0, 0)`],
+  'skin-nav-bar-never': ['Skin.lua', `if state.selected then row.bar:Show() else row.bar:Hide() end`, `row.bar:Hide()`],
+  'skin-nav-fill-normal': ['Skin.lua', `local fillName, alpha, text = "fill", 0, "text"`, `local fillName, alpha, text = "fill", 1, "text"`],
+  'skin-nav-selected-fill': ['Skin.lua', `fillName, alpha, text = "selected", 1, "accentLight"`, `fillName, alpha, text = "hover", 1, "accentLight"`],
+  'skin-nav-selected-text': ['Skin.lua', `fillName, alpha, text = "selected", 1, "accentLight"`, `fillName, alpha, text = "selected", 1, "text"`],
+  'skin-nav-hover': ['Skin.lua', `fillName, alpha = "hover", 1`, `fillName, alpha = "selected", 1`],
+  'skin-nav-pressed': ['Skin.lua', `fillName, alpha = "pressed", 1`, `fillName, alpha = "hover", 1`],
+  'skin-nav-bar-width': ['Skin.lua', `row.bar:SetWidth(2)`, `row.bar:SetWidth(4)`],
+  'skin-nav-select-unpainted': ['Skin.lua', `        self.skinState.selected = on and true or false
+        paintRow(self)`, `        self.skinState.selected = on and true or false`],
+
+  // The hub window: the shell and the settings pages
+  'hub-window-size': ['Settings.lua', `local WIDTH, HEIGHT = 780, 560`, `local WIDTH, HEIGHT = 780, 540`],
+  'hub-nav-click-missing': ['Settings.lua', `        item:SetScript("OnClick", clicked)`, `        local _ = clicked`],
+  'hub-nav-gap': ['Settings.lua', `-(10 + (i - 1) * 30 + (i > 4 and 14 or 0))`, `-(10 + (i - 1) * 30)`],
+  'hub-nav-selected-unmarked': ['Settings.lua', `p.nav[i]:SetSelected(entry.selected)`, `p.nav[i]:SetSelected(false)`],
+  'hub-title-missing': ['Settings.lua', `    p.title:SetText(title)`, `    p.title:SetText("")`],
+  'hub-tabs-always': ['Settings.lua', `        if onSettings then button:Show() else button:Hide() end`, `        button:Show()`],
+  'hub-tab-unmarked': ['Settings.lua', `button:SetSelected(tab.selected)`, `button:SetSelected(false)`],
+  'hub-tab-never-greyed': ['Settings.lua', `button:SetEnabled(tab.enabled)`, `button:SetEnabled(true)`],
+  'hub-tab-width': ['Settings.lua', `local TAB_W = 120`, `local TAB_W = 100`],
+  'hub-banner-missing': ['Settings.lua', `    if #notices > 0 then placeText(p.banner, table.concat(notices`, `    if false then placeText(p.banner, table.concat(notices`],
+  'hub-card-tick-unchecked': ['Settings.lua', `box:SetChecked(row.kept)`, `box:SetChecked(false)`],
+  'hub-card-tick-never-greyed': ['Settings.lua', `box:SetEnabled(row.enabled)`, `box:SetEnabled(true)`],
+  'hub-card-name-missing': ['Settings.lua', `name:SetText(row.name)`, `name:SetText("")`],
+  'hub-card-help-missing': ['Settings.lua', `help:SetText(helpText)`, `help:SetText("")`],
+  'hub-level-long-label': ['Settings.lua', `button:SetLabel(level.short or level.text)`, `button:SetLabel(level.text)`],
+  'hub-level-tip-short': ['Settings.lua', `button.tip = level.text`, `button.tip = level.short`],
+  'hub-level-unmarked': ['Settings.lua', `button:SetSelected(level.selected)`, `button:SetSelected(false)`],
+  'hub-level-never-greyed': ['Settings.lua', `button:SetEnabled(row.enabled)`, `button:SetEnabled(true)`],
+  'hub-level-key': ['Settings.lua', `button.key = "level:" .. row.cvar .. ":" .. level.value`, `button.key = "level:" .. row.cvar .. ":0"`],
+  'hub-cost-now-colour': ['Settings.lua', `level.cost == "now" and "accentLight" or "dim"`, `"dim"`],
+  'hub-two-columns-only': ['Settings.lua', `        local columns = settings.columnsFor(#rows)`, `        local columns = 2`],
+  'hub-columns-high': ['Settings.lua', `return count > 6 and 3 or 2`, `return count > 8 and 3 or 2`],
+  'hub-columns-low': ['Settings.lua', `return count > 6 and 3 or 2`, `return count > 5 and 3 or 2`],
+  'hub-column-gap': ['Settings.lua', `local CARD_GAP_X, CARD_GAP_Y = 18, 6`, `local CARD_GAP_X, CARD_GAP_Y = 20, 6`],
+  'hub-none-text-missing': ['Settings.lua', `        placeText(p.note, NONE_TEXT)`, `        hideText(p.note)`],
+  'hub-levels-not-released': ['Settings.lua', `    release(p.levels)`, `    local _ = p.levels`],
+  'hub-ticks-not-released': ['Settings.lua', `    release(p.checks)`, `    local _ = p.checks`],
+  'hub-summary-on-every-page': ['Settings.lua', `        if not (onSettings and str) then`, `        if not str then`],
+  'hub-footer-on-every-page': ['Settings.lua', `        p.use:Hide()
+`, ``],
+  'hub-use-never-greyed': ['Settings.lua', `p.use:SetEnabled(button.enabled)`, `p.use:SetEnabled(true)`],
+  'hub-maximum-never-greyed': ['Settings.lua', `p.maximum:SetEnabled(button.enabled)`, `p.maximum:SetEnabled(true)`],
+  'hub-footer-margin': ['Settings.lua', `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)`, `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + 4), 9)`],
+  'hub-footer-use-width': ['Settings.lua', `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26`, `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 180, 160, 26`],
 
   // The pages of the hub window
   'page-order-wrong': ['Settings.lua', `{ key = "light", text = "Light and shadows" }, { key = "world", text = "World detail" },`, `{ key = "world", text = "World detail" }, { key = "light", text = "Light and shadows" },`],
@@ -1644,15 +1686,14 @@ end`],
   'size-notice-missing': ['Settings.lua', `if ok and info.refused then`, `if false then`],
   'size-back-missing': ['Settings.lua', `if key == "sizeback" then`, `if key == "sizeback-off" then`],
   'size-click-pattern': ['Settings.lua', `key:match("^size:(%d+)$")`, `key:match("^size:(%d%d)$")`],
-  'size-range-max': ['Settings.lua', `slider:SetMinMaxValues(SIZE_MIN, SIZE_MAX)`, `slider:SetMinMaxValues(SIZE_MIN, 150)`],
-  'size-step': ['Settings.lua', `slider:SetValueStep(SIZE_STEP)`, `slider:SetValueStep(1)`],
-  'size-stack-order': ['Settings.lua', `    stack(p.sizeNote, size and size.note)
-    stack(p.sizeWarn, size and size.warning)`, `    stack(p.sizeWarn, size and size.warning)
-    stack(p.sizeNote, size and size.note)`],
-  'size-label-not-stacked': ['Settings.lua', `    stack(p.sizeLabel, size and size.label)
+  'size-range-max': ['Settings.lua', `SIZE_SLIDER_WIDTH, SIZE_MIN, SIZE_MAX, SIZE_STEP)`, `SIZE_SLIDER_WIDTH, SIZE_MIN, 150, SIZE_STEP)`],
+  'size-step': ['Settings.lua', `SIZE_SLIDER_WIDTH, SIZE_MIN, SIZE_MAX, SIZE_STEP)`, `SIZE_SLIDER_WIDTH, SIZE_MIN, SIZE_MAX, 1)`],
+  'size-stack-order': ['Settings.lua', `        if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end
+        placeText(p.sizeNote, size.note)`, `        placeText(p.sizeNote, size.note)
+        if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end`],
+  'size-label-not-stacked': ['Settings.lua', `        placeText(p.sizeLabel, size.label)
 `, ``],
-  'size-value-not-set': ['Settings.lua', `        p.sizeSlider:SetValue(size.value)
-`, ``],
+  'size-value-not-set': ['Settings.lua', `        p.sizeSlider:SetValue(size.value)`, `        local _ = size`],
   'size-back-always-enabled': ['Settings.lua', `p.sizeBack:SetEnabled(size.canPutBack)`, `p.sizeBack:SetEnabled(true)`],
   'size-slider-never-greyed': ['Settings.lua', `if p.sizeSlider.SetEnabled then p.sizeSlider:SetEnabled(size.enabled) end`, `local _ = size`],
 

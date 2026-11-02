@@ -239,11 +239,12 @@ test("S1-11 a profile switched from outside moves the in-use mark and the highli
     p.switch("crowded")
     e.pump(1, function() return 0.05 end)
     local after = byKey(f, "tab:crowded")._text == "Crowded (in use)" and byKey(f, "tab:everyday")._text == "Everyday"
-    local highlighted = byKey(f, "level:graphicsShadowQuality:0").locked == true and byKey(f, "level:graphicsShadowQuality:2").locked ~= true
+    local highlighted = byKey(f, "level:graphicsShadowQuality:0").skinState.selected == true
+        and byKey(f, "level:graphicsShadowQuality:2").skinState.selected == false
     return before and after and highlighted, tostring(byKey(f, "tab:crowded")._text)
 end)
 
-test("S1-12 the window: title, tabs, a tick and level buttons per row, footer buttons, Escape once, wrapped levels, no raw names", function()
+test("S1-12 the window's pages: a tick and level buttons per setting on each page, 13 levels wrap to two lines, the X closes it, Escape is listed once, no raw names", function()
     local e, s, db = boot()
     local b = e.ns.bench
     b.state().tiers.graphicsSSAO = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }
@@ -251,33 +252,47 @@ test("S1-12 the window: title, tabs, a tick and level buttons per row, footer bu
     s.open("everyday")
     local f = window()
     if not f then return false, "no window: " .. outText() end
-    local keeps, levels = 0, 0
-    walk(f, function(frame)
-        if frame.shown and frame.key and frame.key:sub(1, 5) == "keep:" then keeps = keeps + 1 end
-        if frame.shown and frame.key and frame.key:sub(1, 6) == "level:" then levels = levels + 1 end
-    end)
-    local listed = 0
-    for _, name in ipairs(UISpecialFrames) do if name == "ForeverSettingsSettings" then listed = listed + 1 end end
-    local raw = false
-    for _, text in ipairs(shownTexts(f)) do
-        for _, name in ipairs(RAW) do if text:find(name, 1, true) then raw = true end end
+    local function count(prefix)
+        local n = 0
+        walk(f, function(frame)
+            if frame.shown and frame.key and frame.key:sub(1, #prefix) == prefix then n = n + 1 end
+        end)
+        return n
     end
-    local keepBox = byKey(f, "keep:graphicsShadowQuality")
-    local live = byKey(f, "level:graphicsShadowQuality:2")
-    local keptNow, liveHighlighted = keepBox ~= nil and keepBox.checked == true, live ~= nil and live.locked == true
-    local titled = hasText(f, "My settings") and hasText(f, INTRO) and hasText(f, "Shadow detail") and hasText(f, "Everyday (in use)")
+    local function rawIn(frame)
+        for _, text in ipairs(shownTexts(frame)) do
+            for _, name in ipairs(RAW) do if text:find(name, 1, true) then return true end end
+        end
+        return false
+    end
+    local raw = rawIn(f)
+    local lightKeeps, lightLevels = count("keep:"), count("level:")
+    local lines = {}
+    walk(f, function(frame)
+        if frame.shown and frame.key and frame.key:find("^level:graphicsSSAO:") then lines[frame._point[5]] = true end
+    end)
+    local ssaoLines = 0
+    for _ in pairs(lines) do ssaoLines = ssaoLines + 1 end
+    local keepBox, live = byKey(f, "keep:graphicsShadowQuality"), byKey(f, "level:graphicsShadowQuality:2")
+    local keptNow = keepBox ~= nil and keepBox:GetChecked() == true
+    local liveSelected = live ~= nil and live.skinState.selected == true
+    local titled = hasText(f, "Light and shadows") and hasText(f, "Shadow detail") and hasText(f, "Everyday (in use)")
     byKey(f, "tab:crowded"):Click()
     local switched = s.state().tab == "crowded"
-    local closeButton, useButton
-    walk(f, function(frame)
-        if frame.kind == "Button" and frame.shown and frame._text == "Close" then closeButton = frame end
-        if frame.kind == "Button" and frame.shown and frame._text == "Use what I have in the game now" then useButton = frame end
-    end)
-    local footer = closeButton ~= nil and useButton ~= nil
-    if closeButton then closeButton:Click() end
-    return titled and keptNow and liveHighlighted and switched and footer and not f:IsShown() and listed == 1 and keeps == 4
-        and levels == 5 + 13 + 3 + 6 and not raw,
-        tostring(keeps) .. " " .. tostring(levels) .. " " .. tostring(listed) .. " " .. tostring(raw)
+    s.click("page:world")
+    local worldKeeps, worldLevels = count("keep:"), count("level:")
+    raw = raw or rawIn(f)
+    s.click("page:size")
+    local sizeKeeps, sizeLevels = count("keep:"), count("level:")
+    raw = raw or rawIn(f)
+    local listed = 0
+    for _, name in ipairs(UISpecialFrames) do if name == "ForeverSettingsSettings" then listed = listed + 1 end end
+    f.close:Click()
+    return titled and keptNow and liveSelected and switched and not f:IsShown() and listed == 1 and not raw
+        and lightKeeps == 2 and lightLevels == 5 + 13 and ssaoLines == 2 and worldKeeps == 1 and worldLevels == 3
+        and sizeKeeps == 1 and sizeLevels == 6,
+        tostring(lightKeeps) .. " " .. tostring(lightLevels) .. " " .. tostring(ssaoLines) .. " " .. tostring(worldKeeps) .. " "
+            .. tostring(worldLevels) .. " " .. tostring(sizeKeeps) .. " " .. tostring(sizeLevels) .. " " .. tostring(listed) .. " " .. tostring(raw)
 end)
 
 test("S1-13 no action of the window prints to chat", function()
@@ -626,7 +641,7 @@ test("S2-8 a click on Switch to Maximum with nothing to set shows the plain reas
             .. tostring(again) .. tostring(cleared) .. outText()
 end)
 
-test("S2-9 the window draws the costs under the level buttons, the matters lines, the notes, the total and the third button, and hides them again", function()
+test("S2-9 the window draws the costs under the level buttons, the matters words, the notes and the footer buttons, and takes them away again without a test", function()
     local e, s, db, p = bootWith(fullEntry())
     s.open("everyday")
     local f = window()
@@ -634,60 +649,32 @@ test("S2-9 the window draws the costs under the level buttons, the matters lines
         maximum = { fps = 151.5, skipped = 0, leftOut = 0 } }))
     local match, drawnCosts = true, 0
     for _, row in ipairs(view.rows) do
-        for _, level in ipairs(row.levels) do
-            local text, fs = costFor(f, row.cvar, level.value)
-            if level.cost then
-                drawnCosts = drawnCosts + 1
-                if text ~= level.cost or fs._width ~= 100 then match = false end
-            elseif text ~= nil then
-                match = false
+        if row.page == "light" then
+            for _, level in ipairs(row.levels) do
+                local text, fs = costFor(f, row.cvar, level.value)
+                if level.cost then
+                    drawnCosts = drawnCosts + 1
+                    if text ~= level.cost or fs._width ~= 36 then match = false end
+                elseif text ~= nil then
+                    match = false
+                end
             end
         end
     end
-    local matters = fontStringWith(f, "Matters to the picture: some.") ~= nil and fontStringWith(f, "Matters to the picture: a lot.") ~= nil
-    local line = fontStringWith(f, "Matters to the picture: some.")
-    local shadowsName = fontStringWith(f, "Shadow detail")
-    local mattersBelowName = line ~= nil and shadowsName ~= nil and -line._point[5] > -shadowsName._point[5]
+    local matters = hasText(f, "matters: some") and hasText(f, "matters: a little")
     local notes = hasText(f, COST_QUIET) and hasText(f, MATTERS_NOTE) and hasText(f, "Everything at the highest: about 152 fps.")
         and byKey(f, "maximum") ~= nil and byKey(f, "maximum")._text == "Switch to Maximum"
-    -- the footer buttons stand side by side, a gap apart, inside the window's 580 pixels
-    local function footerFits(count)
-        local last, shown = -290, 0
-        for _, key in ipairs({ "use", "maximum", "close" }) do
-            local b = byKey(f, key)
-            if b then
-                shown = shown + 1
-                local left, right = b._point[4] - b._width / 2, b._point[4] + b._width / 2
-                if left - last < 8 and shown > 1 or left < -270 or right > 270 then return false end
-                last = right
-            end
-        end
-        return shown == count
-    end
-    local footer3 = footerFits(3)
-    local withCosts = {
-        shadows = -byKey(f, "keep:graphicsSSAO")._point[5] + byKey(f, "keep:graphicsShadowQuality")._point[5],
-        clutter = -byKey(f, "keep:RenderScale")._point[5] + byKey(f, "keep:groundEffectDensity")._point[5],
-    }
-    -- a draw with no test: the second lines, the note and the total go away, the rows are shorter, the matters lines stay
+    -- a draw with no test: the second lines, the cost note and the total go away, the matters words and their note stay
     e.ns.bench.state().history[1] = nil
     s.open("everyday")
     local gone = costFor(f, "graphicsShadowQuality", "0") == nil and not hasText(f, "Everything at the highest")
-        and hasText(f, COST_NONE) and not hasText(f, COST_QUIET) and hasText(f, MATTERS_NOTE) and hasText(f, "Matters to the picture: some.")
-    local without = {
-        shadows = -byKey(f, "keep:graphicsSSAO")._point[5] + byKey(f, "keep:graphicsShadowQuality")._point[5],
-        clutter = -byKey(f, "keep:RenderScale")._point[5] + byKey(f, "keep:groundEffectDensity")._point[5],
-    }
-    -- a row with costs is 14 pixels taller for every line of level buttons it has: Shadows has two (5 levels, 4 to a line)
-    local taller = withCosts.shadows - without.shadows == 28 and withCosts.clutter - without.clutter == 14
+        and hasText(f, COST_NONE) and not hasText(f, COST_QUIET) and hasText(f, MATTERS_NOTE) and hasText(f, "matters: some")
     -- with Maximum in use the third button goes
     p.switch("maximum", true)
     s.open("everyday")
-    local noButton = byKey(f, "maximum") == nil and footerFits(2)
-    return match and drawnCosts > 0 and matters and mattersBelowName and notes and footer3 and gone and taller and noButton,
-        tostring(match) .. tostring(drawnCosts) .. tostring(matters) .. tostring(mattersBelowName) .. tostring(notes) .. tostring(footer3)
-            .. tostring(gone) .. tostring(taller) .. tostring(noButton) .. " " .. tostring(withCosts.shadows - without.shadows) .. "/"
-            .. tostring(withCosts.clutter - without.clutter)
+    local noButton = byKey(f, "maximum") == nil
+    return match and drawnCosts > 0 and matters and notes and gone and noButton,
+        tostring(match) .. tostring(drawnCosts) .. tostring(matters) .. tostring(notes) .. tostring(gone) .. tostring(noButton)
 end)
 
 test("S2-13 a level the game will not take when Maximum is switched on from the window is named in the window, in plain words", function()
@@ -783,50 +770,6 @@ test("S2-11 the note while Maximum is in use counts the settings it left as they
     local plural = "2 settings stay as they are: the addon has not learned their levels yet."
     return note(0) == MAX_ON and note(1) == MAX_ON .. " " .. LEFT_OUT_1 and note(2) == MAX_ON .. " " .. plural
         and s.model({ tab = "everyday" }, ctxOf(e, { active = "maximum" })).notice == MAX_ON, tostring(note(2))
-end)
-
-test("S2-9b a client that wraps at 9 pixels a letter still has every note above the buttons and clear of the rows", function()
-    local e, s, db, p = bootWith(quietEntry())
-    CVARS.graphicsComputeEffects = "1"
-    p.switch("maximum", true)
-    STRINGHEIGHT = function(fs)
-        local text = fs._text or ""
-        local perLine = math.max(1, math.floor((fs._width or 520) / 9))
-        return 14 * math.max(1, math.ceil(#text / perLine))
-    end
-    s.open("everyday")
-    local f = window()
-    local function top(fs) return -fs._point[5] end
-    local function bottom(fs) return top(fs) + STRINGHEIGHT(fs) end
-    local header = { fontStringWith(f, "My settings"), fontStringWith(f, "Choose how the game looks. Settings you tick are kept: the addon puts them back at every loading screen."),
-        fontStringWith(f, "Settings for normal play."), fontStringWith(f, "Costs from your quiet-spot test. Measured in Highmountain, 3 days ago.") }
-    local notice
-    walk(f, function(frame)
-        for _, fs in ipairs(frame.fontStrings) do
-            if fs.shown and fs._text and fs._text:find(MAX_ON, 1, true) then notice = fs end
-        end
-    end)
-    header[#header + 1] = notice
-    local ordered = true
-    for i = 1, #header - 1 do
-        if not header[i] or not header[i + 1] or bottom(header[i]) > top(header[i + 1]) then ordered = false end
-    end
-    local total = fontStringWith(f, "The test skipped the highest levels of 4 settings, so there is no total yet. Run Find my best settings and choose Thorough.")
-    local mattersNote = fontStringWith(f, MATTERS_NOTE)
-    local buttons = byKey(f, "use")
-    -- the bottom block is stacked up from the buttons: total, then the matters note, each clear of the one below it
-    local bottomUp = total ~= nil and mattersNote ~= nil and total._point[1] == "BOTTOMLEFT" and mattersNote._point[1] == "BOTTOMLEFT"
-        and total._point[5] >= 38 and mattersNote._point[5] >= total._point[5] + STRINGHEIGHT(total)
-    local headerBottom = header[#header] and bottom(header[#header]) or 9999
-    -- the rows' scroll area ends above the stacked block and still has room: from the last header line down to it
-    local scroll
-    walk(f, function(frame) if frame.kind == "ScrollFrame" then scroll = frame end end)
-    local scrollBottom = scroll and scroll._point and scroll._point[5] or 0
-    local clear = mattersNote ~= nil and scrollBottom >= mattersNote._point[5] + STRINGHEIGHT(mattersNote)
-    local room = 620 - scrollBottom - headerBottom
-    STRINGHEIGHT = nil
-    return ordered and bottomUp and clear and room >= 120 and buttons ~= nil,
-        tostring(ordered) .. tostring(bottomUp) .. tostring(clear) .. " header " .. tostring(headerBottom) .. " room " .. tostring(room)
 end)
 
 test("S2-10 no raw setting name in any text this change adds", function()
@@ -950,28 +893,6 @@ test("S3-5 an estimate that cannot be made leaves the window drawn, without the 
         and #OUT == 0, tostring(yourText(f)) .. outText()
 end)
 
-test("S3-6 the line stacks between the matters note and the total, each clear of the next, and the rows keep their room", function()
-    local e, s = bootWith(fullEntry())
-    STRINGHEIGHT = function(fs)
-        local text = fs._text or ""
-        local perLine = math.max(1, math.floor((fs._width or 520) / 9))
-        return 14 * math.max(1, math.ceil(#text / perLine))
-    end
-    s.open("everyday")
-    local f = window()
-    local mine = yourFS(f)
-    local total = fontStringWith(f, "Everything at the highest: about 152 fps.")
-    local matters = fontStringWith(f, MATTERS_NOTE)
-    local scroll
-    walk(f, function(frame) if frame.kind == "ScrollFrame" then scroll = frame end end)
-    local scrollBottom = scroll and scroll._point and scroll._point[5] or 0
-    local stacked = mine ~= nil and total ~= nil and matters ~= nil and mine._point[1] == "BOTTOMLEFT" and total._point[5] >= 38
-        and mine._point[5] >= total._point[5] + STRINGHEIGHT(total) and matters._point[5] >= mine._point[5] + STRINGHEIGHT(mine)
-    local clear = matters ~= nil and scrollBottom >= matters._point[5] + STRINGHEIGHT(matters)
-    STRINGHEIGHT = nil
-    return stacked and clear, tostring(stacked) .. tostring(clear)
-end)
-
 -- The picture sharpness block (spec 2026-11-02-picture-sharpness-slider-design.md): a slider for this session only.
 local SIZE_NOTE = "Not saved: the game goes back to your normal setting when you log out."
 local SIZE_WARNING = "Above 100% the game draws more pixels than your screen has. That can cost a lot of frame rate and graphics memory, "
@@ -1006,7 +927,7 @@ end)
 
 test("S4-2 the window draws the block; letting go of the slider applies the size, Back to normal puts it back, and nothing prints", function()
     local e, s = bootWith(fullEntry())
-    s.open("everyday")
+    s.open("size")
     local f = window()
     local slider = byKey(f, "size")
     local back = byKey(f, "sizeback")
@@ -1025,7 +946,7 @@ end)
 
 test("S4-3 dragging only moves the label; nothing is written until the mouse button is released", function()
     local e, s = bootWith(fullEntry())
-    s.open("everyday")
+    s.open("size")
     local f = window()
     local slider = byKey(f, "size")
     SETLOG = {}
@@ -1040,18 +961,18 @@ test("S4-4 drawing the window never writes: a size between steps, or out of the 
     local e, s = bootWith(fullEntry())
     CVARS.RenderScale = "1.3"
     SETLOG = {}
-    s.open("everyday")
+    s.open("size")
     local f = window()
     local mid = byKey(f, "size")._value == 130 and hasText(f, "Picture sharpness right now: 130%")
     CVARS.RenderScale = "0.3"
-    s.open("everyday")
+    s.open("size")
     local under = byKey(f, "size")._value == 50 and hasText(f, "Picture sharpness right now: 30%")
     return mid and under and #SETLOG == 0 and #OUT == 0, tostring(mid) .. tostring(under) .. #SETLOG
 end)
 
 test("S4-5 the release rounds to the nearest step of 5", function()
     local e, s = bootWith(fullEntry())
-    s.open("everyday")
+    s.open("size")
     local f = window()
     drag(f, 152)
     local a = CVARS.RenderScale == "1.5"
@@ -1063,11 +984,11 @@ end)
 test("S4-6 in combat or during a test the slider and Back to normal are greyed, and a stray click writes nothing", function()
     local e, s = bootWith(fullEntry())
     CVARS.RenderScale = "1"
-    s.open("everyday")
+    s.open("size")
     local f = window()
     drag(f, 150)
     COMBAT = true
-    s.open("everyday")
+    s.open("size")
     local greyed = byKey(f, "size").enabled == false and byKey(f, "sizeback").enabled == false
     SETLOG = {}
     s.click("size:200")
@@ -1081,7 +1002,7 @@ test("S4-7 a client with no picture sharpness setting has no block", function()
     local e5 = H.boot({ graphicsShadowQuality = "2", graphicsSSAO = "1", vsync = "0" }, { fresh = true })
     e5.ns.bench.now = function() return NOW end
     e5.ns.bench.state().history[1] = quietEntry()
-    e5.ns.settings.open("everyday")
+    e5.ns.settings.open("size")
     local f = window()
     return f ~= nil and byKey(f, "size") == nil and byKey(f, "sizeback") == nil and not hasText(f, "Picture sharpness right now")
         and not hasText(f, SIZE_NOTE)
@@ -1089,7 +1010,7 @@ end)
 
 test("S4-8 a size the game will not take is said in the window, in plain words, and the slider shows what the game holds", function()
     local e, s = bootWith(fullEntry())
-    s.open("everyday")
+    s.open("size")
     local f = window()
     SETFAIL.RenderScale = "clamp"
     drag(f, 150)
@@ -1097,28 +1018,35 @@ test("S4-8 a size the game will not take is said in the window, in plain words, 
         and byKey(f, "size")._value == 100 and #OUT == 0, outText()
 end)
 
-test("S4-9 the block stands above the footer, the label over the slider over the warning over the note, and the total over them all", function()
+test("S4-9 on the Picture size page the block stands under the card: the label over the slider over the warning over the note, Back to normal beside the slider, all above the summary", function()
     local e, s = bootWith(fullEntry())
-    s.open("everyday")
-    local f0 = window()
-    drag(f0, 150)
+    s.open("size")
+    drag(window(), 150)
     STRINGHEIGHT = function(fs)
         local text = fs._text or ""
         local perLine = math.max(1, math.floor((fs._width or 520) / 9))
         return 14 * math.max(1, math.ceil(#text / perLine))
     end
-    s.open("everyday")
+    s.open("size")
     local f = window()
-    local note, warn = fontStringWith(f, SIZE_NOTE), fontStringWith(f, SIZE_WARNING)
-    local label = fontStringWith(f, "Picture sharpness right now: 150% (normal: 100%)")
-    local total = fontStringWith(f, "Everything at the highest: about 152 fps.")
-    local slider, back = byKey(f, "size"), byKey(f, "sizeback")
-    local ok = note ~= nil and warn ~= nil and label ~= nil and total ~= nil and slider ~= nil and back ~= nil
-        and note._point[1] == "BOTTOMLEFT" and note._point[5] >= 38
-        and warn._point[5] >= note._point[5] + STRINGHEIGHT(note)
-        and slider._point[5] >= warn._point[5] + STRINGHEIGHT(warn)
-        and label._point[5] >= slider._point[5] + 17 and total._point[5] >= label._point[5] + STRINGHEIGHT(label)
-        and back._point[4] >= slider._point[4] + slider._width and back._point[4] + back._width <= 580
+    local function textHas(part)
+        local found
+        walk(f, function(frame)
+            for _, fs in ipairs(frame.fontStrings) do
+                if fs.shown and fs._text and fs._text:find(part, 1, true) then found = fs end
+            end
+        end)
+        return found
+    end
+    local label, warn, note = fontStringWith(f, "Picture sharpness right now: 150% (normal: 100%)"), fontStringWith(f, SIZE_WARNING), fontStringWith(f, SIZE_NOTE)
+    local slider, back, card = byKey(f, "size"), byKey(f, "sizeback"), byKey(f, "level:RenderScale:1")
+    local your = textHas("Your Everyday settings")
+    local function top(item) return -item._point[5] end
+    local ok = label ~= nil and warn ~= nil and note ~= nil and slider ~= nil and back ~= nil and card ~= nil and your ~= nil
+        and top(label) >= top(card) + 22 + 16 and top(slider) >= top(label) + STRINGHEIGHT(label)
+        and top(warn) >= top(slider) + 16 and top(note) >= top(warn) + STRINGHEIGHT(warn)
+        and back._point[4] >= slider._point[4] + slider._width and back._point[4] + back._width <= 595
+        and 8 + top(note) + STRINGHEIGHT(note) <= 522 - (your._point[5] + STRINGHEIGHT(your))
     STRINGHEIGHT = nil
     return ok, tostring(ok)
 end)
@@ -1179,6 +1107,287 @@ test("S5-3 open takes a page, a tab, or nothing: a tab picks its first settings 
     local bogus = s.state().page == "light"
     return first and sized and kept and crowded and everyday and bogus and #OUT == 0, tostring(first) .. tostring(sized) .. tostring(kept)
         .. tostring(crowded) .. tostring(everyday) .. tostring(bogus)
+end)
+
+-- The flat hub window: the shell and the settings pages (spec 2026-11-02-flat-hub-window-design.md H1, H6-H8, H11, sections 4-5).
+local PAGE_H = 522                         -- the page area under the 36 pixel header of the 560 pixel window
+local NONE_TEXT = "None of these settings are in this client."
+local function injectSettings(e, n)        -- n more settings the page table does not know (they land on World detail)
+    local real = e.ns.bench.resolve
+    e.ns.bench.resolve = function()
+        local list = real()
+        for i = 1, n do list[#list + 1] = { key = "extra" .. i, cvar = "extraSetting" .. i, label = "Extra " .. i, tiers = { "0", "1", "2" } } end
+        return list
+    end
+end
+local function onlyRenderScale(e)
+    local real = e.ns.bench.resolve
+    e.ns.bench.resolve = function()
+        local list = {}
+        for _, entry in ipairs(real()) do if entry.cvar == "RenderScale" then list[#list + 1] = entry end end
+        return list
+    end
+end
+local function shownButtons(f)
+    local list = {}
+    walk(f, function(frame) if frame.kind == "Button" and frame.shown and frame.label then list[#list + 1] = frame end end)
+    return list
+end
+
+test("S6-0 the model gives each level its short label and each row its matters words; columns are two, three above six cards", function()
+    local e, s = boot()
+    local view = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, quietEntry()) }))
+    local shadows, clutter = rowOf(view, "graphicsShadowQuality"), rowOf(view, "groundEffectDensity")
+    return shadows.mattersWords == "some" and shadows.levels[1].short == "0" and shadows.levels[1].text == "0 (lowest)"
+        and shadows.levels[5].short == "4" and shadows.levels[5].text == "4 (highest)" and clutter.levels[1].short == "48"
+        and clutter.levels[3].short == "128" and rowOf(view, "RenderScale").levels[1].short == "50%"
+        and s.columnsFor(0) == 2 and s.columnsFor(6) == 2 and s.columnsFor(7) == 3 and s.columnsFor(9) == 3,
+        tostring(shadows.mattersWords) .. tostring(shadows.levels[1].short)
+end)
+
+test("S6-1 the window is flat and 780 by 560, with the header, six page rows and no scroll frame", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    local scrolls = 0
+    walk(f, function(frame) if frame.kind == "ScrollFrame" then scrolls = scrolls + 1 end end)
+    local rows = {}
+    for _, page in ipairs(s.PAGES) do
+        local b = byKey(f, "page:" .. page.key)
+        rows[#rows + 1] = b and b._text or "?"
+    end
+    return f ~= nil and f.name == "ForeverSettingsSettings" and f.template == nil and f._width == 780 and f._height == 560
+        and f.titleText._text == "ForeverSettings" and f.close ~= nil and scrolls == 0
+        and table.concat(rows, "|") == "Home|Light and shadows|World detail|Picture size|Tests and results|About", table.concat(rows, "|")
+end)
+
+test("S6-2 the page list marks the current page, a click changes it, and the page's title follows", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    local start = byKey(f, "page:light").skinState.selected == true and byKey(f, "page:home").skinState.selected == false
+        and hasText(f, "Light and shadows")
+    byKey(f, "page:world"):Click()
+    local moved = s.state().page == "world" and byKey(f, "page:world").skinState.selected == true
+        and byKey(f, "page:light").skinState.selected == false and fontStringWith(f, "World detail") ~= nil
+    local function rowY(key) return -byKey(f, "page:" .. key)._point[5] end
+    local spaced = rowY("size") - rowY("world") == 30 and rowY("tests") - rowY("size") == 44          -- a gap before Tests and results
+    byKey(f, "page:about"):Click()
+    local bare = byKey(f, "tab:everyday") == nil and byKey(f, "use") == nil and byKey(f, "maximum") == nil
+        and not hasText(f, "Everything at the highest") and not hasText(f, "Your Everyday settings")
+    return start and moved and spaced and bare and #OUT == 0, tostring(start) .. tostring(moved) .. tostring(spaced) .. tostring(bare)
+end)
+
+test("S6-3 Light and shadows draws a card per setting of the page: tick, name, matters words, help, small level buttons with costs, and the lowest and highest words in the tooltip", function()
+    local e, s = bootWith(fullEntry())
+    local tip
+    GameTooltip = { SetOwner = function() end, SetText = function(_, text) tip = text end, Show = function() end, Hide = function() tip = nil end }
+    s.open("everyday")
+    local f = window()
+    local shadowsTick, ssaoTick = byKey(f, "keep:graphicsShadowQuality"), byKey(f, "keep:graphicsSSAO")
+    local onPage = shadowsTick ~= nil and ssaoTick ~= nil and byKey(f, "keep:groundEffectDensity") == nil and byKey(f, "keep:RenderScale") == nil
+        and shadowsTick:GetChecked() == true and ssaoTick:GetChecked() == false
+    local texts = hasText(f, "Shadow detail") and hasText(f, "matters: some") and hasText(f, "How sharp and detailed shadows look.")
+    local first, last, now = byKey(f, "level:graphicsShadowQuality:0"), byKey(f, "level:graphicsShadowQuality:4"), byKey(f, "level:graphicsShadowQuality:2")
+    local levels = first ~= nil and last ~= nil and now ~= nil and first._text == "0" and last._text == "4" and first._width == 36
+        and first._height == 22 and now.skinState.selected == true and first.skinState.selected == false
+    local nowText, nowFs = costFor(f, "graphicsShadowQuality", "2")
+    local costs = costFor(f, "graphicsShadowQuality", "0") == "+83 fps" and nowText == "now"
+    local lightR, lightG, lightB = e.ns.skin.color("accentLight")
+    costs = costs and nowFs._textColor[1] == lightR and nowFs._textColor[2] == lightG and nowFs._textColor[3] == lightB
+    first.scripts.OnEnter(first)
+    local lowTip = tip == "0 (lowest)"
+    last.scripts.OnEnter(last)
+    local highTip = tip == "4 (highest)"
+    GameTooltip = nil
+    return onPage and texts and levels and costs and lowTip and highTip,
+        tostring(onPage) .. tostring(texts) .. tostring(levels) .. tostring(costs) .. tostring(lowTip) .. tostring(highTip)
+end)
+
+test("S6-4 a page is two columns of cards, three above six cards; a page with none says so in one line", function()
+    local e, s = bootWith(fullEntry())
+    injectSettings(e, 4)                                    -- World detail: clutter (raw) and four more: five cards
+    s.open("world")
+    local f = window()
+    local function xs()
+        local seen = {}
+        for _, key in ipairs({ "keep:groundEffectDensity", "keep:extraSetting1", "keep:extraSetting2", "keep:extraSetting3", "keep:extraSetting4" }) do
+            local tick = byKey(f, key)
+            if tick then seen[tick._point[4]] = true end
+        end
+        local list = {}
+        for x in pairs(seen) do list[#list + 1] = x end
+        table.sort(list)
+        return list
+    end
+    local two = xs()
+    local twoOk = #two == 2 and two[2] - two[1] == 306
+    local e2, s2 = bootWith(fullEntry())
+    injectSettings(e2, 6)                                   -- seven cards
+    s2.open("world")
+    local f2 = window()
+    local seen = {}
+    for _, key in ipairs({ "keep:groundEffectDensity", "keep:extraSetting1", "keep:extraSetting2", "keep:extraSetting3", "keep:extraSetting4",
+        "keep:extraSetting5", "keep:extraSetting6" }) do
+        local tick = byKey(f2, key)
+        if tick then seen[tick._point[4]] = true end
+    end
+    local three = {}
+    for x in pairs(seen) do three[#three + 1] = x end
+    table.sort(three)
+    local threeOk = #three == 3 and three[2] - three[1] == 204 and three[3] - three[2] == 204
+    local e3, s3 = bootWith(fullEntry())
+    onlyRenderScale(e3)
+    s3.open("light")
+    local f3 = window()
+    local empty = hasText(f3, NONE_TEXT) and byKey(f3, "keep:graphicsShadowQuality") == nil
+    return twoOk and threeOk and empty, tostring(twoOk) .. tostring(threeOk) .. tostring(empty)
+end)
+
+test("S6-5 every page fits inside the page area with a 9-pixel wrap and a long notice, and no two buttons overlap", function()
+    local e, s = bootWith(fullEntry(), { active = "maximum" })
+    injectSettings(e, 5)                                    -- six cards on World detail
+    STRINGHEIGHT = function(fs)
+        local text = fs._text or ""
+        local perLine = math.max(1, math.floor((fs._width or 520) / 9))
+        return 14 * math.max(1, math.ceil(#text / perLine))
+    end
+    s.open("world")
+    local f = window()
+    local lowest = 0
+    local buttons = {}
+    walk(f, function(frame)
+        if frame.shown and frame.key and frame.key:find("^level:") then
+            buttons[#buttons + 1] = frame
+            local bottom = -frame._point[5] + frame._height + 16
+            if bottom > lowest then lowest = bottom end
+        end
+    end)
+    local summaryTop = PAGE_H
+    for _, text in ipairs({ "Your Everyday settings: about", "Everything at the highest" }) do
+        local fs
+        walk(f, function(frame)
+            for _, candidate in ipairs(frame.fontStrings) do
+                if candidate.shown and candidate._text and candidate._text:find(text, 1, true) then fs = candidate end
+            end
+        end)
+        if fs and PAGE_H - fs._point[5] - STRINGHEIGHT(fs) < summaryTop then summaryTop = PAGE_H - fs._point[5] - STRINGHEIGHT(fs) end
+    end
+    local fits = #buttons == 18 and 8 + lowest + 4 <= summaryTop
+    local clear = true
+    for i = 1, #buttons do
+        for j = i + 1, #buttons do
+            local a, b = buttons[i], buttons[j]
+            local ax, ay, bx, by = a._point[4], -a._point[5], b._point[4], -b._point[5]
+            if ax < bx + b._width and bx < ax + a._width and ay < by + b._height and by < ay + a._height then clear = false end
+        end
+    end
+    STRINGHEIGHT = nil
+    return fits and clear, tostring(#buttons) .. " " .. tostring(8 + lowest) .. " < " .. tostring(summaryTop)
+end)
+
+test("S6-6 every button label is centred both ways on one line at its width; the page rows keep theirs at the left", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    local bad = {}
+    local count = 0
+    for _, b in ipairs(shownButtons(f)) do
+        count = count + 1
+        local label = b.label
+        if b.navItem then
+            if not (label._justifyH == "LEFT" and label._justifyV == "MIDDLE") then bad[#bad + 1] = "nav:" .. tostring(b._text) end
+        else
+            if not (label._point and label._point[1] == "CENTER" and label._justifyH == "CENTER" and label._justifyV == "MIDDLE"
+                and label._wordWrap == false) then bad[#bad + 1] = "centre:" .. tostring(b._text) end
+            if #(b._text or "") * 6.5 > b._width - 8 then bad[#bad + 1] = "wide:" .. tostring(b._text) end
+        end
+    end
+    local use, maximum = byKey(f, "use"), byKey(f, "maximum")
+    return count >= 14 and #bad == 0 and use._width == 230 and use._height == 26 and maximum._width == 160 and maximum._height == 26,
+        table.concat(bad, ",") .. " " .. count
+end)
+
+test("S6-7 the footer holds Use what I have in the game now and Switch to Maximum, right-aligned; Maximum goes while it is in use; both grey when locked", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    local use, maximum = byKey(f, "use"), byKey(f, "maximum")
+    local placed = use ~= nil and maximum ~= nil and maximum._point[1] == "BOTTOMRIGHT" and maximum._point[4] == -16
+        and use._point[1] == "BOTTOMRIGHT" and use._point[4] == -(16 + 160 + 8) and use._text == "Use what I have in the game now"
+        and maximum._text == "Switch to Maximum" and use.enabled == true and maximum.enabled == true
+    COMBAT = true
+    s.open("everyday")
+    local greyed = byKey(f, "use").enabled == false and byKey(f, "maximum").enabled == false
+    COMBAT = false
+    local e2, s2, _, p2 = bootWith(fullEntry())
+    p2.switch("maximum", true)
+    s2.open("everyday")
+    local f2 = window()
+    local inMaximum = byKey(f2, "maximum") == nil and byKey(f2, "use") ~= nil and byKey(f2, "use")._point[4] == -16
+    return placed and greyed and inMaximum, tostring(placed) .. tostring(greyed) .. tostring(inMaximum)
+end)
+
+test("S6-8 the summary block stands above the footer: the live line, the total and the matters note, bottom-up", function()
+    local e, s = bootWith(fullEntry())
+    s.open("everyday")
+    local f = window()
+    local your = fontStringWith(f, "Your Everyday settings: about 270 fps (an estimate; settings affect each other).")
+    local total = fontStringWith(f, "Everything at the highest: about 152 fps.")
+    local note = fontStringWith(f, MATTERS_NOTE)
+    STRINGHEIGHT = function() return 14 end
+    local ok = your ~= nil and total ~= nil and note ~= nil and your._point[1] == "BOTTOMLEFT" and your._point[4] == 167
+        and note._point[5] >= 44 and total._point[5] >= note._point[5] + 14 and your._point[5] >= total._point[5] + 14
+    STRINGHEIGHT = nil
+    local e2, s2 = bootWith(nil)
+    s2.open("everyday")
+    local none = not hasText(window(), "Your Everyday settings") and not hasText(window(), "Everything at the highest")
+    return ok and none, tostring(ok) .. tostring(none)
+end)
+
+test("S6-9 the Everyday and Crowded switch changes the tab and marks it; the notices stand as one banner", function()
+    local e, s = bootWith(fullEntry(), { active = "maximum" })
+    s.open("everyday")
+    local f = window()
+    local everyday, crowded = byKey(f, "tab:everyday"), byKey(f, "tab:crowded")
+    local start = everyday ~= nil and crowded ~= nil and everyday.skinState.selected == true and crowded.skinState.selected == false
+        and everyday._width == 120 and hasText(f, MAX_ON)
+    crowded:Click()
+    local moved = s.state().tab == "crowded" and byKey(f, "tab:crowded").skinState.selected == true and byKey(f, "tab:everyday").skinState.selected == false
+    return start and moved and #OUT == 0, tostring(start) .. tostring(moved)
+end)
+
+test("S6-10 in combat every control is greyed with the reason shown, clicks write nothing, and the pages still switch", function()
+    local e, s = bootWith(fullEntry())
+    COMBAT = true
+    s.open("everyday")
+    local f = window()
+    local greyed = byKey(f, "level:graphicsShadowQuality:3").enabled == false and byKey(f, "keep:graphicsShadowQuality").enabled == false
+        and byKey(f, "tab:crowded").enabled == false and byKey(f, "use").enabled == false and hasText(f, COMBAT_TEXT)
+    SETLOG = {}
+    s.click("level:graphicsShadowQuality:3")
+    s.click("keep:graphicsSSAO")
+    local quiet = #SETLOG == 0 and CVARS.graphicsShadowQuality == "2"
+    byKey(f, "page:world"):Click()
+    local pages = s.state().page == "world" and byKey(f, "page:world").enabled == true
+    COMBAT = false
+    return greyed and quiet and pages, tostring(greyed) .. tostring(quiet) .. tostring(pages)
+end)
+
+test("S6-11 Escape closes the window once, and no raw setting name appears in any text of any page", function()
+    local e, s = bootWith(fullEntry())
+    CVARS.graphicsComputeEffects = "1"
+    local listed = 0
+    local raw
+    for _, key in ipairs({ "light", "world", "size" }) do
+        s.open(key)
+        local f = window()
+        for _, name in ipairs(RAW) do
+            if allText(f):find(name, 1, true) then raw = name end
+        end
+    end
+    for _, name in ipairs(UISpecialFrames) do if name == "ForeverSettingsSettings" then listed = listed + 1 end end
+    return listed == 1 and raw == nil, tostring(listed) .. tostring(raw)
 end)
 
 test("S5-4 a click on a page changes the page and writes nothing, even in combat; an unknown page is ignored", function()

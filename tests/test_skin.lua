@@ -143,4 +143,29 @@ test("SK-5 no widget asks for a stock template, so a client that lacks one canno
     return #templated == 0 and text._width == 120 and text._justifyH == "LEFT" and colorIs(text._textColor, "8b90a0"), table.concat(templated, ",")
 end)
 
+test("SK-6 a page list row is flat: its label sits at the left, a selected row has the selected fill and an accent bar, hover and pressed show by colour", function()
+    local _, skin = boot()
+    local parent = skin.window("SkinTestWindow5", 400, 300, "t")
+    local row = skin.navItem(parent.page, "Light and shadows", 149, 28)
+    local label = row.label
+    local pt = label and label._point
+    local leftAligned = pt ~= nil and pt[1] == "LEFT" and pt[4] == 14 and label._justifyH == "LEFT" and label._justifyV == "MIDDLE"
+        and label._wordWrap == false and row._width == 149 and row._height == 28 and row._text == "Light and shadows" and row.navItem == true
+    local function bg() return row.bg._color end
+    local normal = bg()[4] == 0 and colorIs(label._textColor, "d8dbe3") and row.bar.shown == false
+    row.scripts.OnEnter(row)
+    local hover = colorIs(bg(), "1b1e28")
+    row.scripts.OnMouseDown(row)
+    local pressed = colorIs(bg(), "2c3266")
+    row.scripts.OnMouseUp(row)
+    row.scripts.OnLeave(row)
+    row:SetSelected(true)
+    local selected = colorIs(bg(), "232850") and row.bar.shown == true and colorIs(row.bar._color, "9a9cff") and row.bar._width == 2
+        and colorIs(label._textColor, "c9caff")
+    row:SetSelected(false)
+    local cleared = bg()[4] == 0 and row.bar.shown == false
+    return leftAligned and normal and hover and pressed and selected and cleared,
+        tostring(leftAligned) .. tostring(normal) .. tostring(hover) .. tostring(pressed) .. tostring(selected) .. tostring(cleared)
+end)
+
 return H.results()

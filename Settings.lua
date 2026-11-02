@@ -8,13 +8,9 @@ ns.settings = settings
 local GetCVar = C_CVar and C_CVar.GetCVar or _G.GetCVar
 
 local FRAME_NAME = "ForeverSettingsSettings"
-local WIDTH, HEIGHT = 580, 620
-local CONTENT_WIDTH = 520
+local WIDTH, HEIGHT = 780, 560
 local REFRESH = 0.5            -- seconds of frame time between looks at what changed outside the window
-local BUTTON_WIDTH, BUTTON_GAP = 100, 4
-local COST_HEIGHT = 14             -- the second line under a level button: a line of level buttons is this much taller
-local FOOTER_WIDTH = { use = 230, maximum = 160, close = 100 }
-local FOOTER_GAP = 12
+local NONE_TEXT = "None of these settings are in this client."
 
 local INTRO = "Choose how the game looks. Settings you tick are kept: the addon puts them back at every loading screen."
 local ORIGINAL_NOTE = "You're using your Original settings (hands off). Switch to Everyday or Crowded in the menu to turn these on."
@@ -26,7 +22,7 @@ local NOTHING_TEXT = "Maximum has nothing to set yet: run Find my best settings 
 local USE_TEXT = "Use what I have in the game now"
 local MAXIMUM_TEXT = "Switch to Maximum"
 local SIZE_MIN, SIZE_MAX, SIZE_STEP = 50, 200, 5          -- percent: the picture sharpness slider (this session only)
-local SIZE_SLIDER_WIDTH, SIZE_BACK_WIDTH = 360, 140
+local SIZE_SLIDER_WIDTH, SIZE_BACK_WIDTH = 360, 140      -- pixels: the slider and its Back to normal button
 local SIZE_NOTE = "Not saved: the game goes back to your normal setting when you log out."
 local SIZE_WARNING = "Above 100% the game draws more pixels than your screen has. That can cost a lot of frame rate and graphics memory, "
     .. "and some graphics cards crash at high values."
@@ -117,6 +113,11 @@ local function refusedNames(mismatched)
     return list
 end
 
+-- Columns of cards on a settings page: two, three above six cards (spec H7).
+function settings.columnsFor(count)
+    return count > 6 and 3 or 2
+end
+
 -- "Picture sharpness right now: 150%".
 function settings.sizeLabel(percent)
     return "Picture sharpness right now: " .. percent .. "%"
@@ -172,6 +173,7 @@ function settings.model(st, ctx)
         local words = ranking[cvar] and names.matters(ranking[cvar].weight)
         if words then
             row.matters = "Matters to the picture: " .. words .. "."
+            row.mattersWords = words
             view.mattersNote = MATTERS_NOTE
         end
         local chosen = saved[cvar]
@@ -183,7 +185,7 @@ function settings.model(st, ctx)
         for i, value in ipairs(entry.tiers) do
             local position
             if i == 1 then position = "lowest" elseif i == #entry.tiers then position = "highest" end
-            local level = { value = value, text = names.level(cvar, value, position),
+            local level = { value = value, text = names.level(cvar, value, position), short = names.level(cvar, value),
                 selected = chosen ~= nil and sameValue(chosen, value) }
             if heldFps then
                 if sameValue(chosen, value) then
@@ -445,30 +447,25 @@ function settings.click(key)
 end
 
 -- The window (frame adapter) ----------------------------------------------------------------------------------------
+-- Drawn from the flat widgets of Skin.lua (spec 2026-11-02-flat-hub-window-design.md): a header, the page list at the left, the
+-- page area, and a footer strip. Nothing scrolls.
 
+local skin = ns.skin
 local frame, parts
 local sinceRefresh = 0
 local lastSignature
 
-local function make(kind, name, parent, template, fallbackKind)
-    local ok, made = pcall(CreateFrame, kind, name, parent, template)
-    if ok and made then return made, true end
-    return CreateFrame(fallbackKind or kind, name, parent), false
-end
-
-local function giveLabel(button)
-    local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    button:SetFontString(fs)
-    button:SetHighlightFontObject(GameFontHighlight)
-    button:SetDisabledFontObject(GameFontDisable)
-end
-
-local function text(parent, font, width)
-    local fs = parent:CreateFontString(nil, "OVERLAY", font)
-    fs:SetWidth(width)
-    fs:SetJustifyH("LEFT")
-    return fs
-end
+local NAV_WIDTH, PAD, TOP, TITLE_H, FOOTER_H = 150, 16, 8, 26, 44
+local AREA_X = NAV_WIDTH + 1 + PAD                 -- where the page area starts inside the page frame
+local AREA_W = WIDTH - 2 - AREA_X - PAD
+local PAGE_H = HEIGHT - 38                         -- the page frame: under the 36 pixel header, inside the 1 pixel border
+local CARD_GAP_X, CARD_GAP_Y = 18, 6
+local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 36, 22, 3, 14
+local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26
+local SUMMARY_GAP = 6
+local TAB_W = 120
+local SETTINGS_PAGE = { light = true, world = true, size = true }
+local PLACEHOLDER = "This page is coming in the next step."
 
 local function heightOf(fs, str)
     local h = fs:GetStringHeight()
@@ -501,19 +498,23 @@ end
 
 local function clicked(self) settings.click(self.key) end
 
-local function makeButton(parent, width)
-    local button, templated = make("Button", nil, parent, "UIPanelButtonTemplate")
-    if not templated then giveLabel(button) end
-    button:SetSize(width, 24)
-    button:SetScript("OnClick", clicked)
-    return button
+local function versionText()
+    local get = C_AddOns and C_AddOns.GetAddOnMetadata or _G.GetAddOnMetadata
+    local version = get and get("ForeverSettings", "Version")
+    if type(version) == "string" and version ~= "" then return "Version " .. version end
+    return ""
 end
 
-local function makeCheck(parent)
-    local box = make("CheckButton", nil, parent, "UICheckButtonTemplate", "Button")
-    box:SetSize(26, 26)
-    box:SetScript("OnClick", clicked)
-    return box
+-- The words of a level button that the button is too small for ("(lowest)" and "(highest)") show in a tooltip.
+local function showTip(self)
+    if GameTooltip and self.tip then
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(self.tip)
+        GameTooltip:Show()
+    end
+end
+local function hideTip()
+    if GameTooltip then GameTooltip:Hide() end
 end
 
 -- The picture sharpness slider: dragging moves the label, letting go applies the size (rebuilding the game's render targets at
@@ -524,18 +525,8 @@ local function roundToStep(value)
 end
 
 local function makeSlider(parent, p)
-    local slider, templated = make("Slider", FRAME_NAME .. "Size", parent, "OptionsSliderTemplate")
+    local slider = skin.slider(parent, FRAME_NAME .. "Size", SIZE_SLIDER_WIDTH, SIZE_MIN, SIZE_MAX, SIZE_STEP)
     slider.key = "size"
-    slider:SetSize(SIZE_SLIDER_WIDTH, 17)
-    slider:SetOrientation("HORIZONTAL")
-    slider:SetMinMaxValues(SIZE_MIN, SIZE_MAX)
-    slider:SetValueStep(SIZE_STEP)
-    if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
-    if not templated then slider:SetThumbTexture("Interface/Buttons/UI-SliderBar-Button-Horizontal") end
-    local low, high, title = _G[FRAME_NAME .. "SizeLow"], _G[FRAME_NAME .. "SizeHigh"], _G[FRAME_NAME .. "SizeText"]
-    if low then low:SetText(SIZE_MIN .. "%") end
-    if high then high:SetText(SIZE_MAX .. "%") end
-    if title then title:SetText("") end
     slider:SetScript("OnValueChanged", function(_, value)
         p.sizeLabel:SetText(settings.sizeLabel(roundToStep(value)))        -- a draw sets the label right after moving the slider
     end)
@@ -557,86 +548,95 @@ local function signature(ctx)
 end
 
 local function build()
-    local f, templated = make("Frame", FRAME_NAME, UIParent, "BasicFrameTemplateWithInset")
-    f:SetSize(WIDTH, HEIGHT)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-    if templated then
-        if f.SetTitle then f:SetTitle("ForeverSettings") end
-    else
-        local background = f:CreateTexture(nil, "BACKGROUND")
-        background:SetAllPoints()
-        background:SetColorTexture(0, 0, 0, 0.85)
-    end
+    local f = skin.window(FRAME_NAME, WIDTH, HEIGHT, "ForeverSettings")
+    local page = f.page
     local p = {}
-    p.title = text(f, "GameFontNormalLarge", WIDTH - 40)
-    p.intro = text(f, "GameFontHighlight", WIDTH - 40)
-    p.note = text(f, "GameFontNormal", WIDTH - 40)
-    p.costNote = text(f, "GameFontHighlightSmall", WIDTH - 40)
-    p.notice = text(f, "GameFontNormal", WIDTH - 40)
-    p.notice:SetTextColor(1, 0.2, 0.2)
-    p.mattersNote = text(f, "GameFontDisableSmall", WIDTH - 40)
-    p.total = text(f, "GameFontNormal", WIDTH - 40)
-    p.your = text(f, "GameFontNormal", WIDTH - 40)
-    p.sizeLabel = text(f, "GameFontNormal", WIDTH - 40)
-    p.sizeNote = text(f, "GameFontHighlightSmall", WIDTH - 40)
-    p.sizeWarn = text(f, "GameFontNormal", WIDTH - 40)
-    p.sizeWarn:SetTextColor(1, 0.6, 0.2)
-    p.sizeSlider = makeSlider(f, p)
-    p.sizeBack = makeButton(f, SIZE_BACK_WIDTH)
-    p.sizeBack.key = "sizeback"
-    p.sizeBack:SetText("Back to normal")
+    f.close.key = "close"
+    f.versionText:SetText(versionText())
+
+    -- The page list at the left, with a rule between it and the page area.
+    p.nav = {}
+    for i, entry in ipairs(settings.PAGES) do
+        local item = skin.navItem(page, entry.text, NAV_WIDTH, 28)
+        item.key = "page:" .. entry.key
+        item:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -(10 + (i - 1) * 30 + (i > 4 and 14 or 0)))
+        item:SetScript("OnClick", clicked)
+        p.nav[i] = item
+    end
+    local rule = page:CreateTexture(nil, "BORDER")
+    rule:SetColorTexture(skin.color("divider"))
+    rule:SetWidth(1)
+    rule:SetPoint("TOPLEFT", page, "TOPLEFT", NAV_WIDTH, 0)
+    rule:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", NAV_WIDTH, 0)
+
+    -- The page area: the title, the Everyday/Crowded switch, the banner, the cards.
+    local area = CreateFrame("Frame", nil, page)
+    area:SetPoint("TOPLEFT", page, "TOPLEFT", AREA_X, -TOP)
+    area:SetSize(AREA_W, PAGE_H - TOP - FOOTER_H)
+    p.area = area
+    p.title = skin.text(area, "large", "accent", AREA_W - 2 * TAB_W - 8)
+    p.title:SetPoint("TOPLEFT", area, "TOPLEFT", 0, -2)
     p.tabs = {}
     for i, key in ipairs(TABS) do
-        local button = makeButton(f, 180)
+        local button = skin.button(area, TAB_TEXT[key], TAB_W, 24)
         button.key = "tab:" .. key
+        button:SetScript("OnClick", clicked)
+        button:SetPoint("TOPRIGHT", area, "TOPRIGHT", -(#TABS - i) * (TAB_W + 4), 0)
         p.tabs[i] = button
     end
-    p.scroll = make("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    p.content = CreateFrame("Frame", nil, p.scroll)
-    p.scroll:SetScrollChild(p.content)
-    p.scroll:EnableMouseWheel(true)
-    p.scroll:SetScript("OnMouseWheel", function(self, delta)
-        local range = self:GetVerticalScrollRange()
-        local now = self:GetVerticalScroll()
-        if type(range) ~= "number" or type(now) ~= "number" then return end
-        self:SetVerticalScroll(math.max(0, math.min(range, now - delta * 32)))
+    p.costNote = skin.text(area, "small", "dim", AREA_W)
+    p.banner = skin.text(area, "small", "warning", AREA_W)
+    p.note = skin.text(area, "normal", "dim", AREA_W)
+    p.checks = newPool(area, function(parent)
+        local box = skin.check(parent)
+        box:SetScript("OnClick", clicked)
+        return box
     end)
-    p.names = newPool(p.content, function(parent)
-        local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        fs:SetJustifyH("LEFT")
+    p.names = newPool(area, function(parent) return skin.text(parent, "normal", "bright") end)
+    p.matters = newPool(area, function(parent)
+        local fs = skin.text(parent, "small", "dim")
+        fs:SetJustifyH("RIGHT")
         return fs
     end)
-    p.lines = newPool(p.content, function(parent)
-        local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        fs:SetJustifyH("LEFT")
-        return fs
+    p.helps = newPool(area, function(parent) return skin.text(parent, "small", "dim") end)
+    p.levels = newPool(area, function(parent)
+        local button = skin.button(parent, "", LEVEL_W, LEVEL_H)
+        button:SetScript("OnClick", clicked)
+        local enter, leave = button:GetScript("OnEnter"), button:GetScript("OnLeave")
+        button:SetScript("OnEnter", function(self) enter(self) showTip(self) end)
+        button:SetScript("OnLeave", function(self) leave(self) hideTip() end)
+        return button
     end)
-    p.matters = newPool(p.content, function(parent)
-        local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        fs:SetJustifyH("LEFT")
-        return fs
-    end)
-    p.checks = newPool(p.content, makeCheck)
-    p.levels = newPool(p.content, function(parent) return makeButton(parent, BUTTON_WIDTH) end)
     -- The second line under a level button: what that level costs against the level held.
-    p.costs = newPool(p.content, function(parent)
-        local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        fs:SetWidth(BUTTON_WIDTH)
+    p.costs = newPool(area, function(parent)
+        local fs = skin.text(parent, "small", "dim", LEVEL_W)
         fs:SetJustifyH("CENTER")
         return fs
     end)
-    p.use = makeButton(f, FOOTER_WIDTH.use)
+
+    -- The picture sharpness block of the Picture size page.
+    p.sizeLabel = skin.text(area, "normal", "bright", AREA_W)
+    p.sizeSlider = makeSlider(area, p)
+    p.sizeBack = skin.button(area, "Back to normal", SIZE_BACK_WIDTH, 24)
+    p.sizeBack.key = "sizeback"
+    p.sizeBack:SetScript("OnClick", clicked)
+    p.sizeWarn = skin.text(area, "small", "warning", AREA_W)
+    p.sizeNote = skin.text(area, "small", "dim", AREA_W)
+
+    -- The summary block above the footer, and the footer strip.
+    p.your = skin.text(page, "small", "text", AREA_W)
+    p.total = skin.text(page, "small", "text", AREA_W)
+    p.mattersNote = skin.text(page, "small", "dim", AREA_W)
+    p.footerRule = skin.divider(page)
+    p.footerRule:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", NAV_WIDTH + 1, FOOTER_H)
+    p.footerRule:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, FOOTER_H)
+    p.use = skin.button(page, USE_TEXT, FOOTER_USE_W, FOOTER_BTN_H)
     p.use.key = "use"
-    p.maximum = makeButton(f, FOOTER_WIDTH.maximum)
+    p.use:SetScript("OnClick", clicked)
+    p.maximum = skin.button(page, MAXIMUM_TEXT, FOOTER_MAX_W, FOOTER_BTN_H)
     p.maximum.key = "maximum"
-    p.close = makeButton(f, FOOTER_WIDTH.close)
-    p.close.key = "close"
+    p.maximum:SetScript("OnClick", clicked)
+
     f:SetScript("OnUpdate", function(self, elapsed)
         if not self:IsShown() then return end
         sinceRefresh = sinceRefresh + elapsed
@@ -644,11 +644,6 @@ local function build()
         sinceRefresh = 0
         if signature(context()) ~= lastSignature then draw() end
     end)
-    local listed = false
-    for _, name in ipairs(UISpecialFrames) do
-        if name == FRAME_NAME then listed = true end
-    end
-    if not listed then tinsert(UISpecialFrames, FRAME_NAME) end
     frame, parts = f, p
     return f
 end
@@ -657,8 +652,8 @@ local function ensure()
     return frame or build()
 end
 
--- Draws the model: title, intro, tabs, the tab's note, the note on where the costs come from, any notice, one row per
--- setting (with what each level costs and what the setting is worth), the total and the notes above the footer, the footer.
+-- Draws the model: the page list, the page's title and switch, the banner, then the page: cards for a settings page, the size
+-- block on the Picture size page, the summary block and the footer.
 function settings.render()
     local f = ensure()
     local p = parts
@@ -666,158 +661,196 @@ function settings.render()
     local view = settings.model(state, ctx)
     state.notice = nil                       -- a refusal is shown once: until the next click or redraw
     lastSignature = signature(ctx)
+    local onSettings = SETTINGS_PAGE[view.page] == true
 
-    local y = 34
-    local function place(fs, str, gap)
-        fs:SetText(str)
-        fs:ClearAllPoints()
-        fs:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -y)
-        fs:Show()
-        y = y + heightOf(fs, str) + gap
+    local title = ""
+    for i, entry in ipairs(view.pages) do
+        p.nav[i]:SetSelected(entry.selected)
+        p.nav[i]:SetEnabled(entry.enabled)
+        if entry.selected then title = entry.text end
     end
-    place(p.title, view.title, 6)
-    place(p.intro, view.intro, 8)
-    local selectedNote = ""
+    p.title:SetText(title)
     for i, tab in ipairs(view.tabs) do
         local button = p.tabs[i]
-        button:SetText(tab.text)
+        button:SetLabel(tab.text)
+        button:SetSelected(tab.selected)
         button:SetEnabled(tab.enabled)
-        button:ClearAllPoints()
-        button:SetPoint("TOPLEFT", f, "TOPLEFT", 20 + (i - 1) * 186, -y)
-        if tab.selected then
-            button:LockHighlight()
-            selectedNote = tab.note or ""
-        else
-            button:UnlockHighlight()
-        end
-        button:Show()
+        if onSettings then button:Show() else button:Hide() end
     end
-    y = y + 32
-    place(p.note, selectedNote, 6)
-    place(p.costNote, view.costNote, 6)
+
+    local y = TITLE_H
+    local function placeText(fs, str, x)
+        fs:SetText(str)
+        fs:ClearAllPoints()
+        fs:SetPoint("TOPLEFT", p.area, "TOPLEFT", x or 0, -y)
+        fs:Show()
+        y = y + heightOf(fs, str) + 6
+    end
+    local function hideText(fs)
+        fs:SetText("")
+        fs:Hide()
+    end
+    -- Which test the costs come from (or that there is none), under the title of a settings page.
+    if onSettings then placeText(p.costNote, view.costNote) else hideText(p.costNote) end
     local notices = {}
     if view.notice then notices[#notices + 1] = view.notice end
     if view.locked then notices[#notices + 1] = view.locked end
     if view.refusal then notices[#notices + 1] = view.refusal end
-    if #notices > 0 then place(p.notice, table.concat(notices, "\n"), 6) else p.notice:SetText(""); p.notice:Hide() end
+    if #notices > 0 then placeText(p.banner, table.concat(notices, "\n")) else hideText(p.banner) end
 
-    -- Above the footer buttons, stacked up from them: the total, the line on what this tab's levels give, then the note on
-    -- "matters to the picture".
-    local bottom = 44
-    local function stack(fs, str)
-        if not str then
-            fs:SetText("")
-            fs:Hide()
-            return
-        end
-        fs:SetText(str)
-        fs:ClearAllPoints()
-        fs:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 20, bottom)
-        fs:Show()
-        bottom = bottom + heightOf(fs, str) + 4
-    end
-    -- The picture sharpness block comes first from the footer: the note, the warning above 100%, the slider with Back to
-    -- normal beside it, then its label.
-    local size = view.size
-    stack(p.sizeNote, size and size.note)
-    stack(p.sizeWarn, size and size.warning)
-    if size then
-        p.sizeSlider:ClearAllPoints()
-        p.sizeSlider:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 24, bottom + 14)
-        p.sizeSlider:SetValue(size.value)
-        if p.sizeSlider.SetEnabled then p.sizeSlider:SetEnabled(size.enabled) end
-        p.sizeSlider:Show()
-        p.sizeBack:ClearAllPoints()
-        p.sizeBack:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 24 + SIZE_SLIDER_WIDTH + 20, bottom + 6)
-        p.sizeBack:SetEnabled(size.canPutBack)
-        p.sizeBack:Show()
-        bottom = bottom + 14 + 17 + 6
-    else
-        p.sizeSlider:Hide()
-        p.sizeBack:Hide()
-    end
-    stack(p.sizeLabel, size and size.label)
-    stack(p.total, view.totalLine)
-    stack(p.your, view.yourLine)
-    stack(p.mattersNote, view.mattersNote)
-
-    p.scroll:ClearAllPoints()
-    p.scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -y)
-    p.scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, math.max(56, bottom + 2))
-    local perLine = math.max(1, math.floor((CONTENT_WIDTH - 40) / (BUTTON_WIDTH + BUTTON_GAP)))
-    local cy = 0
-    for _, row in ipairs(view.rows) do
+    -- One card per setting of the page: the tick, the name, how much it matters, the help, the small level buttons with their costs.
+    local function placeCard(row, x, top, cardW, perRow)
         local box = take(p.checks)
         box.key = "keep:" .. row.cvar
         box:SetChecked(row.kept)
         box:SetEnabled(row.enabled)
         box:ClearAllPoints()
-        box:SetPoint("TOPLEFT", p.content, "TOPLEFT", 0, -cy)
+        box:SetPoint("TOPLEFT", p.area, "TOPLEFT", x, -(top + 1))
         local name = take(p.names)
         name:SetText(row.name)
-        name:SetWidth(CONTENT_WIDTH - 40)
+        name:SetWidth(cardW - 22 - 100)
         name:ClearAllPoints()
-        name:SetPoint("TOPLEFT", p.content, "TOPLEFT", 36, -(cy + 4))
-        local line = take(p.lines)
-        line:SetText(row.line or "")
-        line:SetWidth(CONTENT_WIDTH - 40)
-        line:ClearAllPoints()
-        line:SetPoint("TOPLEFT", p.content, "TOPLEFT", 36, -(cy + 22))
-        local lineHeight = heightOf(line, row.line or "")
-        local by = cy + 22 + lineHeight + 4
-        if row.matters then
+        name:SetPoint("TOPLEFT", p.area, "TOPLEFT", x + 22, -top)
+        if row.mattersWords then
             local worth = take(p.matters)
-            worth:SetText(row.matters)
-            worth:SetWidth(CONTENT_WIDTH - 40)
+            worth:SetText("matters: " .. row.mattersWords)
+            worth:SetWidth(96)
             worth:ClearAllPoints()
-            worth:SetPoint("TOPLEFT", p.content, "TOPLEFT", 36, -(by - 2))
-            by = by + heightOf(worth, row.matters)
+            worth:SetPoint("TOPRIGHT", p.area, "TOPLEFT", x + cardW, -(top + 2))
         end
-        -- Every line of level buttons of a row with costs is taller by the second line under each button.
-        local pitch = 28
-        for _, level in ipairs(row.levels) do
-            if level.cost then pitch = 28 + COST_HEIGHT end
-        end
+        local helpText = row.line or ""
+        local help = take(p.helps)
+        help:SetText(helpText)
+        help:SetWidth(cardW)
+        help:ClearAllPoints()
+        help:SetPoint("TOPLEFT", p.area, "TOPLEFT", x, -(top + 18))
+        local helpH = helpText == "" and 0 or heightOf(help, helpText)
+        local levelsTop = top + 18 + helpH + 4
+        local lineH = LEVEL_H + COST_H + 2
         for i, level in ipairs(row.levels) do
             local button = take(p.levels)
             button.key = "level:" .. row.cvar .. ":" .. level.value
-            button:SetText(level.text)
+            button.tip = level.text
+            button:SetLabel(level.short or level.text)
+            button:SetSelected(level.selected)
             button:SetEnabled(row.enabled)
-            local col, rowNo = (i - 1) % perLine, math.floor((i - 1) / perLine)
-            local x, top = 36 + col * (BUTTON_WIDTH + BUTTON_GAP), by + rowNo * pitch
+            local col, line = (i - 1) % perRow, math.floor((i - 1) / perRow)
+            local bx, by = x + col * (LEVEL_W + LEVEL_GAP), levelsTop + line * lineH
             button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", p.content, "TOPLEFT", x, -top)
-            if level.selected then button:LockHighlight() else button:UnlockHighlight() end
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", bx, -by)
             if level.cost then
                 local cost = take(p.costs)
                 cost:SetText(level.cost)
+                cost:SetTextColor(skin.color(level.cost == "now" and "accentLight" or "dim"))
                 cost:ClearAllPoints()
-                cost:SetPoint("TOPLEFT", p.content, "TOPLEFT", x, -(top + 25))
+                cost:SetPoint("TOPLEFT", p.area, "TOPLEFT", bx, -(by + LEVEL_H + 2))
             end
         end
-        cy = by + math.ceil(#row.levels / perLine) * pitch + 12
+        return (levelsTop - top) + math.ceil(#row.levels / perRow) * lineH
     end
-    p.content:SetSize(CONTENT_WIDTH, math.max(cy, 1))
+
+    local rows = {}
+    if onSettings then
+        for _, row in ipairs(view.rows) do
+            if row.page == view.page then rows[#rows + 1] = row end
+        end
+    end
+    if not onSettings then
+        placeText(p.note, PLACEHOLDER)
+    elseif #rows == 0 then
+        placeText(p.note, NONE_TEXT)
+    else
+        hideText(p.note)
+        local columns = settings.columnsFor(#rows)
+        local cardW = math.floor((AREA_W - (columns - 1) * CARD_GAP_X) / columns)
+        local perRow = math.max(1, math.floor((cardW + LEVEL_GAP) / (LEVEL_W + LEVEL_GAP)))
+        local i = 1
+        while i <= #rows do
+            local rowH = 0
+            for c = 0, columns - 1 do
+                local row = rows[i + c]
+                if row then
+                    local h = placeCard(row, c * (cardW + CARD_GAP_X), y, cardW, perRow)
+                    if h > rowH then rowH = h end
+                end
+            end
+            y = y + rowH + CARD_GAP_Y
+            i = i + columns
+        end
+    end
     release(p.checks)
     release(p.names, true)
-    release(p.lines, true)
     release(p.matters, true)
+    release(p.helps, true)
     release(p.levels)
     release(p.costs, true)
 
-    -- The footer buttons the model lists, in a row centred on the window.
-    local width = FOOTER_GAP * (#view.buttons - 1)
-    for _, button in ipairs(view.buttons) do width = width + FOOTER_WIDTH[button.key] end
-    local x = -width / 2
-    p.maximum:Hide()
+    -- The picture sharpness block, under the card of the Picture size page.
+    local size = view.size
+    if view.page == "size" and size then
+        y = y + 6
+        p.sizeSlider:SetValue(size.value)             -- moving the slider in code rewrites the label: set the label after it
+        placeText(p.sizeLabel, size.label)
+        p.sizeSlider:ClearAllPoints()
+        p.sizeSlider:SetPoint("TOPLEFT", p.area, "TOPLEFT", 6, -y)
+        if p.sizeSlider.SetEnabled then p.sizeSlider:SetEnabled(size.enabled) end
+        p.sizeSlider:Show()
+        p.sizeBack:ClearAllPoints()
+        p.sizeBack:SetPoint("TOPLEFT", p.area, "TOPLEFT", 6 + SIZE_SLIDER_WIDTH + 20, -(y - 4))
+        p.sizeBack:SetEnabled(size.canPutBack)
+        p.sizeBack:Show()
+        y = y + 16 + 12
+        if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end
+        placeText(p.sizeNote, size.note)
+    else
+        p.sizeSlider:Hide()
+        p.sizeBack:Hide()
+        hideText(p.sizeLabel)
+        hideText(p.sizeWarn)
+        hideText(p.sizeNote)
+    end
+
+    -- The summary block, stacked up from the footer: the matters note, the total, then the line on this tab's levels.
+    local bottom = FOOTER_H + SUMMARY_GAP
+    local function stack(fs, str)
+        if not (onSettings and str) then
+            hideText(fs)
+            return
+        end
+        fs:SetText(str)
+        fs:ClearAllPoints()
+        fs:SetPoint("BOTTOMLEFT", f.page, "BOTTOMLEFT", AREA_X, bottom)
+        fs:Show()
+        bottom = bottom + heightOf(fs, str) + 2
+    end
+    stack(p.mattersNote, view.mattersNote)
+    stack(p.total, view.totalLine)
+    stack(p.your, view.yourLine)
+
+    -- The footer: Use what I have in the game now and Switch to Maximum, right-aligned.
+    local hasMaximum = false
     for _, button in ipairs(view.buttons) do
-        local part, w = p[button.key], FOOTER_WIDTH[button.key]
-        part:SetText(button.text)
-        part:SetEnabled(button.enabled)
-        part:ClearAllPoints()
-        part:SetPoint("BOTTOM", f, "BOTTOM", x + w / 2, 14)
-        part:Show()
-        x = x + w + FOOTER_GAP
+        if button.key == "use" then
+            p.use:SetLabel(button.text)
+            p.use:SetEnabled(button.enabled)
+        elseif button.key == "maximum" then
+            hasMaximum = true
+            p.maximum:SetLabel(button.text)
+            p.maximum:SetEnabled(button.enabled)
+        end
+    end
+    if onSettings then
+        p.use:ClearAllPoints()
+        p.maximum:ClearAllPoints()
+        p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)
+        p.use:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0)), 9)
+        p.use:Show()
+        if hasMaximum then p.maximum:Show() else p.maximum:Hide() end
+        p.footerRule:Show()
+    else
+        p.use:Hide()
+        p.maximum:Hide()
+        p.footerRule:Hide()
     end
 end
 
