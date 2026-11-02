@@ -11,6 +11,7 @@ Bench.lua
 Profiles.lua
 Recommend.lua
 UI.lua
+Skin.lua
 Settings.lua
 Graph.lua
 Guide.lua

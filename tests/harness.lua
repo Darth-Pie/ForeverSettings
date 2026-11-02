@@ -129,6 +129,9 @@ local function makeFrame(kind, name, parent, template)
         function fs:SetPoint(...) self._point = { ... } end
         function fs:ClearAllPoints() self._point = nil end
         function fs:SetWidth(w) self._width = w end
+        function fs:SetJustifyH(h) self._justifyH = h end
+        function fs:SetJustifyV(v) self._justifyV = v end
+        function fs:SetWordWrap(on) self._wordWrap = on end
         function fs:SetTextColor(r, g, b, a) self._textColor = { r, g, b, a } end
         -- The client's answer for how tall the text is once wrapped; a test sets STRINGHEIGHT(fs) to simulate it, else the
         -- answer is not a number and the addon falls back to a count of lines.
@@ -189,6 +192,7 @@ end
 -- opts.nounitspeed    leave GetUnitSpeed undefined
 -- opts.console        "new" (default), "legacy" or "none": which console-list function the client has
 -- opts.noDefault      GetCVarDefault raises for every name (a client with no default to give)
+-- opts.skin           false: do not load Skin.lua (default: load it when it exists)
 -- opts.profiles       false: do not load Profiles.lua (default: load it when it exists)
 -- opts.guide          false: do not load Guide.lua (default: load it when it exists)
 -- opts.recommend      false: do not load Recommend.lua (default: load it when it exists)
@@ -367,6 +371,9 @@ function H.boot(cvars, opts)
     end
     if opts.ui ~= false and UI_SRC and UI_SRC ~= "" then
         assert(load(UI_SRC, "=UI.lua"))("ForeverSettings", ns)
+    end
+    if opts.skin ~= false and SKIN_SRC and SKIN_SRC ~= "" then
+        assert(load(SKIN_SRC, "=Skin.lua"))("ForeverSettings", ns)
     end
     if opts.settings ~= false and SETTINGS_SRC and SETTINGS_SRC ~= "" then
         assert(load(SETTINGS_SRC, "=Settings.lua"))("ForeverSettings", ns)

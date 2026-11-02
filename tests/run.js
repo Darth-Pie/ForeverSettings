@@ -1497,6 +1497,44 @@ end`],
   'probe-default-unguarded': ['ForeverSettings.lua', `okDefault, default = pcall(GetCVarDefault, name) end`, `okDefault, default = true, GetCVarDefault(name) end`],
   'probe-default-no-mark': ['ForeverSettings.lua', `tostring(default) or "?")`, `tostring(default) or "")`],
 
+  // The flat skin (spec 2026-11-02-flat-hub-window-design.md)
+  'skin-palette-accent': ['Skin.lua', `accent = "9a9cff"`, `accent = "9a9cfe"`],
+  'skin-palette-fill-alpha': ['Skin.lua', `local ALPHA = { fill = 0.96 }`, `local ALPHA = { fill = 1 }`],
+  'skin-unknown-colour': ['Skin.lua', `    if not c then return nil end`, `    if not c then return 0, 0, 0, 1 end`],
+  'skin-border-missing': ['Skin.lua', `, edge("TOPRIGHT", "BOTTOMRIGHT", 1, nil) }`, ` }`],
+  'skin-border-thick': ['Skin.lua', `edge("TOPLEFT", "TOPRIGHT", nil, 1)`, `edge("TOPLEFT", "TOPRIGHT", nil, 2)`],
+  'skin-no-fill': ['Skin.lua', `    fill:SetColorTexture(skin.color("fill"))`, `    fill:SetColorTexture(skin.color("border"))`],
+  'skin-label-not-centred': ['Skin.lua', `label:SetPoint("CENTER", b, "CENTER", 0, 0)`, `label:SetPoint("LEFT", b, "LEFT", 4, 0)`],
+  'skin-justify-h': ['Skin.lua', `label:SetJustifyH("CENTER")`, `label:SetJustifyH("LEFT")`],
+  'skin-justify-v': ['Skin.lua', `label:SetJustifyV("MIDDLE")`, `label:SetJustifyV("TOP")`],
+  'skin-label-wraps': ['Skin.lua', `label:SetWordWrap(false)`, `label:SetWordWrap(true)`],
+  'skin-label-width': ['Skin.lua', `label:SetWidth(width - 8)`, `label:SetWidth(width)`],
+  'skin-state-hover': ['Skin.lua', `    elseif state.hover then
+        fill = "hover"`, `    elseif state.hover then
+        fill = "pressed"`],
+  'skin-state-pressed': ['Skin.lua', `fill, edge = "pressed", "accent"`, `fill, edge = "pressed", "control"`],
+  'skin-state-selected': ['Skin.lua', `fill, edge, text = "selected", "accent", "bright"`, `fill, edge, text = "selected", "accent", "text"`],
+  'skin-state-disabled': ['Skin.lua', `        text = "textDisabled"`, `        text = "text"`],
+  'skin-disabled-hover': ['Skin.lua', `    if not b:IsEnabled() then`, `    if false then`],
+  'skin-set-enabled-unpainted': ['Skin.lua', `        setEnabled(self, on)
+        paint(self)`, `        setEnabled(self, on)`],
+  'skin-selected-unpainted': ['Skin.lua', `        self.skinState.selected = on and true or false
+        paint(self)`, `        self.skinState.selected = on and true or false`],
+  'skin-close-noop': ['Skin.lua', `f.close:SetScript("OnClick", function() f:Hide() end)`, `f.close:SetScript("OnClick", function() end)`],
+  'skin-escape-missing': ['Skin.lua', `    if not listed and name then tinsert(UISpecialFrames, name) end`, `    local _ = listed`],
+  'skin-escape-twice': ['Skin.lua', `    if not listed and name then tinsert(UISpecialFrames, name) end`, `    if name then tinsert(UISpecialFrames, name) end`],
+  'skin-window-shown': ['Skin.lua', `    f:Hide()
+    return f`, `    return f`],
+  'skin-check-mark': ['Skin.lua', `mark:SetColorTexture(skin.color("accent"))`, `mark:SetColorTexture(skin.color("text"))`],
+  'skin-check-size': ['Skin.lua', `box:SetSize(16, 16)`, `box:SetSize(18, 18)`],
+  'skin-slider-range': ['Skin.lua', `slider:SetMinMaxValues(min, max)`, `slider:SetMinMaxValues(min, max - 1)`],
+  'skin-slider-step': ['Skin.lua', `slider:SetValueStep(step)`, `slider:SetValueStep(1)`],
+  'skin-slider-thumb': ['Skin.lua', `thumb:SetSize(10, 16)`, `thumb:SetSize(12, 16)`],
+  'skin-slider-track': ['Skin.lua', `track:SetColorTexture(skin.color("control"))`, `track:SetColorTexture(skin.color("border"))`],
+  'skin-text-colour': ['Skin.lua', `fs:SetTextColor(skin.color(colorName or "text"))`, `fs:SetTextColor(skin.color("text"))`],
+  'skin-text-width': ['Skin.lua', `    if width then fs:SetWidth(width) end`, `    local _ = width`],
+  'skin-template': ['Skin.lua', `local b = CreateFrame("Button", nil, parent)`, `local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")`],
+
   // The picture sharpness slider, this session only (spec 2026-11-02-picture-sharpness-slider-design.md)
   'size-range-low': ['Profiles.lua', `fraction < BOOST_MIN or fraction > BOOST_MAX then`, `fraction < 0 or fraction > BOOST_MAX then`],
   'size-range-high': ['Profiles.lua', `fraction < BOOST_MIN or fraction > BOOST_MAX then`, `fraction < BOOST_MIN or fraction > 4 then`],
@@ -1625,7 +1663,7 @@ function main() {
     require(path.join(path.resolve(pkgDir), 'node_modules', 'fengari'));
 
   const read = (file) => (fs.existsSync(path.join(srcDir, file)) ? fs.readFileSync(path.join(srcDir, file), 'utf8') : '');
-  const sources = { 'ForeverSettings.lua': read('ForeverSettings.lua'), 'Bench.lua': read('Bench.lua'), 'Profiles.lua': read('Profiles.lua'), 'UI.lua': read('UI.lua'), 'Guide.lua': read('Guide.lua'), 'Recommend.lua': read('Recommend.lua'), 'Results.lua': read('Results.lua'), 'Names.lua': read('Names.lua'), 'Settings.lua': read('Settings.lua'), 'Graph.lua': read('Graph.lua') };
+  const sources = { 'ForeverSettings.lua': read('ForeverSettings.lua'), 'Bench.lua': read('Bench.lua'), 'Profiles.lua': read('Profiles.lua'), 'UI.lua': read('UI.lua'), 'Guide.lua': read('Guide.lua'), 'Recommend.lua': read('Recommend.lua'), 'Results.lua': read('Results.lua'), 'Names.lua': read('Names.lua'), 'Settings.lua': read('Settings.lua'), 'Graph.lua': read('Graph.lua'), 'Skin.lua': read('Skin.lua') };
   if (!sources['ForeverSettings.lua']) throw new Error('ForeverSettings.lua not found in ' + srcDir);
 
   if (mutation) {
@@ -1653,6 +1691,7 @@ function main() {
   setGlobal('RECOMMEND_SRC', sources['Recommend.lua']);
   setGlobal('RESULTS_SRC', sources['Results.lua']);
   setGlobal('NAMES_SRC', sources['Names.lua']);
+  setGlobal('SKIN_SRC', sources['Skin.lua']);
   setGlobal('SETTINGS_SRC', sources['Settings.lua']);
   setGlobal('GRAPH_SRC', sources['Graph.lua']);
   setGlobal('HARNESS_SRC', fs.readFileSync(path.join(__dirname, 'harness.lua'), 'utf8'));
