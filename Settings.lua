@@ -442,17 +442,20 @@ function settings.state()
 end
 
 -- Switches to a profile from the window, silently: a refusal Maximum gives, or a level the game would not take, shows in the banner.
+local REFUSED_WORDS = { maximum = "the highest level", original = "the level you had", everyday = "the level you saved",
+    crowded = "the level you saved" }
 local function switchProfile(name)
     local ok, info = ns.profiles.switch(name, true)
-    if name == "maximum" then
-        if not ok and info == "nothing" then
-            state.notice = NOTHING_TEXT
-        elseif ok then
-            -- The switch stands, but a level the game would not take is said here, since nothing is said in chat.
-            local refused = refusedNames(info.mismatched)
-            if #refused > 0 then
-                state.notice = "The game would not take the highest level for: " .. table.concat(refused, ", ") .. "."
-            end
+    if not ok and info == "nothing" then
+        state.notice = NOTHING_TEXT
+    elseif ok then
+        -- The switch stands, but a level the game would not take is said here, since nothing is said in chat; so is a profile
+        -- that holds nothing yet.
+        local refused = refusedNames(info.mismatched)
+        if #refused > 0 then
+            state.notice = "The game would not take " .. (REFUSED_WORDS[name] or "the level") .. " for: " .. table.concat(refused, ", ") .. "."
+        elseif (name == "everyday" or name == "crowded") and ns.profiles.hasValues and not ns.profiles.hasValues(name) then
+            state.notice = TAB_TEXT[name] .. " has no saved settings yet: pick some on the settings pages."
         end
     end
     draw()
@@ -551,7 +554,7 @@ function settings.click(key)
         if ctx.saved[profile][cvar] ~= nil then
             ns.profiles.unsetProfileValue(profile, cvar, true)
         else
-            local now = GetCVar(cvar)
+            local now = ns.profiles.liveValue(cvar)          -- not a picture sharpness boost: that is never saved
             if now ~= nil then ns.profiles.setProfileValue(profile, cvar, now, true) end
         end
         draw()
@@ -724,6 +727,7 @@ local function build()
     p.costs = newPool(area, function(parent)
         local fs = skin.text(parent, "small", "dim", LEVEL_W)
         fs:SetJustifyH("CENTER")
+        fs:SetWordWrap(false)                 -- "+136 fps" is wider than the 36 pixel column: it overhangs, it never wraps
         return fs
     end)
 
@@ -867,14 +871,15 @@ function settings.render()
             worth:ClearAllPoints()
             worth:SetPoint("TOPRIGHT", p.area, "TOPLEFT", x + cardW, -(top + 2))
         end
+        local helpTop = top + math.max(18, heightOf(name, row.name) + 2)         -- a name that wraps pushes the help down
         local helpText = row.line or ""
         local help = take(p.helps)
         help:SetText(helpText)
         help:SetWidth(cardW)
         help:ClearAllPoints()
-        help:SetPoint("TOPLEFT", p.area, "TOPLEFT", x, -(top + 18))
+        help:SetPoint("TOPLEFT", p.area, "TOPLEFT", x, -helpTop)
         local helpH = helpText == "" and 0 or heightOf(help, helpText)
-        local levelsTop = top + 18 + helpH + 4
+        local levelsTop = helpTop + helpH + 4
         local lineH = LEVEL_H + COST_H + 2
         for i, level in ipairs(row.levels) do
             local button = take(p.levels)

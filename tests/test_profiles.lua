@@ -1474,6 +1474,22 @@ test("SZ-6 a level chosen for the same setting, or any profile switch (which wri
         tostring(level) .. tostring(profile) .. tostring(original) .. tostring(sameProfile) .. tostring(sameLevel) .. outText()
 end)
 
+test("SZ-8 a boost is never saved: while it holds the setting, the value the player has is the one from before, for a save and for a capture of live values", function()
+    local e, p = boostGame()
+    local db = p.state()
+    db.profiles.everyday.values = {}
+    p.boost(1.5, true)
+    local during = p.liveValue("RenderScale") == "1" and p.liveValue("graphicsSSAO") == "1" and p.live({ "RenderScale", "graphicsSSAO" }).RenderScale == "1"
+    local count = p.save("everyday", true)
+    local saved = count ~= nil and db.profiles.everyday.values.RenderScale == "1" and db.profiles.everyday.values.graphicsSSAO == "1"
+        and CVARS.RenderScale == "1.5" and p.boosted() ~= nil and db.want.RenderScale ~= "1.5"
+    CVARS.RenderScale = "0.8"                           -- the game changes it itself: that is the player's value
+    local stale = p.liveValue("RenderScale") == "0.8" and p.live({ "RenderScale" }).RenderScale == "0.8"
+    local e2, p2 = boostGame()
+    local plain = p2.liveValue("RenderScale") == "1" and p2.liveValue("noSuchSetting") == nil
+    return during and saved and stale and plain, tostring(during) .. tostring(saved) .. tostring(stale) .. tostring(plain)
+end)
+
 test("SZ-7 asking for the size the game had before ends the boost", function()
     local e, p = boostGame()
     p.boost(1.5, true)

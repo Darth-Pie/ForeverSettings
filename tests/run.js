@@ -1410,9 +1410,9 @@ end`],
   'settings-max-click-locked-writes': ['Settings.lua', `    if ctx.locked then
         if key == "maximum" then draw() end`, `    if ctx.locked and key ~= "maximum" then
         if key == "maximum" then draw() end`],
-  'settings-max-nothing-notice-missing': ['Settings.lua', `        if not ok and info == "nothing" then
-            state.notice = NOTHING_TEXT`, `        if false then
-            state.notice = NOTHING_TEXT`],
+  'settings-max-nothing-notice-missing': ['Settings.lua', `    if not ok and info == "nothing" then
+        state.notice = NOTHING_TEXT`, `    if false then
+        state.notice = NOTHING_TEXT`],
   'settings-max-refusal-not-shown': ['Settings.lua', `    if view.refusal then notices[#notices + 1] = view.refusal end`, `    if false then notices[#notices + 1] = view.refusal end`],
   'settings-max-notice-not-consumed': ['Settings.lua', `    state.notice = nil                       -- a refusal is shown once: until the next click or redraw`, `    local _ = state`],
   'settings-max-level-click-wrong-call': ['Settings.lua', `ns.profiles.setProfileValue(profile, pickedCvar, value, true)`, `ns.profiles.setValue(pickedCvar, value, true)`],
@@ -1500,8 +1500,14 @@ end`],
   'skin-no-fill': ['Skin.lua', `    fill:SetColorTexture(skin.color("fill"))`, `    fill:SetColorTexture(skin.color("border"))`],
   'skin-label-not-centred': ['Skin.lua', `label:SetPoint("CENTER", b, "CENTER", 0, 0)`, `label:SetPoint("LEFT", b, "LEFT", 4, 0)`],
   'skin-justify-h': ['Skin.lua', `label:SetJustifyH("CENTER")`, `label:SetJustifyH("LEFT")`],
-  'skin-justify-v': ['Skin.lua', `label:SetJustifyV("MIDDLE")`, `label:SetJustifyV("TOP")`],
-  'skin-label-wraps': ['Skin.lua', `label:SetWordWrap(false)`, `label:SetWordWrap(true)`],
+  'skin-justify-v': ['Skin.lua', `    label:SetJustifyV("MIDDLE")
+    label:SetWordWrap(false)
+    b.label = label`, `    label:SetJustifyV("TOP")
+    label:SetWordWrap(false)
+    b.label = label`],
+  'skin-label-wraps': ['Skin.lua', `    label:SetWordWrap(false)
+    b.label = label`, `    label:SetWordWrap(true)
+    b.label = label`],
   'skin-label-width': ['Skin.lua', `label:SetWidth(width - 8)`, `label:SetWidth(width)`],
   'skin-state-hover': ['Skin.lua', `    elseif state.hover then
         fill = "hover"`, `    elseif state.hover then
@@ -1576,6 +1582,27 @@ end`],
   'hub-maximum-never-greyed': ['Settings.lua', `p.maximum:SetEnabled(button.enabled)`, `p.maximum:SetEnabled(true)`],
   'hub-footer-margin': ['Settings.lua', `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)`, `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + 4), 9)`],
   'hub-footer-use-width': ['Settings.lua', `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26`, `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 180, 160, 26`],
+
+  // The final review's fix pass: a boost is never saved, a wrapped name pushes the help down, a Home click says what was refused
+  'fix-live-value-ignores-boost': ['Profiles.lua', `    if boost and boost.cvar:lower() == cvar:lower() then return boost.before end`, `    local _ = boost`],
+  'fix-live-uses-raw': ['Profiles.lua', `        local value = profiles.liveValue(name)`, `        local value = GetCVar(name)`],
+  'fix-keep-tick-raw': ['Settings.lua', `local now = ns.profiles.liveValue(cvar)`, `local now = GetCVar(cvar)`],
+  'fix-name-wrap-ignored': ['Settings.lua', `local helpTop = top + math.max(18, heightOf(name, row.name) + 2)`, `local helpTop = top + 18`],
+  'fix-name-wrap-no-gap': ['Settings.lua', `math.max(18, heightOf(name, row.name) + 2)`, `math.max(18, heightOf(name, row.name))`],
+  'fix-cost-wraps': ['Settings.lua', `        fs:SetWordWrap(false)                 -- "+136 fps"`, `        fs:SetWordWrap(true)                 -- "+136 fps"`],
+  'fix-refusal-unsaid': ['Settings.lua', `        if #refused > 0 then
+            state.notice = "The game would not take " .. (REFUSED_WORDS[name] or "the level")`, `        if false then
+            state.notice = "The game would not take " .. (REFUSED_WORDS[name] or "the level")`],
+  'fix-refusal-words': ['Settings.lua', `crowded = "the level you saved" }`, `crowded = "the highest level" }`],
+  'fix-empty-profile-unsaid': ['Settings.lua', `elseif (name == "everyday" or name == "crowded") and ns.profiles.hasValues and not ns.profiles.hasValues(name) then`, `elseif false then`],
+  'fix-empty-note-for-original': ['Settings.lua', `elseif (name == "everyday" or name == "crowded") and ns.profiles.hasValues`, `elseif ns.profiles.hasValues`],
+  'fix-maximum-nothing-unsaid': ['Settings.lua', `    if not ok and info == "nothing" then
+        state.notice = NOTHING_TEXT
+    elseif ok then
+        -- The switch stands`, `    if false then
+        state.notice = NOTHING_TEXT
+    elseif ok then
+        -- The switch stands`],
 
   // The dynamic render scale warning of the test's preflight
   'dynwarn-never': ['Bench.lua', `    if dynamic and dynamic ~= 0 then`, `    if false then`],
@@ -1790,7 +1817,9 @@ end
   'settings-max-pending-plural': ['Settings.lua', `    if n == 1 then return "1 setting will go to its highest level" .. tail end`, `    if n == 0 then return "1 setting will go to its highest level" .. tail end`],
   'settings-max-pending-counts-all': ['Settings.lua', `if not (db and db.want[cvar] ~= nil and sameValue(db.want[cvar], value)) then`, `if true then`],
   'settings-max-pending-ignores-value': ['Settings.lua', `db.want[cvar] ~= nil and sameValue(db.want[cvar], value)`, `db.want[cvar] ~= nil`],
-  'settings-max-clamp-notice-missing': ['Settings.lua', `            if #refused > 0 then`, `            if false then`],
+  'settings-max-clamp-notice-missing': ['Settings.lua', `        if #refused > 0 then
+            state.notice = "The game would not take "`, `        if false then
+            state.notice = "The game would not take "`],
   'settings-max-clamp-raw-name': ['Settings.lua', `local name = ns.names.label(m.cvar, "")`, `local name = m.cvar`],
   'settings-max-clamp-unnamed-listed': ['Settings.lua', `        if name ~= "" then list[#list + 1] = name end`, `        list[#list + 1] = name`],
 

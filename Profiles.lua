@@ -628,10 +628,18 @@ function profiles.handle(rest)
 end
 
 -- {name = value} for the names the client answers for; a name it does not have is left out, never an error.
+-- The value of a setting as the player has it: while a picture sharpness boost holds the setting, the value from before the
+-- boost, so a boost is never saved into a profile (spec 2026-11-02-picture-sharpness-slider-design.md R1).
+function profiles.liveValue(cvar)
+    local boost = profiles.boosted()
+    if boost and boost.cvar:lower() == cvar:lower() then return boost.before end
+    return GetCVar(cvar)
+end
+
 function profiles.live(names)
     local values = {}
     for _, name in ipairs(names) do
-        local value = GetCVar(name)
+        local value = profiles.liveValue(name)
         if value ~= nil then values[name] = value end
     end
     return values

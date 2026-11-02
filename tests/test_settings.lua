@@ -654,7 +654,7 @@ test("S2-9 the window draws the costs under the level buttons, the matters words
                 local text, fs = costFor(f, row.cvar, level.value)
                 if level.cost then
                     drawnCosts = drawnCosts + 1
-                    if text ~= level.cost or fs._width ~= 36 then match = false end
+                    if text ~= level.cost or fs._width ~= 36 or fs._wordWrap ~= false then match = false end
                 elseif text ~= nil then
                     match = false
                 end
@@ -1018,6 +1018,18 @@ test("S4-8 a size the game will not take is said in the window, in plain words, 
         and byKey(f, "size")._value == 100 and #OUT == 0, outText()
 end)
 
+test("S4-10 ticking keep on Picture sharpness, or Use what I have in the game now, while a boost is on never saves the boosted size", function()
+    local e, s, db = bootWith(fullEntry())
+    s.open("size")
+    drag(window(), 150)
+    s.click("keep:RenderScale")                           -- the size from before is what is kept; it takes over from the boost
+    local kept = db.profiles.everyday.values.RenderScale == "1" and db.want.RenderScale == "1" and CVARS.RenderScale == "1"
+    drag(window(), 175)
+    s.click("use")
+    local used = db.profiles.everyday.values.RenderScale == "1" and db.want.RenderScale == "1" and CVARS.RenderScale == "1.75"
+    return kept and used, tostring(kept) .. tostring(used) .. tostring(db.profiles.everyday.values.RenderScale)
+end)
+
 test("S4-9 on the Picture size page the block stands under the card: the label over the slider over the warning over the note, Back to normal beside the slider, all above the summary", function()
     local e, s = bootWith(fullEntry())
     s.open("size")
@@ -1051,7 +1063,45 @@ test("S4-9 on the Picture size page the block stands under the card: the label o
     return ok, tostring(ok)
 end)
 
+test("S6-12 a card's name that wraps pushes its help line and levels down: the help never sits on the name", function()
+    local e, s = bootWith(fullEntry())
+    STRINGHEIGHT = function(fs)
+        local text = fs._text or ""
+        local perLine = math.max(1, math.floor((fs._width or 520) / 9))
+        return 14 * math.max(1, math.ceil(#text / perLine))
+    end
+    s.open("light")
+    local f = window()
+    local name = fontStringWith(f, "Soft corner shadows")
+    local help = fontStringWith(f, "Soft darkening where things meet, like corners and under objects. Small visual gain, moderate cost.")
+    local button = byKey(f, "level:graphicsSSAO:0")
+    local ok = name ~= nil and help ~= nil and button ~= nil and STRINGHEIGHT(name) == 28 and -help._point[5] == -name._point[5] + 30
+        and -button._point[5] >= -help._point[5] + STRINGHEIGHT(help)
+    local plain = fontStringWith(f, "Shadow detail")                  -- one line: the help stays where it was
+    local helpOne = fontStringWith(f, "How sharp and detailed shadows look. Higher looks better and costs a lot of speed.")
+    local tight = plain ~= nil and helpOne ~= nil and -helpOne._point[5] == -plain._point[5] + 18
+    STRINGHEIGHT = nil
+    return ok and tight, tostring(ok) .. tostring(tight)
+end)
+
 -- The Home page (spec 2026-11-02-flat-hub-window-design.md section 5).
+test("S8-5 a Home profile click says what the game refused, or that the profile holds nothing, in the banner and not in chat", function()
+    local e, s, db = bootWith(fullEntry())
+    db.profiles.crowded.values = { graphicsShadowQuality = "0" }
+    s.open("home")
+    SETFAIL.graphicsShadowQuality = "clamp"
+    OUT = {}
+    byKey(window(), "profile:crowded"):Click()
+    local refused = hasText(window(), "The game would not take the level you saved for: Shadow detail.") and #OUT == 0
+    SETFAIL.graphicsShadowQuality = nil
+    db.profiles.everyday.values = {}
+    byKey(window(), "profile:everyday"):Click()
+    local empty = hasText(window(), "Everyday has no saved settings yet: pick some on the settings pages.") and #OUT == 0
+    db.profiles.crowded.values = { graphicsShadowQuality = "1" }
+    byKey(window(), "profile:crowded"):Click()
+    local quiet = not hasText(window(), "no saved settings") and not hasText(window(), "would not take") and #OUT == 0
+    return refused and empty and quiet, tostring(refused) .. tostring(empty) .. tostring(quiet)
+end)
 test("S8-1 Home names the profile in use and shows four profile cards with their notes, centred, the one in use marked, and the test the costs come from", function()
     local e, s = bootWith(fullEntry())
     s.open("home")

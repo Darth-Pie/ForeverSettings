@@ -947,6 +947,17 @@ skin-nav-hover|test_skin|SK-6|killed
 skin-nav-pressed|test_skin|SK-6|killed
 skin-nav-bar-width|test_skin|SK-6|killed
 skin-nav-select-unpainted|test_skin|SK-6|killed
+fix-live-value-ignores-boost|test_profiles|SZ-8|killed
+fix-live-uses-raw|test_profiles|SZ-8|killed
+fix-keep-tick-raw|test_settings|S4-10|killed
+fix-name-wrap-ignored|test_settings|S6-12|killed
+fix-name-wrap-no-gap|test_settings|S6-12|killed
+fix-cost-wraps|test_settings|S2-9|killed
+fix-refusal-unsaid|test_settings|S8-5|killed
+fix-refusal-words|test_settings|S8-5|killed
+fix-empty-profile-unsaid|test_settings|S8-5|killed
+fix-empty-note-for-original|test_settings|S8-3|killed
+fix-maximum-nothing-unsaid|test_settings|S8-2|killed
 dynwarn-never|test_bench|QT-7|killed
 dynwarn-zero|test_bench|QT-7|killed
 dynwarn-only-one|test_bench|QT-7|killed
