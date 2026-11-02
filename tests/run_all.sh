@@ -93,6 +93,8 @@ else
   tocfail "Bindings.xml is missing"
 fi
 if grep -q '^Bindings\.xml$' "$toc"; then tocfail "Bindings.xml must not be listed in the TOC (the game loads it by itself)"; fi
+# The corner pictures of the rounded boxes: the four files Skin.lua names must be there and be what it expects.
+node "$T/check_media.js" "$SRC/Media" || { echo "TOC FAIL: the corner pictures in Media are missing or wrong"; status=1; }
 echo "== TOC and file format: $([ "$status" -eq 0 ] && echo OK || echo FAIL)"
 echo "== all suites: $([ "$status" -eq 0 ] && echo PASS || echo FAIL)"
 exit $status

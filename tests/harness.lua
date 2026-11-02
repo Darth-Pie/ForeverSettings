@@ -151,11 +151,20 @@ local function makeFrame(kind, name, parent, template)
         -- A real texture has no SetText (a font string does): calling it raises, as it does in the client.
         function tex:SetText() error("a texture has no SetText") end
         function tex:SetColorTexture(r, g, b, a) self._color = { r, g, b, a } end
+        -- A picture from a file, which part of it (SetTexCoord: left, right, top, bottom) and its tint (SetVertexColor).
+        function tex:SetTexture(path) self._texture = path end
+        function tex:SetTexCoord(l, r, t, b) self._texCoord = { l, r, t, b } end
+        function tex:SetVertexColor(r, g, b, a) self._vertex = { r, g, b, a } end
         function tex:SetWidth(w) self._width = w end
         function tex:SetHeight(h) self._height = h end
         function tex:SetSize(w, h) self._width, self._height = w, h end
-        function tex:SetPoint(...) self._point = { ... } end
-        function tex:ClearAllPoints() self._point = nil end
+        -- _point is the last anchor given; _points every anchor in order (a texture anchored at two corners stretches between them).
+        function tex:SetPoint(...)
+            self._point = { ... }
+            self._points = self._points or {}
+            self._points[#self._points + 1] = { ... }
+        end
+        function tex:ClearAllPoints() self._point, self._points = nil, nil end
         function tex:Show() self.shown = true end
         function tex:Hide() self.shown = false end
         function tex:IsShown() return self.shown end

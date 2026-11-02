@@ -1,7 +1,7 @@
 -- Skin.lua: the flat look of the addon's windows (spec 2026-11-02-flat-hub-window-design.md sections 3 and 7). Widgets are
--- drawn from colour textures only: no backdrops and no stock templates, so they look the same in every client. Loaded after
--- UI.lua and before Settings.lua.
-local _, ns = ...
+-- drawn from colour textures and four small corner pictures (the Media folder), with no backdrops and no stock templates, so
+-- they look the same in every client. Loaded after UI.lua and before Settings.lua.
+local addonName, ns = ...
 
 local skin = {}
 ns.skin = skin
@@ -49,19 +49,77 @@ function skin.divider(parent, width)
     return line
 end
 
--- A one-pixel border of four textures around a frame; returns them in the order top, bottom, left, right.
-local function addEdges(frame, colorName)
-    local function edge(a, b, width, height)
-        local tex = frame:CreateTexture(nil, "BORDER")
-        tex:SetColorTexture(skin.color(colorName))
-        tex:SetPoint(a, frame, a, 0, 0)
-        tex:SetPoint(b, frame, b, 0, 0)
-        if width then tex:SetWidth(width) end
-        if height then tex:SetHeight(height) end
-        return tex
+-- Rounded boxes (owner request 2026-11-02). The straight parts are colour strips; each corner is a small picture from the
+-- addon's Media folder (the top-left corner, flipped by texture coordinates for the other three) tinted to the same colour.
+-- There are pictures for two radii only, in pixels: the one for controls and the one for windows.
+local MEDIA = "Interface/AddOns/" .. addonName .. "/Media/"
+skin.RADIUS = { control = 4, window = 8 }
+local CORNERS = { "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }
+local FLIP = { TOPLEFT = { 0, 1, 0, 1 }, TOPRIGHT = { 1, 0, 0, 1 }, BOTTOMLEFT = { 0, 1, 1, 0 }, BOTTOMRIGHT = { 1, 0, 1, 0 } }
+
+-- A colour strip stretched between two anchors of the frame ({point, x, y} each), with an optional width or height.
+local function strip(frame, layer, from, to, width, height)
+    local tex = frame:CreateTexture(nil, layer)
+    tex:SetPoint(from[1], frame, from[1], from[2], from[3])
+    tex:SetPoint(to[1], frame, to[1], to[2], to[3])
+    if width then tex:SetWidth(width) end
+    if height then tex:SetHeight(height) end
+    return tex
+end
+
+local function cornerPicture(frame, layer, which, file, radius)
+    local tex = frame:CreateTexture(nil, layer)
+    tex:SetTexture(file)
+    local flip = FLIP[which]
+    tex:SetTexCoord(flip[1], flip[2], flip[3], flip[4])
+    tex:SetSize(radius, radius)
+    tex:SetPoint(which, frame, which, 0, 0)
+    return tex
+end
+
+-- Textures painted as one: SetColorTexture colours the strips and tints the corner pictures, and remembers the colour.
+local function paintSet(strips, pictures)
+    local set = {}
+    function set:SetColorTexture(r, g, b, a)
+        self._color = { r, g, b, a }
+        for _, tex in ipairs(strips) do tex:SetColorTexture(r, g, b, a) end
+        for _, tex in ipairs(pictures) do tex:SetVertexColor(r, g, b, a) end
     end
-    return { edge("TOPLEFT", "TOPRIGHT", nil, 1), edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1),
-        edge("TOPLEFT", "BOTTOMLEFT", 1, nil), edge("TOPRIGHT", "BOTTOMRIGHT", 1, nil) }
+    return set
+end
+
+-- A rounded fill (under the frame's other textures) and, when `edgeName` is given, a one-pixel rounded edge on top of it, in
+-- palette colours.
+-- Returns {fill, edge}; each answers SetColorTexture and paints all its pieces, so a widget repaints it like a single texture.
+function skin.box(frame, radius, fillName, edgeName)
+    local r = radius
+    local box = {}
+    local fillStrips = {
+        strip(frame, "BACKGROUND", { "TOPLEFT", 0, -r }, { "BOTTOMRIGHT", 0, r }),
+        strip(frame, "BACKGROUND", { "TOPLEFT", r, 0 }, { "TOPRIGHT", -r, 0 }, nil, r),
+        strip(frame, "BACKGROUND", { "BOTTOMLEFT", r, 0 }, { "BOTTOMRIGHT", -r, 0 }, nil, r),
+    }
+    local fillPictures = {}
+    for _, which in ipairs(CORNERS) do
+        fillPictures[#fillPictures + 1] = cornerPicture(frame, "BACKGROUND", which, MEDIA .. "fill" .. r .. ".tga", r)
+    end
+    box.fill = paintSet(fillStrips, fillPictures)
+    box.fill:SetColorTexture(skin.color(fillName))
+    if edgeName then
+        local strips = {
+            strip(frame, "BORDER", { "TOPLEFT", r, 0 }, { "TOPRIGHT", -r, 0 }, nil, 1),
+            strip(frame, "BORDER", { "BOTTOMLEFT", r, 0 }, { "BOTTOMRIGHT", -r, 0 }, nil, 1),
+            strip(frame, "BORDER", { "TOPLEFT", 0, -r }, { "BOTTOMLEFT", 0, r }, 1, nil),
+            strip(frame, "BORDER", { "TOPRIGHT", 0, -r }, { "BOTTOMRIGHT", 0, r }, 1, nil),
+        }
+        local pictures = {}
+        for _, which in ipairs(CORNERS) do
+            pictures[#pictures + 1] = cornerPicture(frame, "BORDER", which, MEDIA .. "ring" .. r .. ".tga", r)
+        end
+        box.edge = paintSet(strips, pictures)
+        box.edge:SetColorTexture(skin.color(edgeName))
+    end
+    return box
 end
 
 -- A button: a flat fill and a one-pixel edge, its label centred both ways on one line. States are painted by colour:
@@ -87,9 +145,8 @@ function skin.button(parent, text, width, height)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(width, height or 24)
     b.skinState = { hover = false, pressed = false, selected = false }
-    b.bg = b:CreateTexture(nil, "BACKGROUND")
-    b.bg:SetAllPoints()
-    b.edges = addEdges(b, "control")
+    local box = skin.box(b, skin.RADIUS.control, "fill", "control")
+    b.bg, b.edges = box.fill, { box.edge }
     local label = b:CreateFontString(nil, "OVERLAY", FONTS.small)
     label:SetPoint("CENTER", b, "CENTER", 0, 0)
     label:SetWidth(width - 8)
@@ -134,18 +191,19 @@ local function paintRow(row)
     row.label:SetTextColor(skin.color(text))
 end
 
+local BAR_INSET = skin.RADIUS.control + 1
+
 function skin.navItem(parent, text, width, height)
     local row = CreateFrame("Button", nil, parent)
     row:SetSize(width, height)
     row.navItem = true
     row.skinState = { hover = false, pressed = false, selected = false }
-    row.bg = row:CreateTexture(nil, "BACKGROUND")
-    row.bg:SetAllPoints()
+    row.bg = skin.box(row, skin.RADIUS.control, "fill").fill
     row.bar = row:CreateTexture(nil, "ARTWORK")
     row.bar:SetColorTexture(skin.color("accent"))
     row.bar:SetWidth(2)
-    row.bar:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
+    row.bar:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -BAR_INSET)           -- clear of the rounded corners
+    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, BAR_INSET)
     local label = row:CreateFontString(nil, "OVERLAY", FONTS.normal)
     label:SetPoint("LEFT", row, "LEFT", 14, 0)
     label:SetWidth(width - 20)
@@ -168,14 +226,12 @@ function skin.navItem(parent, text, width, height)
     return row
 end
 
--- A check box: a 16 pixel square with an accent mark when ticked.
+-- A check box: a 16 pixel rounded square with an accent mark when ticked.
 function skin.check(parent)
     local box = CreateFrame("CheckButton", nil, parent)
     box:SetSize(16, 16)
-    local bg = box:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(skin.color("fill"))
-    local edges = addEdges(box, "control")
+    local shape = skin.box(box, skin.RADIUS.control, "fill", "control")
+    local edges = { shape.edge }
     local mark = box:CreateTexture(nil, "OVERLAY")
     mark:SetColorTexture(skin.color("accent"))
     mark:SetSize(8, 8)
@@ -216,10 +272,7 @@ function skin.window(name, width, height, title)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
-    local fill = f:CreateTexture(nil, "BACKGROUND")
-    fill:SetAllPoints()
-    fill:SetColorTexture(skin.color("fill"))
-    f.edges = addEdges(f, "border")
+    f.box = skin.box(f, skin.RADIUS.window, "fill", "border")
 
     local header = CreateFrame("Frame", nil, f)
     header:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)

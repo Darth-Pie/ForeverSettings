@@ -79,11 +79,7 @@ test("SK-3 a button centres its label both ways on one line, and shows normal, h
     local centred = pt ~= nil and pt[1] == "CENTER" and label._justifyH == "CENTER" and label._justifyV == "MIDDLE"
         and label._wordWrap == false and label._width == 222 and b._width == 230 and b._height == 26 and b._text == "Use what I have in the game now"
     local function bg() return b.bg._color end
-    local function edge()
-        for _, tex in ipairs(b.textures) do
-            if tex ~= b.bg and tex._color then return tex._color end
-        end
-    end
+    local function edge() return b.edges[1]._color end
     local normal = colorIs(bg(), "14161b", 0.96) and colorIs(edge(), "2f3440") and colorIs(label._textColor, "d8dbe3")
     b.scripts.OnEnter(b)
     local hover = colorIs(bg(), "1b1e28")
@@ -166,6 +162,144 @@ test("SK-6 a page list row is flat: its label sits at the left, a selected row h
     local cleared = bg()[4] == 0 and row.bar.shown == false
     return leftAligned and normal and hover and pressed and selected and cleared,
         tostring(leftAligned) .. tostring(normal) .. tostring(hover) .. tostring(pressed) .. tostring(selected) .. tostring(cleared)
+end)
+
+-- Rounded corners (owner request 2026-11-02): a box is solid strips plus four corner pictures from the addon's Media folder,
+-- tinted by SetVertexColor, so a fill and a one-pixel edge keep their palette colours and still follow the button states.
+local MEDIA = "Interface/AddOns/ForeverSettings/Media/"
+local COORDS = { TOPLEFT = "0,1,0,1", TOPRIGHT = "1,0,0,1", BOTTOMLEFT = "0,1,1,0", BOTTOMRIGHT = "1,0,1,0" }
+local function describe(tex)
+    local parts = {}
+    for _, p in ipairs(tex._points or {}) do parts[#parts + 1] = p[1] .. ":" .. p[4] .. ":" .. p[5] end
+    return table.concat(parts, ",") .. " w=" .. tostring(tex._width) .. " h=" .. tostring(tex._height)
+end
+-- The textures of a frame on one layer: the solid strips described, the corners described with their file and coordinates.
+local function onLayer(frame, layer)
+    local solids, corners = {}, {}
+    for _, tex in ipairs(frame.textures) do
+        if tex.layer == layer then
+            if tex._texture then
+                local c = tex._texCoord or {}
+                corners[#corners + 1] = describe(tex) .. " " .. tostring(tex._texture) .. " " .. table.concat(c, ",")
+            else
+                solids[#solids + 1] = describe(tex)
+            end
+        end
+    end
+    table.sort(solids)
+    table.sort(corners)
+    return solids, corners
+end
+local function sameList(got, want)
+    table.sort(want)
+    return table.concat(got, " | ") == table.concat(want, " | "), table.concat(got, " | ")
+end
+local function cornerLines(r, file)
+    local list = {}
+    for _, which in ipairs({ "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }) do
+        list[#list + 1] = which .. ":0:0 w=" .. r .. " h=" .. r .. " " .. MEDIA .. file .. " " .. COORDS[which]
+    end
+    return list
+end
+
+test("SK-7 a box of radius 4 is a fill of three strips and four corner pictures, and a one-pixel edge of four lines and four ring corners", function()
+    local _, skin = boot()
+    local f = CreateFrame("Frame", nil, UIParent)
+    local box = skin.box(f, 4, "fill", "control")
+    local fillSolids, fillCorners = onLayer(f, "BACKGROUND")
+    local edgeSolids, edgeCorners = onLayer(f, "BORDER")
+    local a, ga = sameList(fillSolids, { "TOPLEFT:0:-4,BOTTOMRIGHT:0:4 w=nil h=nil", "TOPLEFT:4:0,TOPRIGHT:-4:0 w=nil h=4",
+        "BOTTOMLEFT:4:0,BOTTOMRIGHT:-4:0 w=nil h=4" })
+    local b, gb = sameList(fillCorners, cornerLines(4, "fill4.tga"))
+    local c, gc = sameList(edgeSolids, { "TOPLEFT:4:0,TOPRIGHT:-4:0 w=nil h=1", "BOTTOMLEFT:4:0,BOTTOMRIGHT:-4:0 w=nil h=1",
+        "TOPLEFT:0:-4,BOTTOMLEFT:0:4 w=1 h=nil", "TOPRIGHT:0:-4,BOTTOMRIGHT:0:4 w=1 h=nil" })
+    local d, gd = sameList(edgeCorners, cornerLines(4, "ring4.tga"))
+    return a and b and c and d and box.fill ~= nil and box.edge ~= nil, ga .. " /// " .. gb .. " /// " .. gc .. " /// " .. gd
+end)
+
+test("SK-8 painting a box paints every piece: solids by colour, corners by tint; a fill-only box has no edge; radius 8 uses the larger pictures", function()
+    local _, skin = boot()
+    local f = CreateFrame("Frame", nil, UIParent)
+    local box = skin.box(f, 4, "fill", "control")
+    box.fill:SetColorTexture(0.1, 0.2, 0.3, 0.4)
+    box.edge:SetColorTexture(0.5, 0.6, 0.7, 1)
+    local function same(c, r, g, b, a) return c ~= nil and c[1] == r and c[2] == g and c[3] == b and c[4] == a end
+    local fillOk, edgeOk, fillN, edgeN = true, true, 0, 0
+    for _, tex in ipairs(f.textures) do
+        if tex.layer == "BACKGROUND" then
+            fillN = fillN + 1
+            fillOk = fillOk and same(tex._texture and tex._vertex or tex._color, 0.1, 0.2, 0.3, 0.4)
+        elseif tex.layer == "BORDER" then
+            edgeN = edgeN + 1
+            edgeOk = edgeOk and same(tex._texture and tex._vertex or tex._color, 0.5, 0.6, 0.7, 1)
+        end
+    end
+    local remembered = same(box.fill._color, 0.1, 0.2, 0.3, 0.4) and same(box.edge._color, 0.5, 0.6, 0.7, 1)
+    local g = CreateFrame("Frame", nil, UIParent)
+    local plain = skin.box(g, 4, "fill")
+    local solids = onLayer(g, "BORDER")
+    local h = CreateFrame("Frame", nil, UIParent)
+    skin.box(h, 8, "fill", "border")
+    local bigSolids, bigCorners = onLayer(h, "BACKGROUND")
+    local _, bigRings = onLayer(h, "BORDER")
+    local function has(list, str)
+        for _, item in ipairs(list) do if item == str then return true end end
+        return false
+    end
+    local big = sameList(bigCorners, cornerLines(8, "fill8.tga")) and sameList(bigRings, cornerLines(8, "ring8.tga"))
+        and has(bigSolids, "TOPLEFT:0:-8,BOTTOMRIGHT:0:8 w=nil h=nil") and has(bigSolids, "TOPLEFT:8:0,TOPRIGHT:-8:0 w=nil h=8")
+    return fillN == 7 and edgeN == 8 and fillOk and edgeOk and remembered and plain.edge == nil and #solids == 0 and big == true,
+        tostring(fillN) .. tostring(edgeN) .. tostring(fillOk) .. tostring(edgeOk) .. tostring(remembered) .. tostring(plain.edge) .. tostring(big)
+end)
+
+test("SK-9 the window is rounded by 8, buttons, check boxes and page rows by 4, and their colours still follow the states", function()
+    local _, skin = boot()
+    local w = skin.window("SkinTestWindow6", 400, 300, "t")
+    local _, windowCorners = onLayer(w, "BACKGROUND")
+    local _, windowRings = onLayer(w, "BORDER")
+    local win = sameList(windowCorners, cornerLines(8, "fill8.tga")) and sameList(windowRings, cornerLines(8, "ring8.tga"))
+    local b = skin.button(w.page, "Save as Everyday", 126, 28)
+    local _, buttonCorners = onLayer(b, "BACKGROUND")
+    local _, buttonRings = onLayer(b, "BORDER")
+    local btn = sameList(buttonCorners, cornerLines(4, "fill4.tga")) and sameList(buttonRings, cornerLines(4, "ring4.tga"))
+    local function tints(frame, layer)
+        local list = {}
+        for _, tex in ipairs(frame.textures) do
+            if tex.layer == layer and tex._texture then list[#list + 1] = tex._vertex end
+        end
+        return list
+    end
+    local function allColor(list, hex, alpha)
+        for _, c in ipairs(list) do if not colorIs(c, hex, alpha) then return false end end
+        return #list == 4
+    end
+    local normal = allColor(tints(b, "BACKGROUND"), "14161b", 0.96) and allColor(tints(b, "BORDER"), "2f3440")
+    b.scripts.OnEnter(b)
+    local hover = allColor(tints(b, "BACKGROUND"), "1b1e28")
+    b.scripts.OnMouseDown(b)
+    local pressed = allColor(tints(b, "BACKGROUND"), "2c3266") and allColor(tints(b, "BORDER"), "9a9cff")
+    b.scripts.OnMouseUp(b)
+    b.scripts.OnLeave(b)
+    b:SetSelected(true)
+    local selected = allColor(tints(b, "BACKGROUND"), "232850") and allColor(tints(b, "BORDER"), "9a9cff")
+    local box = skin.check(w.page)
+    local _, boxRings = onLayer(box, "BORDER")
+    local tick = sameList(boxRings, cornerLines(4, "ring4.tga"))
+    box.scripts.OnEnter(box)
+    local tickHover = allColor(tints(box, "BORDER"), "3a3f4b")
+    box.scripts.OnLeave(box)
+    local tickLeave = allColor(tints(box, "BORDER"), "2f3440")
+    local row = skin.navItem(w.page, "Home", 149, 28)
+    local _, rowCorners = onLayer(row, "BACKGROUND")
+    local _, rowRings = onLayer(row, "BORDER")
+    local rowOk = sameList(rowCorners, cornerLines(4, "fill4.tga")) and #rowRings == 0
+    local bar = row.bar._points or {}
+    local barInset = #bar == 2 and bar[1][1] == "TOPLEFT" and bar[1][5] == -5 and bar[2][1] == "BOTTOMLEFT" and bar[2][5] == 5
+    row:SetSelected(true)
+    local rowSelected = allColor(tints(row, "BACKGROUND"), "232850")
+    return win and btn and normal and hover and pressed and selected and tick and tickHover and tickLeave and rowOk and barInset and rowSelected,
+        tostring(win) .. tostring(btn) .. tostring(normal) .. tostring(hover) .. tostring(pressed) .. tostring(selected) .. tostring(tick)
+            .. tostring(tickHover) .. tostring(tickLeave) .. tostring(rowOk) .. tostring(barInset) .. tostring(rowSelected)
 end)
 
 return H.results()
