@@ -306,4 +306,135 @@ check("TD-1 a first install forces nothing: an empty list, nothing written, the 
     forced and CVARS.groundEffectDensity == "48" and #SETLOG == 0 and e19.ns.profiles.active() == "original"
         and count("Original is read-only") == 1, tostring(forced) .. " " .. tostring(CVARS.groundEffectDensity) .. " " .. out())
 
+-- TP: /fset probe asks the client by name which console variables exist, changing nothing. The names are the ones the
+-- macros of the r/wowforever "beyond Ultra" thread set (67 of them, copied here as the spec).
+local MACRO_NAMES = {
+    "overridefarclip", "farclip", "horizonfarclip", "horizonStart", "horizonClip", "terrainLodDist", "TerrainLodDiv", "wmoLodDist",
+    "entityLodDist", "doodadLodDist", "doodadLodScale", "lodObjectCullDist", "lodObjectCullSize", "lodObjectMinSize",
+    "lodObjectFadeScale", "M2UseLOD", "smallcull",
+    "environmentDetail", "groundEffectDist", "groundEffectDensity", "groundEffectFade", "detailDoodadAlpha", "WeatherDensity",
+    "SkyCloudLOD", "volumeFogLevel",
+    "shadowMode", "shadowTextureSize", "shadowNumCascades", "shadowBlendCascades", "shadowSoft", "extshadowquality",
+    "entityShadowFadeScale", "SSAO", "SSAODistance",
+    "waterDetail", "pbrLiquidDetail", "reflectionMode", "rippleDetail", "refraction", "graphicsDepthEffects", "projectedTextures",
+    "physicsLevel",
+    "graphicsSpellDensity", "spellEffectLevel", "spellClutter", "spellVisualDensityFilterSetting", "particleDensity",
+    "particleMTDensity", "showfootprints", "showfootprintparticles",
+    "bodyQuota", "componentTextureLevel", "componentCompress", "componentEmissive", "componentSpecular", "componentTexCacheSize",
+    "componentTexLoadLimit", "componentThread",
+    "giQuality", "graphicsLightMode", "graphicsComputeEffects", "graphicsBloomUserMult", "sunshafts", "characterAmbient",
+    "OutlineEngineMode", "M2UseThreads", "terrainMipLevel",
+}
+local PREFIX_LEN = #"|cff66ccffForeverSettings|r: "
+local function tokens(lines)
+    local list = {}
+    for _, l in ipairs(lines) do
+        for word in l:gmatch("[%w_]+") do list[#list + 1] = word end
+    end
+    return list
+end
+local function countWord(lines, name)
+    local n = 0
+    for _, word in ipairs(tokens(lines)) do
+        if word:lower() == name:lower() then n = n + 1 end
+    end
+    return n
+end
+local function allWithin(lines, width)
+    for _, l in ipairs(lines) do
+        if #l - PREFIX_LEN > width then return false end
+    end
+    return true
+end
+
+local ep = boot({ groundEffectDensity = "48", groundEffectDist = "200", farclip = "1600", shadowMode = "2", accountName = "x" },
+    { fresh = true, defaults = false })
+local wantBefore = ForeverSettingsDB.want
+OUT = {}
+SETLOG = {}
+ep.slash("probe")
+local header = OUT[1] or ""
+local foundWords, missingFirst = {}, nil
+for i = 2, #OUT do
+    if OUT[i]:find("not here:", 1, true) then missingFirst = i break end
+    foundWords[#foundWords + 1] = OUT[i]
+end
+local missingLines = {}
+if missingFirst then for i = missingFirst, #OUT do missingLines[#missingLines + 1] = OUT[i] end end
+check("TP-1 probe says how many names it asked about and how many exist here", header:find("probe: asked about 67; here: 4, not here: 63.", 1, true) ~= nil, header)
+check("TP-1 probe lists each existing CVar once with its value now and its default",
+    countWord(foundWords, "groundEffectDensity") == 1 and countWord(foundWords, "farclip") == 1
+        and table.concat(foundWords, "\n"):find("groundEffectDensity = 48 / DgroundEffectDensity", 1, true) ~= nil
+        and table.concat(foundWords, "\n"):find("farclip = 1600 / Dfarclip", 1, true) ~= nil, out())
+check("TP-1 probe lists the names this client does not have on their own lines, and not the ones it has",
+    countWord(missingLines, "M2UseLOD") == 1 and countWord(missingLines, "farclip") == 0 and countWord(missingLines, "groundEffectDist") == 0, out())
+check("TP-1 probe changes nothing: no CVar written, the saved list untouched", #SETLOG == 0 and ForeverSettingsDB.want == wantBefore and next(ForeverSettingsDB.want) == nil, #SETLOG)
+local order = {}
+for _, word in ipairs(tokens(foundWords)) do
+    for _, name in ipairs({ "farclip", "groundEffectDensity", "groundEffectDist", "shadowMode" }) do
+        if word == name then order[#order + 1] = name end
+    end
+end
+check("TP-1 probe lists the existing names in alphabetical order", table.concat(order, ",") == "farclip,groundEffectDensity,groundEffectDist,shadowMode", table.concat(order, ","))
+OUT = {}
+ep.slash("")
+check("TP-1 the command list names probe", count("probe") == 1, out())
+
+local seen, dupes, listed = {}, {}, {}
+for _, name in ipairs(ep.ns.probeCVars or {}) do
+    if seen[name:lower()] then dupes[#dupes + 1] = name end
+    seen[name:lower()] = true
+    listed[#listed + 1] = name
+end
+table.sort(listed)
+local wanted = {}
+for _, name in ipairs(MACRO_NAMES) do wanted[#wanted + 1] = name end
+table.sort(wanted)
+check("TP-2 the built-in names are exactly the thread's, each once whatever its case", #dupes == 0 and table.concat(listed, ",") == table.concat(wanted, ","),
+    #listed .. " listed, " .. #dupes .. " repeated")
+
+-- TP-3: every line stays short enough to read, whether most names exist or none do, and no name is lost or repeated
+local everything = {}
+for _, name in ipairs(MACRO_NAMES) do everything[name] = "1" end
+local e_all = boot(everything, { fresh = true, defaults = false })
+OUT = {}
+e_all.slash("probe")
+local allHere = allWithin(OUT, 200) and OUT[1]:find("here: 67, not here: 0.", 1, true) ~= nil
+local onceEach = true
+for _, name in ipairs(MACRO_NAMES) do
+    if countWord(OUT, name) ~= 1 then onceEach = false end
+end
+local e_none = boot({ accountName = "x" }, { fresh = true, defaults = false })
+OUT = {}
+e_none.slash("probe")
+local noneHere = allWithin(OUT, 200) and OUT[1]:find("here: 0, not here: 67.", 1, true) ~= nil
+local onceEachMissing = true
+for _, name in ipairs(MACRO_NAMES) do
+    if countWord(OUT, name) ~= 1 then onceEachMissing = false end
+end
+check("TP-3 with every name present the lines are short and each name appears once", allHere and onceEach, #OUT)
+check("TP-3 with none present the lines are short and each name appears once", noneHere and onceEachMissing, #OUT)
+
+-- TP-4: names typed after the command are probed instead of the built-in list, in any case, each once
+local ep2 = boot({ groundEffectDensity = "48", groundEffectDist = "200", farclip = "1600", shadowMode = "2", accountName = "x" },
+    { fresh = true, defaults = false })
+OUT = {}
+ep2.slash("probe FARCLIP nonsenseName farclip")
+check("TP-4 probe with names asks only about those, once each", OUT[1] and OUT[1]:find("asked about 2; here: 1, not here: 1.", 1, true) ~= nil
+    and countWord(OUT, "nonsenseName") == 1 and countWord(OUT, "M2UseLOD") == 0 and #SETLOG == 0, out())
+
+-- TP-5: a client that raises when asked about a name still gets a full report
+GETHOOK = function(n) if n == "smallcull" then error("boom") end end
+OUT = {}
+local okRaise = pcall(ep2.slash, "probe")
+GETHOOK = nil
+check("TP-5 a name the client raises on is reported as not here and the probe finishes", okRaise and countWord(OUT, "smallcull") == 1
+    and OUT[1]:find("here: 4, not here: 63.", 1, true) ~= nil, out())
+
+-- TP-6: a client with no default to give shows a question mark and still lists the value
+local e_nd = boot({ farclip = "1600" }, { fresh = true, defaults = false, noDefault = true })
+OUT = {}
+local okNd = pcall(e_nd.slash, "probe farclip")
+check("TP-6 no default to give: the value is listed with a question mark", okNd and count("farclip = 1600 / ?") == 1, out())
+
 return H.results()

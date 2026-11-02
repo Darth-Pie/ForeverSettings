@@ -1471,6 +1471,32 @@ end`],
   // A first install forces nothing (the owner's decision before the addon is shared)
   'defaults-forced': ['ForeverSettings.lua', `    -- Nothing is forced on a first install: every setting is the player's to choose (My settings, or /fset set).`, `    groundEffectDensity = "64",`],
 
+  // /fset probe: ask the client by name which console variables exist, changing nothing
+  'probe-counts-swapped': ['ForeverSettings.lua', `"; here: " .. #found .. ", not here: " .. #missing .. "."`, `"; here: " .. #missing .. ", not here: " .. #found .. "."`],
+  'probe-found-not-listed': ['ForeverSettings.lua', `if #found > 0 then sayPacked(`, `if false then sayPacked(`],
+  'probe-missing-not-listed': ['ForeverSettings.lua', `if #missing > 0 then sayPacked(`, `if false then sayPacked(`],
+  'probe-unsorted': ['ForeverSettings.lua', `    table.sort(asked, function(a, b) return a:lower() < b:lower() end)`, `    local _ = asked`],
+  'probe-writes': ['ForeverSettings.lua', `            local okDefault, default = false, nil`, `            pcall(SetCVar, name, now)
+            local okDefault, default = false, nil`],
+  'probe-not-routed': ['ForeverSettings.lua', `    elseif cmd == "probe" then`, `    elseif cmd == "probe-off" then`],
+  'probe-commands-line': ['ForeverSettings.lua', `dump <text>, probe [names], profile`, `dump <text>, profile`],
+  'probe-list-typo': ['ForeverSettings.lua', `"overridefarclip", "farclip", "horizonfarclip"`, `"overridefarclip", "farclp", "horizonfarclip"`],
+  'probe-list-duplicate': ['ForeverSettings.lua', `"overridefarclip", "farclip", "horizonfarclip"`, `"overridefarclip", "farclip", "FarClip", "horizonfarclip"`],
+  'probe-width-unbounded': ['ForeverSettings.lua', `local PROBE_WIDTH = 200`, `local PROBE_WIDTH = 100000`],
+  'probe-wrap-loses-item': ['ForeverSettings.lua', `            line = item
+`, `            line = ""
+`],
+  'probe-args-ignored': ['ForeverSettings.lua', `    for name in rest:gmatch("%S+") do add(name) end`, `    local _ = rest`],
+  'probe-args-added-to-list': ['ForeverSettings.lua', `    if #asked == 0 then
+        for _, name in ipairs(PROBE_CVARS) do add(name) end`, `    if true then
+        for _, name in ipairs(PROBE_CVARS) do add(name) end`],
+  'probe-case-dupes': ['ForeverSettings.lua', `        local key = name:lower()
+        if not seen[key] then`, `        local key = name
+        if not seen[key] then`],
+  'probe-get-unguarded': ['ForeverSettings.lua', `local ok, now = pcall(GetCVar, name)`, `local ok, now = true, GetCVar(name)`],
+  'probe-default-unguarded': ['ForeverSettings.lua', `okDefault, default = pcall(GetCVarDefault, name) end`, `okDefault, default = true, GetCVarDefault(name) end`],
+  'probe-default-no-mark': ['ForeverSettings.lua', `tostring(default) or "?")`, `tostring(default) or "")`],
+
   // Maximum and costs, review fix pass: Maximum is re-derived at a loading screen, the window names a level the game refused
   'mx-refresh-always': ['Profiles.lua', `    if db and db.active == "maximum" then db.want = profiles.plan("maximum").want end`, `    if db then db.want = profiles.plan("maximum").want end`],
   'mx-refresh-no-want': ['Profiles.lua', `    if db and db.active == "maximum" then db.want = profiles.plan("maximum").want end`, `    if db and db.active == "maximum" then local _ = profiles.plan("maximum") end`],

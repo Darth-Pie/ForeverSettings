@@ -8,6 +8,8 @@
 --   /fset apply                apply the list now
 --   /fset reset                put back every CVar this addon changed, then empty the list
 --   /fset dump <text>          list CVars whose name contains <text>, with current and default values
+--   /fset probe [names]        ask the client which of these CVars exist (the beyond-Ultra macros' when none are given);
+--                              changes nothing
 
 local _, ns = ...
 
@@ -198,7 +200,7 @@ local function showList()
         local flag = (current ~= nil and same(current, db.want[name])) and "" or "  <- differs"
         say(name .. ": want " .. db.want[name] .. ", now " .. tostring(current) .. flag)
     end
-    say("commands: set, unset, apply, reset, dump <text>, profile, bench, minimap")
+    say("commands: set, unset, apply, reset, dump <text>, probe [names], profile, bench, minimap")
 end
 
 local function dump(needle)
@@ -220,6 +222,77 @@ local function dump(needle)
     end
     if #names > MAX_DUMP then say((#names - MAX_DUMP) .. " more; use a longer filter") end
     if #names == 0 then say("nothing matches '" .. needle .. "'") end
+end
+
+-- The console variables the macros of the r/wowforever "beyond Ultra" thread set. /fset probe asks the client about these
+-- by name, since a client with no list of its own CVars (Forever) cannot be searched for names it was never told.
+local PROBE_CVARS = {
+    "overridefarclip", "farclip", "horizonfarclip", "horizonStart", "horizonClip", "terrainLodDist", "TerrainLodDiv", "wmoLodDist",
+    "entityLodDist", "doodadLodDist", "doodadLodScale", "lodObjectCullDist", "lodObjectCullSize", "lodObjectMinSize",
+    "lodObjectFadeScale", "M2UseLOD", "smallcull",
+    "environmentDetail", "groundEffectDist", "groundEffectDensity", "groundEffectFade", "detailDoodadAlpha", "WeatherDensity",
+    "SkyCloudLOD", "volumeFogLevel",
+    "shadowMode", "shadowTextureSize", "shadowNumCascades", "shadowBlendCascades", "shadowSoft", "extshadowquality",
+    "entityShadowFadeScale", "SSAO", "SSAODistance",
+    "waterDetail", "pbrLiquidDetail", "reflectionMode", "rippleDetail", "refraction", "graphicsDepthEffects", "projectedTextures",
+    "physicsLevel",
+    "graphicsSpellDensity", "spellEffectLevel", "spellClutter", "spellVisualDensityFilterSetting", "particleDensity",
+    "particleMTDensity", "showfootprints", "showfootprintparticles",
+    "bodyQuota", "componentTextureLevel", "componentCompress", "componentEmissive", "componentSpecular", "componentTexCacheSize",
+    "componentTexLoadLimit", "componentThread",
+    "giQuality", "graphicsLightMode", "graphicsComputeEffects", "graphicsBloomUserMult", "sunshafts", "characterAmbient",
+    "OutlineEngineMode", "M2UseThreads", "terrainMipLevel",
+}
+ns.probeCVars = PROBE_CVARS
+local PROBE_WIDTH = 200
+
+-- Says `items` after `label`, joined by `sep`, in lines no longer than PROBE_WIDTH characters (an item is never split).
+local function sayPacked(label, items, sep)
+    local line = label
+    local fresh = true
+    for _, item in ipairs(items) do
+        if fresh then
+            line = line .. " " .. item
+            fresh = false
+        elseif #line + #sep + #item > PROBE_WIDTH then
+            say(line)
+            line = item
+        else
+            line = line .. sep .. item
+        end
+    end
+    say(line)
+end
+
+-- /fset probe [names]: whether each name is a CVar this client has, its value now and its default. Changes nothing.
+local function probe(rest)
+    local asked, seen = {}, {}
+    local function add(name)
+        local key = name:lower()
+        if not seen[key] then
+            seen[key] = true
+            asked[#asked + 1] = name
+        end
+    end
+    for name in rest:gmatch("%S+") do add(name) end
+    if #asked == 0 then
+        for _, name in ipairs(PROBE_CVARS) do add(name) end
+    end
+    table.sort(asked, function(a, b) return a:lower() < b:lower() end)
+    local found, missing = {}, {}
+    for _, name in ipairs(asked) do
+        local ok, now = pcall(GetCVar, name)
+        if ok and now ~= nil then
+            local okDefault, default = false, nil
+            if GetCVarDefault then okDefault, default = pcall(GetCVarDefault, name) end
+            found[#found + 1] = name .. " = " .. tostring(now) .. " / " .. ((okDefault and default ~= nil) and tostring(default) or "?")
+        else
+            missing[#missing + 1] = name
+        end
+    end
+    say("probe: asked about " .. #asked .. "; here: " .. #found .. ", not here: " .. #missing .. ".")
+    if #found > 0 then sayPacked("here (name = now / default):", found, "; ") end
+    if #missing > 0 then sayPacked("not here:", missing, ", ") end
 end
 
 local function handleSlash(msg)
@@ -244,6 +317,8 @@ local function handleSlash(msg)
         ns.profiles.switch("original")
     elseif cmd == "dump" then
         dump(rest)
+    elseif cmd == "probe" then
+        probe(rest)
     elseif cmd == "bench" then
         if ns.bench and ns.bench.handle then
             ns.bench.handle(rest)

@@ -178,6 +178,7 @@ end
 -- opts.bench          false: do not load Bench.lua (default: load it when it exists)
 -- opts.nounitspeed    leave GetUnitSpeed undefined
 -- opts.console        "new" (default), "legacy" or "none": which console-list function the client has
+-- opts.noDefault      GetCVarDefault raises for every name (a client with no default to give)
 -- opts.profiles       false: do not load Profiles.lua (default: load it when it exists)
 -- opts.guide          false: do not load Guide.lua (default: load it when it exists)
 -- opts.recommend      false: do not load Recommend.lua (default: load it when it exists)
@@ -231,7 +232,10 @@ function H.boot(cvars, opts)
         if derive then derive(CVARS[n], CVARS) end
         return true
     end
-    _G.GetCVarDefault = function(n) return "D" .. n end
+    _G.GetCVarDefault = function(n)
+        if opts.noDefault then error("no default for " .. tostring(n)) end
+        return "D" .. n
+    end
     _G.InCombatLockdown = function() return COMBAT end
     _G.print = function(s) OUT[#OUT + 1] = s end
     _G.SlashCmdList = {}
