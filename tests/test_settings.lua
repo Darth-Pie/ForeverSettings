@@ -123,7 +123,7 @@ test("S1-3 one row per setting the client has, in the table's order, with the pl
         and r[1].name == "Shadow detail"
         and r[1].line == "How sharp and detailed shadows look. Higher looks better and costs a lot of speed."
         and levelTexts(r[1]) == "0 (lowest)|1|2|3|4 (highest)" and r[2].name == "Soft corner shadows"
-        and r[3].name == "Grass and plants (exact amount)" and levelTexts(r[3]) == "48 (lowest)|64|128 (highest)"
+        and r[3].name == "Grass and plants (exact amount)" and levelTexts(r[3]) == "48 (lowest)|64|128|256 (highest)"
         and r[4].name == "Picture sharpness" and levelTexts(r[4]) == "50%|60%|70%|80%|90%|100%|125%|150%|175%|200%", order[3] .. " " .. levelTexts(r[4])
 end)
 
@@ -250,7 +250,7 @@ test("S1-12 the window's pages: a tick and level buttons per setting on each pag
     for _, name in ipairs(UISpecialFrames) do if name == "ForeverSettingsSettings" then listed = listed + 1 end end
     f.close:Click()
     return titled and keptNow and liveSelected and not f:IsShown() and listed == 1 and not raw
-        and lightKeeps == 2 and lightLevels == 5 + 13 and ssaoLines == 3 and worldKeeps == 1 and worldLevels == 3
+        and lightKeeps == 2 and lightLevels == 5 + 13 and ssaoLines == 3 and worldKeeps == 1 and worldLevels == 4
         and sizeKeeps == 1 and sizeLevels == 10,
         tostring(lightKeeps) .. " " .. tostring(lightLevels) .. " " .. tostring(ssaoLines) .. " " .. tostring(worldKeeps) .. " "
             .. tostring(worldLevels) .. " " .. tostring(sizeKeeps) .. " " .. tostring(sizeLevels) .. " " .. tostring(listed) .. " " .. tostring(raw)
@@ -298,7 +298,7 @@ local function quietEntry()
         } }
 end
 -- T1 plus the highest level of every setting of the fixture client: Shadows 4 costs 1.2 ms, SSAO 4 0.8, clutter (raw) 128
--- 0.6 and render scale 1 is where it is, so everything at the highest is 6.6 ms, 151.5 fps.
+-- and 256 0.6 each and render scale 1 is where it is, so everything at the highest is 6.6 ms, 151.5 fps.
 local function fullEntry()
     local entry = quietEntry()
     local function add(...) entry.rows[#entry.rows + 1] = lv(...) end
@@ -309,6 +309,7 @@ local function fullEntry()
     add("groundEffectDensity", "Ground clutter (raw)", "48", -0.3)
     add("groundEffectDensity", "Ground clutter (raw)", "64", 0, true)
     add("groundEffectDensity", "Ground clutter (raw)", "128", 0.6)
+    add("groundEffectDensity", "Ground clutter (raw)", "256", 0.6)
     add("RenderScale", "Render scale", "0.5", -2.0)
     add("RenderScale", "Render scale", "1", 0, true)
     return entry
@@ -396,7 +397,7 @@ test("S2-1 each level's cost is its frame rate minus the held level's, in whole 
     local none = "-|-|-|-|-"
     return costTexts(rowOf(mine, "graphicsShadowQuality")) == "+83 fps|+28 fps|now|?|?"
         and costTexts(rowOf(mine, "graphicsSSAO")) == "+24 fps|now|-20 fps|?|?"
-        and costTexts(rowOf(mine, "groundEffectDensity")) == "-|-|-" and costTexts(rowOf(mine, "RenderScale")) == "-|-|-|-|-|-|-|-|-|-"
+        and costTexts(rowOf(mine, "groundEffectDensity")) == "-|-|-|-" and costTexts(rowOf(mine, "RenderScale")) == "-|-|-|-|-|-|-|-|-|-"
         and costTexts(rowOf(crowd, "graphicsShadowQuality")) == "+56 fps|now|-28 fps|?|?"
         and costTexts(rowOf(crowd, "graphicsSSAO")) == "+24 fps|now|-20 fps|?|?"
         and costTexts(rowOf(unmeasured, "graphicsShadowQuality")) == none
@@ -1118,7 +1119,7 @@ test("S6-12 a card's name that wraps pushes its help line and levels down: the h
     s.open("world")
     local f = window()
     local name = fontStringWith(f, "Grass and plants (exact amount)")
-    local help = fontStringWith(f, "The same thing with a finer dial: 48 is sparse, 128 is lush.")
+    local help = fontStringWith(f, "The same thing with a finer dial: 48 is sparse, 128 is lush, 256 is the most.")
     local button = byKey(f, "level:groundEffectDensity:48")
     local ok = name ~= nil and help ~= nil and button ~= nil and STRINGHEIGHT(name) == 28 and -help._point[5] == -name._point[5] + 30
         and -button._point[5] >= -help._point[5] + STRINGHEIGHT(help)
@@ -1748,7 +1749,8 @@ test("P-RUN-1 while a test runs the window stays on Find my settings: the other 
     s.open("about")
     local free = byKey(f, "page:about").skinState.selected == true and byKey(f, "page:home").enabled == true
         and byKey(f, "rocker:crowded").enabled == true
-    return onTest and stayed and greyed and free and table.concat(pages, ",") == "home=false,light=false,world=false,size=false,test=true,results=false,about=false",
+    return onTest and stayed and greyed and free
+        and table.concat(pages, ",") == "home=false,light=false,effects=false,world=false,size=false,test=true,results=false,about=false",
         table.concat(pages, ",") .. " " .. tostring(onTest) .. tostring(stayed) .. tostring(greyed) .. tostring(free)
 end)
 
@@ -1876,9 +1878,9 @@ test("S5-1 the pages and their order; the model lists them with the current one 
     local bogus = s.model({ page = "nosuchpage" }, ctxOf(e, {}))
     local listed = {}
     for _, p in ipairs(size.pages) do listed[#listed + 1] = p.key .. ":" .. p.text end
-    return table.concat(keys, ",") == "home,light,world,size,test,results,about"
-        and table.concat(texts, "|") == "Home|Light and shadows|World detail|Picture size|Find my settings|My results|About"
-        and table.concat(listed, "|") == "home:Home|light:Light and shadows|world:World detail|size:Picture size|test:Find my settings|results:My results|about:About"
+    return table.concat(keys, ",") == "home,light,effects,world,size,test,results,about"
+        and table.concat(texts, "|") == "Home|Light and shadows|Effects and smoothing|World detail|Picture size|Find my settings|My results|About"
+        and table.concat(listed, "|") == "home:Home|light:Light and shadows|effects:Effects and smoothing|world:World detail|size:Picture size|test:Find my settings|results:My results|about:About"
         and none.page == "home" and selected(none) == "home" and size.page == "size" and selected(size) == "size"
         and bogus.page == "home" and selected(bogus) == "home", table.concat(listed, "|")
 end)
@@ -1887,7 +1889,11 @@ test("S5-2 every known setting sits on exactly one page by the table, and a sett
     local e, s = boot()
     local want = { graphicsShadowQuality = "light", graphicsSSAO = "light", graphicsComputeEffects = "light", giQuality = "light",
         graphicsLightMode = "light", graphicsGroundClutter = "world", groundEffectDensity = "world", graphicsLiquidDetail = "world",
-        graphicsTextureResolution = "world", RenderScale = "size" }
+        graphicsTextureResolution = "world", RenderScale = "size",
+        -- since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1): at most six cards a page, so nothing scrolls
+        graphicsDepthEffects = "light", graphicsOutlineMode = "light", graphicsParticleDensity = "effects",
+        graphicsSpellDensity = "effects", graphicsProjectedTextures = "effects", textureFilteringMode = "effects",
+        ffxAntiAliasingMode = "effects", MSAAQuality = "effects", graphicsViewDistance = "world", graphicsEnvironmentDetail = "world" }
     local wrong = {}
     for cvar, page in pairs(want) do
         if s.PAGE_OF[cvar:lower()] ~= page then wrong[#wrong + 1] = cvar end
@@ -1899,6 +1905,38 @@ test("S5-2 every known setting sits on exactly one page by the table, and a sett
     for _, row in ipairs(view.rows) do pages[row.cvar] = row.page end
     return #wrong == 0 and pages.graphicsShadowQuality == "light" and pages.graphicsSSAO == "light" and pages.groundEffectDensity == "world"
         and pages.RenderScale == "size" and pages.someUnknownSetting == "world", table.concat(wrong, ",")
+end)
+
+test("S5-2b with every setting of the test on the page list, no settings page holds more than six cards (nothing scrolls)", function()
+    local e, s = boot()
+    local count = {}
+    for _, row in ipairs(e.ns.bench.SETTINGS) do
+        local page = s.PAGE_OF[row.cvars[1]:lower()] or "world"
+        count[page] = (count[page] or 0) + 1
+    end
+    local over = {}
+    for page, n in pairs(count) do
+        if page ~= "size" and n > 6 then over[#over + 1] = page .. "=" .. n end
+    end
+    local effects = false
+    for _, page in ipairs(s.PAGES) do
+        if page.key == "effects" then effects = page.text == "Effects and smoothing" end
+    end
+    return #over == 0 and effects and count.effects == 6, table.concat(over, ",")
+end)
+
+test("S5-2c the Effects and smoothing page shows a card for each of its settings the client has, with its levels", function()
+    local e, s = boot()
+    CVARS.textureFilteringMode, CVARS.MSAAQuality = "5", "2"
+    s.open("effects")
+    local f = window()
+    local levels = 0
+    walk(f, function(frame)
+        if frame.shown and frame.key and frame.key:find("^level:textureFilteringMode:") then levels = levels + 1 end
+    end)
+    return byKey(f, "keep:textureFilteringMode") ~= nil and byKey(f, "keep:MSAAQuality") ~= nil and levels == 6
+        and hasText(f, "Texture filtering") and hasText(f, "Edge smoothing (multisample)") and byKey(f, "keep:graphicsShadowQuality") == nil,
+        tostring(levels)
 end)
 
 test("S5-3 open takes a page, a profile name, or nothing: a profile name opens the first settings page without switching, nothing keeps the last page (Home the first time)", function()
@@ -1956,7 +1994,7 @@ test("S6-0 the model gives each level its short label and each row its matters w
         tostring(shadows.mattersWords) .. tostring(shadows.levels[1].short)
 end)
 
-test("S6-1 the window is flat and 860 by 560, with the header, seven page rows and no scroll frame", function()
+test("S6-1 the window is flat and 860 by 560, with the header, eight page rows and no scroll frame", function()
     local e, s = bootWith(fullEntry())
     s.open("everyday")
     local f = window()
@@ -1969,7 +2007,7 @@ test("S6-1 the window is flat and 860 by 560, with the header, seven page rows a
     end
     return f ~= nil and f.name == "ForeverSettingsSettings" and f.template == nil and f._width == 860 and f._height == 560
         and f.titleText._text == "ForeverSettings" and f.close ~= nil and scrolls == 0
-        and table.concat(rows, "|") == "Home|Light and shadows|World detail|Picture size|Find my settings|My results|About", table.concat(rows, "|")
+        and table.concat(rows, "|") == "Home|Light and shadows|Effects and smoothing|World detail|Picture size|Find my settings|My results|About", table.concat(rows, "|")
 end)
 
 test("S6-2 the page list marks the current page, a click changes it, and the page's title follows", function()
@@ -2085,7 +2123,7 @@ test("S6-5 every page fits inside the page area with a 9-pixel wrap and a long n
         end)
         if fs and PAGE_H - fs._point[5] - STRINGHEIGHT(fs) < summaryTop then summaryTop = PAGE_H - fs._point[5] - STRINGHEIGHT(fs) end
     end
-    local fits = #buttons == 18 and 8 + lowest + 4 <= summaryTop
+    local fits = #buttons == 19 and 8 + lowest + 4 <= summaryTop
     local clear = true
     for i = 1, #buttons do
         for j = i + 1, #buttons do

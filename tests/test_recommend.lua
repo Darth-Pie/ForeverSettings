@@ -68,7 +68,22 @@ local WANT = {
     giQuality = { 5, true }, graphicsLightMode = { 5, true }, graphicsLiquidDetail = { 2, true },
     graphicsTextureResolution = { 9, false }, graphicsGroundClutter = { 3, false },
     groundEffectDensity = { 3, false }, RenderScale = { 10, true },
+    -- The game-menu settings measured since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1).
+    graphicsViewDistance = { 8, true }, graphicsEnvironmentDetail = { 7, true }, graphicsProjectedTextures = { 8, true },
+    textureFilteringMode = { 6, true }, graphicsParticleDensity = { 4, true }, ffxAntiAliasingMode = { 4, true },
+    MSAAQuality = { 3, false }, graphicsSpellDensity = { 3, false }, graphicsDepthEffects = { 2, true },
+    graphicsOutlineMode = { 2, true },
 }
+test("R1-1b every setting the test measures has a ranking weight", function()
+    local e, r = boot()
+    local missing = {}
+    for _, row in ipairs(e.ns.bench.SETTINGS) do
+        for _, cvar in ipairs(row.cvars) do
+            if not r.RANKING[cvar] then missing[#missing + 1] = cvar end
+        end
+    end
+    return #missing == 0, table.concat(missing, ",")
+end)
 test("R1-1 the target list and the ranking table are exactly the spec's", function()
     local _, r = boot()
     local targets = table.concat(r.TARGETS, ",")
@@ -81,7 +96,7 @@ test("R1-1 the target list and the ranking table are exactly the spec's", functi
     for cvar in pairs(WANT) do
         if not r.RANKING[cvar] then bad[#bad + 1] = cvar .. " missing" end
     end
-    return targets == "60,90,120,144,165,240" and r.MARGIN == 0.20 and count == 10 and #bad == 0, table.concat(bad, ",")
+    return targets == "60,90,120,144,165,240" and r.MARGIN == 0.20 and count == 20 and #bad == 0, table.concat(bad, ",")
 end)
 
 test("R1-2 the budget is the target's frame time less the margin", function()

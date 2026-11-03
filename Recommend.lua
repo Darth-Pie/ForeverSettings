@@ -27,6 +27,18 @@ recommend.RANKING = {
     groundEffectDensity = { weight = 3, raise = false },
     graphicsLiquidDetail = { weight = 2, raise = true },
     graphicsComputeEffects = { weight = 2, raise = true },
+    -- The game-menu settings measured since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1). Ground
+    -- markings weigh high: some fights need them, and they cost little.
+    graphicsViewDistance = { weight = 8, raise = true },
+    graphicsProjectedTextures = { weight = 8, raise = true },
+    graphicsEnvironmentDetail = { weight = 7, raise = true },
+    textureFilteringMode = { weight = 6, raise = true },
+    graphicsParticleDensity = { weight = 4, raise = true },
+    ffxAntiAliasingMode = { weight = 4, raise = true },
+    MSAAQuality = { weight = 3, raise = false },
+    graphicsSpellDensity = { weight = 3, raise = false },
+    graphicsDepthEffects = { weight = 2, raise = true },
+    graphicsOutlineMode = { weight = 2, raise = true },
 }
 
 -- Flags that make a measurement unusable. `no measurable effect or not applied` does not: its deltas are real.

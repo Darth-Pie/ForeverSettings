@@ -116,7 +116,7 @@ test("B3-12 state() is nil before the saved variables load and holds tiers and h
         and e1.ns.db().bench == st
 end)
 
-test("B3-1 the settings table has the nine rows of spec section 9", function()
+test("B3-1 the settings table has the nine rows of spec section 9 and the ten game-menu rows of 0.11", function()
     local _, b = newBench({})
     local keys = {}
     for _, row in ipairs(b.SETTINGS) do keys[#keys + 1] = row.key end
@@ -124,10 +124,38 @@ test("B3-1 the settings table has the nine rows of spec section 9", function()
     for _, row in ipairs(b.SETTINGS) do if row.key == "clutterraw" then raw = row end end
     local light
     for _, row in ipairs(b.SETTINGS) do if row.key == "lighting" then light = row end end
-    return table.concat(keys, ",") == "shadows,ssao,compute,lighting,liquid,texture,clutter,clutterraw,renderscale"
-        and raw and table.concat(raw.tiers, ",") == "48,64,128" and raw.cvars[1] == "groundEffectDensity"
-        and light and light.cvars[1] == "giQuality" and light.cvars[2] == "graphicsLightMode" and light.confirmed == false
+    return table.concat(keys, ",") == "shadows,ssao,compute,lighting,liquid,texture,clutter,clutterraw,renderscale,"
+            .. "viewdistance,environment,particles,spells,projected,depth,outline,filtering,antialias,msaa"
+        and raw and table.concat(raw.tiers, ",") == "48,64,128,256" and raw.cvars[1] == "groundEffectDensity"
+        and light and light.cvars[1] == "giQuality" and light.cvars[2] == "graphicsLightMode" and light.confirmed == false,
+        table.concat(keys, ",")
 end)
+
+-- The game-menu settings measured since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1).
+test("BN-1 the new menu settings resolve on a client that has them, with explicit levels for the raw ones, and are skipped where the client lacks them", function()
+    local _, b = newBench({ graphicsViewDistance = "5", textureFilteringMode = "5", ffxAntiAliasingMode = "2", MSAAQuality = "2" })
+    b.state().tiers.graphicsViewDistance = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" }
+    local resolved, skipped = b.resolve()
+    local by, why = {}, {}
+    for _, r in ipairs(resolved) do by[r.key] = r end
+    for _, s in ipairs(skipped) do why[s.key] = s.reason end
+    local function tiers(key) return by[key] and table.concat(by[key].tiers, ",") end
+    return by.viewdistance ~= nil and by.viewdistance.cvar == "graphicsViewDistance" and tiers("filtering") == "0,1,2,3,4,5"
+        and tiers("antialias") == "0,1,2,3" and tiers("msaa") == "0,1,2,3"
+        and why.environment ~= nil and why.environment:find("not found", 1, true) ~= nil
+        and why.particles ~= nil and why.spells ~= nil and why.projected ~= nil and why.depth ~= nil and why.outline ~= nil,
+        tostring(tiers("filtering")) .. " " .. tostring(why.environment)
+end)
+
+test("BN-2 the setup estimate counts the new settings: measured levels for the ones with a list, the assumed levels for one not learned yet", function()
+    local _, b = newBench({ graphicsViewDistance = "5", textureFilteringMode = "5" })
+    local resolved = b.resolve()
+    local currents = { textureFilteringMode = "5" }
+    local listed = b.countWindows(resolved, currents, "all")
+    return #resolved == 1 and listed == 5 + 2 + 2 and b.estimateSetupWindows("all") == listed + b.K.ASSUMED_LEVELS,
+        tostring(listed) .. " " .. tostring(b.estimateSetupWindows("all"))
+end)
+
 
 test("B3-2 resolve skips missing CVars and rows without tiers, and says why", function()
     local _, b = newBench({ graphicsShadowQuality = "4", groundEffectDensity = "64", graphicsSSAO = "3" })
@@ -248,8 +276,8 @@ test("B3-13 list prints one line per row, with unconfirmed rows marked and tiers
     b.list()
     local lines = 0
     for _ in ipairs(OUT) do lines = lines + 1 end
-    return lines == 9 and has("Shadows (graphicsShadowQuality) = 4  tiers: 0 1 2")
-        and has("Ground clutter (raw) (groundEffectDensity) = 64  tiers: 48 64 128")
+    return lines == 19 and has("Shadows (graphicsShadowQuality) = 4  tiers: 0 1 2")
+        and has("Ground clutter (raw) (groundEffectDensity) = 64  tiers: 48 64 128 256")
         and has("Secondary lighting: CVar not found (tried giQuality, graphicsLightMode) (unconfirmed)")
         and has("SSAO: CVar not found"), outText()
 end)
@@ -868,6 +896,24 @@ test("B7-24 a control change the game turns into another value is put back at on
     local entry = doRun(e, b)[1]
     return entry ~= nil and entry.valid == true and near(entry.baselineMs, 7.0, 0.05) and CVARS.graphicsShadowQuality == "2"
         and has("did not accept the control graphicsShadowQuality = 0"), outText()
+end)
+
+-- Spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1: 256 grass where the client draws it.
+test("BN-3 grass and plants (exact amount) offers 256; a run where the game refuses it records it rejected and it is not offered again", function()
+    local e, b = newRun()
+    local function rawTiers()
+        for _, r in ipairs(b.resolve()) do if r.key == "clutterraw" then return table.concat(r.tiers, ",") end end
+    end
+    local before = rawTiers()
+    SETFAIL.groundEffectDensity = { ask = "256", to = "128" }
+    local entry = doRun(e, b)[1]
+    local refused
+    for _, row in ipairs(entry and rowsOf(entry, "groundEffectDensity") or {}) do
+        if row.value == "256" then refused = row.status end
+    end
+    local maximum = e.ns.profiles.maxValues().groundEffectDensity
+    return before == "48,64,128,256" and entry ~= nil and entry.valid and refused == "rejected" and rawTiers() == "48,64,128"
+        and maximum == "128", tostring(before) .. " " .. tostring(refused) .. " " .. tostring(rawTiers()) .. " " .. tostring(maximum)
 end)
 
 test("B7-21 a rerun adds its windows to the progress total, so the count never passes the total and ends equal to it", function()

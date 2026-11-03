@@ -758,6 +758,7 @@ local function thoroughQuiet(shadows4, without)
         level("graphicsShadowQuality", "Shadows", "4", shadows4 or 1.2),
         level("groundEffectDensity", "Ground clutter (raw)", "48", -0.3), level("groundEffectDensity", "Ground clutter (raw)", "64", 0, true),
         level("groundEffectDensity", "Ground clutter (raw)", "128", 0.6),
+        level("groundEffectDensity", "Ground clutter (raw)", "256", 0.6),     -- 256 since 0.11, at 128's cost
         level("RenderScale", "Render scale", "0.5", -2.0), level("RenderScale", "Render scale", "0.75", -0.8),
         level("RenderScale", "Render scale", "1", 0, true),
     }

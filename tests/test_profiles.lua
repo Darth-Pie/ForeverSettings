@@ -11,12 +11,20 @@ end
 local function outText() return table.concat(OUT, " | ") end
 
 local MANAGED = { "graphicsShadowQuality", "graphicsSSAO", "graphicsComputeEffects", "giQuality", "graphicsLightMode",
-    "graphicsLiquidDetail", "graphicsTextureResolution", "graphicsGroundClutter", "groundEffectDensity", "RenderScale" }
+    "graphicsLiquidDetail", "graphicsTextureResolution", "graphicsGroundClutter", "groundEffectDensity", "RenderScale",
+    -- the game-menu settings measured since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1)
+    "graphicsViewDistance", "graphicsEnvironmentDetail", "graphicsParticleDensity", "graphicsProjectedTextures",
+    "graphicsSpellDensity", "graphicsDepthEffects", "graphicsOutlineMode", "textureFilteringMode", "ffxAntiAliasingMode",
+    "MSAAQuality" }
 local RAID_OF = {
     graphicsShadowQuality = "raidGraphicsShadowQuality", graphicsSSAO = "raidGraphicsSSAO",
     graphicsComputeEffects = "raidGraphicsComputeEffects", graphicsLiquidDetail = "raidGraphicsLiquidDetail",
     graphicsTextureResolution = "raidGraphicsTextureResolution", graphicsGroundClutter = "raidGraphicsGroundClutter",
     groundEffectDensity = "RAIDgroundEffectDensity", giQuality = "RAIDgiQuality", graphicsLightMode = "raidGraphicsLightMode",
+    graphicsViewDistance = "raidGraphicsViewDistance", graphicsEnvironmentDetail = "raidGraphicsEnvironmentDetail",
+    graphicsParticleDensity = "raidGraphicsParticleDensity", graphicsProjectedTextures = "raidGraphicsProjectedTextures",
+    graphicsSpellDensity = "raidGraphicsSpellDensity", graphicsDepthEffects = "raidGraphicsDepthEffects",
+    graphicsOutlineMode = "raidGraphicsOutlineMode",
 }
 -- A client with every managed setting and its raid counterpart.
 local function fullCvars()
@@ -38,7 +46,7 @@ test("P1-1 the managed list and the raid table are the spec's, and every name is
         pairsSeen = pairsSeen + 1
         if RAID_OF[k] ~= v then problems[#problems + 1] = "raid " .. k end
     end
-    if pairsSeen ~= 9 then problems[#problems + 1] = "raid pairs " .. pairsSeen end
+    if pairsSeen ~= 16 then problems[#problems + 1] = "raid pairs " .. pairsSeen end
     if p.RAID_OF.RenderScale ~= nil then problems[#problems + 1] = "RenderScale has a raid counterpart" end
     local known = {}
     for _, name in ipairs(e.ns.knownCVars) do known[name:lower()] = true end
@@ -62,7 +70,7 @@ test("P1-2 live() returns only settings the client answers for, with their live 
         and got.graphicsShadowQuality == "4" and got.RenderScale == "1" and got.giQuality == nil, table.concat(keys, ",")
 end)
 
-test("P1-3 originalNames() is the ten managed names then the nine raid counterparts, 19 unique names", function()
+test("P1-3 originalNames() is the twenty managed names then the sixteen raid counterparts, 36 unique names", function()
     local _, p = boot({})
     local names = p.originalNames()
     local seen, dup = {}, false
@@ -73,7 +81,7 @@ test("P1-3 originalNames() is the ten managed names then the nine raid counterpa
     local expected = {}
     for _, n in ipairs(MANAGED) do expected[#expected + 1] = n end
     for _, n in ipairs(MANAGED) do if RAID_OF[n] then expected[#expected + 1] = RAID_OF[n] end end
-    return #names == 19 and not dup and table.concat(names, ",") == table.concat(expected, ","), #names .. " names"
+    return #names == 36 and not dup and table.concat(names, ",") == table.concat(expected, ","), #names .. " names"
 end)
 
 test("P1-4 a second boot sees none of the first boot's profiles state", function()
@@ -994,7 +1002,7 @@ local UNKNOWN = "unknown profile 'nope' (original, everyday, crowded or maximum)
 
 -- A game where only Shadows and SSAO have learned levels: Compute effects and Texture resolution are in the client but
 -- unlearned; Ground clutter (raw) and Render scale have built-in levels. The highest of each: Shadows 4, SSAO 4,
--- Ground clutter (raw) 128, Render scale 1. `extra` adds client settings; the player starts on Original.
+-- Ground clutter (raw) 256, Render scale 1. `extra` adds client settings; the player starts on Original.
 local function maxGame(extra)
     local cv = { graphicsShadowQuality = "2", graphicsSSAO = "1", graphicsComputeEffects = "1", RenderScale = "1",
         groundEffectDensity = "64", graphicsTextureResolution = "2", vsync = "0" }
@@ -1004,7 +1012,7 @@ local function maxGame(extra)
     b.state().tiers.graphicsSSAO = { "0", "1", "2", "3", "4" }
     return e, p, db, b
 end
-local MAXIMA = { graphicsShadowQuality = "4", graphicsSSAO = "4", groundEffectDensity = "128", RenderScale = "1" }
+local MAXIMA = { graphicsShadowQuality = "4", graphicsSSAO = "4", groundEffectDensity = "256", RenderScale = "1" }
 local function managedNow()
     local now = {}
     for _, name in ipairs(MANAGED) do now[name] = CVARS[name] end
@@ -1043,7 +1051,7 @@ test("MX-2 plan('maximum') writes the maxima over Original's values, enforces ex
         graphicsTextureResolution = "2", groundEffectDensity = "64", RenderScale = "1", maxFPS = "60" }
     local plan = p.plan("maximum")
     return deepEqual(plan.want, MAXIMA)
-        and deepEqual(plan.writes, { graphicsShadowQuality = "4", graphicsSSAO = "4", groundEffectDensity = "128", RenderScale = "1",
+        and deepEqual(plan.writes, { graphicsShadowQuality = "4", graphicsSSAO = "4", groundEffectDensity = "256", RenderScale = "1",
             graphicsComputeEffects = "1", graphicsTextureResolution = "2", maxFPS = "60" })
         and plan.empty == false and db.profiles.maximum == nil and #SETLOG == 0
 end)
@@ -1055,7 +1063,7 @@ test("MX-3 switching to Maximum writes the maxima, enforces them, and says the p
     local ok, info = p.switch("maximum")
     local profileAt, textureAt, leftAt = lineOf("Profile: Maximum (3 settings changed)"), lineOf(TEXTURE), lineOf(LEFT2)
     return ok == true and info.changed == 3 and #info.mismatched == 0 and db.active == "maximum" and deepEqual(db.want, MAXIMA)
-        and CVARS.graphicsShadowQuality == "4" and CVARS.graphicsSSAO == "4" and CVARS.groundEffectDensity == "128"
+        and CVARS.graphicsShadowQuality == "4" and CVARS.graphicsSSAO == "4" and CVARS.groundEffectDensity == "256"
         and CVARS.graphicsComputeEffects == "1" and CVARS.graphicsTextureResolution == "2" and CVARS.RenderScale == "1"
         and profileAt ~= nil and textureAt ~= nil and leftAt ~= nil and profileAt < textureAt and textureAt < leftAt
         and db.profiles.maximum == nil, outText()
@@ -1229,7 +1237,7 @@ test("MX-10 with Maximum in use a loading screen puts back a level the game chan
     CVARS.groundEffectDensity = "64"
     CVARS.graphicsComputeEffects = "0"
     e.fire("PLAYER_ENTERING_WORLD")
-    return CVARS.graphicsShadowQuality == "4" and CVARS.groundEffectDensity == "128" and CVARS.graphicsComputeEffects == "0"
+    return CVARS.graphicsShadowQuality == "4" and CVARS.groundEffectDensity == "256" and CVARS.graphicsComputeEffects == "0"
         and db.active == "maximum"
 end)
 
@@ -1299,7 +1307,7 @@ end)
 
 test("MX-13 no 'same settings' hint to or from Maximum, even when Everyday holds exactly the maxima", function()
     local _, p, db = maxGame()
-    db.profiles.everyday.values = { graphicsShadowQuality = "4", graphicsSSAO = "4", groundEffectDensity = "128" }
+    db.profiles.everyday.values = { graphicsShadowQuality = "4", graphicsSSAO = "4", groundEffectDensity = "256" }
     p.switch("everyday", true)
     OUT = {}
     p.switch("maximum")

@@ -13,10 +13,21 @@ local SetCVar = C_CVar and C_CVar.SetCVar or _G.SetCVar
 profiles.MANAGED = {
     "graphicsShadowQuality", "graphicsSSAO", "graphicsComputeEffects", "giQuality", "graphicsLightMode",
     "graphicsLiquidDetail", "graphicsTextureResolution", "graphicsGroundClutter", "groundEffectDensity", "RenderScale",
+    -- the game-menu settings measured since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1)
+    "graphicsViewDistance", "graphicsEnvironmentDetail", "graphicsParticleDensity", "graphicsProjectedTextures",
+    "graphicsSpellDensity", "graphicsDepthEffects", "graphicsOutlineMode", "textureFilteringMode", "ffxAntiAliasingMode",
+    "MSAAQuality",
 }
 
--- The game's raid and battleground counterpart of each managed setting (RenderScale has none).
+-- The game's raid and battleground counterpart of each managed setting (RenderScale and the raw menu settings have none).
 profiles.RAID_OF = {
+    graphicsViewDistance = "raidGraphicsViewDistance",
+    graphicsEnvironmentDetail = "raidGraphicsEnvironmentDetail",
+    graphicsParticleDensity = "raidGraphicsParticleDensity",
+    graphicsProjectedTextures = "raidGraphicsProjectedTextures",
+    graphicsSpellDensity = "raidGraphicsSpellDensity",
+    graphicsDepthEffects = "raidGraphicsDepthEffects",
+    graphicsOutlineMode = "raidGraphicsOutlineMode",
     graphicsShadowQuality = "raidGraphicsShadowQuality",
     graphicsSSAO = "raidGraphicsSSAO",
     graphicsComputeEffects = "raidGraphicsComputeEffects",

@@ -1485,7 +1485,7 @@ end`],
   // The hub window: the shell and the settings pages
   'hub-window-size': ['Settings.lua', `local WIDTH, HEIGHT = 860, 560`, `local WIDTH, HEIGHT = 860, 540`],
   'hub-nav-click-missing': ['Settings.lua', `        item:SetScript("OnClick", clicked)`, `        local _ = clicked`],
-  'hub-nav-gap': ['Settings.lua', `-(10 + (i - 1) * 30 + (i > 4 and 14 or 0))`, `-(10 + (i - 1) * 30)`],
+  'hub-nav-gap': ['Settings.lua', `-(10 + (i - 1) * 30 + gap)`, `-(10 + (i - 1) * 30)`],
   'hub-nav-selected-unmarked': ['Settings.lua', `p.nav[i]:SetSelected(entry.selected)`, `p.nav[i]:SetSelected(false)`],
   'hub-card-tick-unchecked': ['Settings.lua', `box:SetChecked(row.kept)`, `box:SetChecked(false)`],
   'hub-card-tick-never-greyed': ['Settings.lua', `box:SetEnabled(row.enabled)`, `box:SetEnabled(true)`],
@@ -1622,7 +1622,7 @@ end
   'dynamic-colour-swapped': ['Settings.lua', `ctx.dynamicScale.on and "warning" or "dim"`, `ctx.dynamicScale.on and "dim" or "warning"`],
 
   // The pages of the hub window
-  'page-order-wrong': ['Settings.lua', `{ key = "light", text = "Light and shadows" }, { key = "world", text = "World detail" },`, `{ key = "world", text = "World detail" }, { key = "light", text = "Light and shadows" },`],
+  'page-order-wrong': ['Settings.lua', `{ key = "home", text = "Home" }, { key = "light", text = "Light and shadows" },`, `{ key = "light", text = "Light and shadows" }, { key = "home", text = "Home" },`],
   'page-text-wrong': ['Settings.lua', `{ key = "size", text = "Picture size" }`, `{ key = "size", text = "Picture sizes" }`],
   'page-of-wrong': ['Settings.lua', `graphicsssao = "light"`, `graphicsssao = "world"`],
   'page-of-size-wrong': ['Settings.lua', `renderscale = "size",`, `renderscale = "world",`],
@@ -2159,6 +2159,24 @@ end
   'sk-rocker-halves-enabled': ['Skin.lua', `        self.left:SetEnabled(self.enabled)`, ``],
   'sk-rocker-half-width': ['Skin.lua', `        b:SetSize(width / 2, height)`, `        b:SetSize(width, height)`],
   'sk-rocker-no-hover': ['Skin.lua', `            elseif rocker.enabled and b.hover then`, `            elseif false then`],
+  // The game-menu settings measured since 0.11, and 256 grass (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1)
+  't2-refused-not-remembered': ['Bench.lua', `                    if isRaw(setting.cvar) then rememberRefused(setting.cvar, value) end`, ``],
+  't2-refused-not-filtered': ['Bench.lua', `        if not refused then return row.tiers end`, `        do return row.tiers end`],
+  't2-256-missing': ['Bench.lua', `tiers = { "48", "64", "128", "256" }`, `tiers = { "48", "64", "128" }`],
+  't2-filtering-tiers': ['Bench.lua', `tiers = { "0", "1", "2", "3", "4", "5" }, confirmed = true },`, `tiers = { "0", "1", "2", "3", "4" }, confirmed = true },`],
+  't2-view-row-missing': ['Bench.lua', `    { key = "viewdistance", label = "View distance", cvars = { "graphicsViewDistance" }, confirmed = true },`, ``],
+  't2-guard-msaa': ['Bench.lua', `"pbr", "antialias", "msaa",`, `"pbr", "antialias",`],
+  't2-guard-antialias': ['Bench.lua', `"pbr", "antialias", "msaa",`, `"pbr", "msaa",`],
+  't2-known-raw': ['ForeverSettings.lua', `    "textureFilteringMode", "ffxAntiAliasingMode", "MSAAQuality",`, `    "textureFilteringMode", "ffxAntiAliasingMode",`],
+  't2-raid-view': ['Profiles.lua', `    graphicsViewDistance = "raidGraphicsViewDistance",`, ``],
+  't2-managed': ['Profiles.lua', `    "graphicsSpellDensity", "graphicsDepthEffects", "graphicsOutlineMode", "textureFilteringMode", "ffxAntiAliasingMode",`, `    "graphicsSpellDensity", "graphicsDepthEffects", "graphicsOutlineMode", "textureFilteringMode",`],
+  't2-page-effects': ['Settings.lua', `{ key = "effects", text = "Effects and smoothing" },`, ``],
+  't2-page-effects-not-drawn': ['Settings.lua', `local SETTINGS_PAGE = { light = true, effects = true, world = true, size = true }`, `local SETTINGS_PAGE = { light = true, world = true, size = true }`],
+  't2-pageof-view': ['Settings.lua', `    graphicsviewdistance = "world", graphicsenvironmentdetail = "world",`, `    graphicsviewdistance = "light", graphicsenvironmentdetail = "world",`],
+  't2-pageof-msaa': ['Settings.lua', `ffxantialiasingmode = "effects", msaaquality = "effects",`, `ffxantialiasingmode = "effects", msaaquality = "light",`],
+  't2-nav-gap-wrong': ['Settings.lua', `        if entry.key == "test" then gap = 14 end`, `        if entry.key == "results" then gap = 14 end`],
+  't2-ranking-view': ['Recommend.lua', `    graphicsViewDistance = { weight = 8, raise = true },`, ``],
+  't2-name-msaa': ['Names.lua', `"Edge smoothing (multisample)", "Smooths jagged edges while`, `"Edge smoothing", "Smooths jagged edges while`],
 };
 
 function main() {

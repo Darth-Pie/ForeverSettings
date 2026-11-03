@@ -67,9 +67,9 @@ end
 -- The pages of the window (specs 2026-11-02-flat-hub-window-design.md H5 and 2026-11-03-tests-and-results-in-my-settings-design.md
 -- M1) and the page each setting sits on; a setting this table does not know sits on World detail.
 settings.PAGES = {
-    { key = "home", text = "Home" }, { key = "light", text = "Light and shadows" }, { key = "world", text = "World detail" },
-    { key = "size", text = "Picture size" }, { key = "test", text = "Find my settings" }, { key = "results", text = "My results" },
-    { key = "about", text = "About" },
+    { key = "home", text = "Home" }, { key = "light", text = "Light and shadows" }, { key = "effects", text = "Effects and smoothing" },
+    { key = "world", text = "World detail" }, { key = "size", text = "Picture size" }, { key = "test", text = "Find my settings" },
+    { key = "results", text = "My results" }, { key = "about", text = "About" },
 }
 -- The two pages the guided test and the results draw into (Guide.lua and Results.lua), each in a host frame of its own.
 local HOSTED = { test = "guide", results = "results" }
@@ -79,6 +79,10 @@ settings.PAGE_OF = {
     graphicsshadowquality = "light", graphicsssao = "light", graphicscomputeeffects = "light", giquality = "light",
     graphicslightmode = "light", graphicsgroundclutter = "world", groundeffectdensity = "world", graphicsliquiddetail = "world",
     graphicstextureresolution = "world", renderscale = "size",
+    -- Since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1): at most six cards a page, so nothing scrolls.
+    graphicsdeptheffects = "light", graphicsoutlinemode = "light", graphicsparticledensity = "effects", graphicsspelldensity = "effects",
+    graphicsprojectedtextures = "effects", texturefilteringmode = "effects", ffxantialiasingmode = "effects", msaaquality = "effects",
+    graphicsviewdistance = "world", graphicsenvironmentdetail = "world",
 }
 
 local state = { page = "home" }
@@ -685,7 +689,7 @@ local EDIT_W, EDIT_H = 112, 24                     -- Everyday and Crowded on a 
 local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6       -- the save buttons at the bottom of the page list
 local HOME_CARD_W, HOME_CARD_H = math.floor((AREA_W - CARD_GAP_X) / 2), 56
 local HOME_TESTS_NOTE = "A highlighted button has a saved result."
-local SETTINGS_PAGE = { light = true, world = true, size = true }
+local SETTINGS_PAGE = { light = true, effects = true, world = true, size = true }
 
 local function heightOf(fs, str)
     local h = fs:GetStringHeight()
@@ -770,10 +774,12 @@ local function build()
 
     -- The page list at the left, with a rule between it and the page area.
     p.nav = {}
+    local gap = 0                            -- a gap between the settings pages and Find my settings
     for i, entry in ipairs(settings.PAGES) do
+        if entry.key == "test" then gap = 14 end
         local item = skin.navItem(page, entry.text, NAV_WIDTH, 28)
         item.key = "page:" .. entry.key
-        item:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -(10 + (i - 1) * 30 + (i > 4 and 14 or 0)))
+        item:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -(10 + (i - 1) * 30 + gap))
         item:SetScript("OnClick", clicked)
         p.nav[i] = item
     end

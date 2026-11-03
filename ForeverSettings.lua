@@ -76,6 +76,8 @@ local KNOWN_CVARS = {
     "spellClutter", "spellVisualDensityFilterSetting", "SSAO", "sunShafts",
     "targetFPS", "terrainLodDist", "TerrainLodDiv", "useMaxFPS",
     "vsync", "waterDetail", "weatherDensity", "wmoLodDist",
+    -- the raw game-menu settings measured since 0.11
+    "textureFilteringMode", "ffxAntiAliasingMode", "MSAAQuality",
 }
 ns.knownCVars = KNOWN_CVARS
 

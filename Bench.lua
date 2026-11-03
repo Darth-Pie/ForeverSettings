@@ -179,9 +179,22 @@ bench.SETTINGS = {
     { key = "texture", label = "Texture resolution", cvars = { "graphicsTextureResolution" }, confirmed = true },
     { key = "clutter", label = "Ground clutter", cvars = { "graphicsGroundClutter" }, confirmed = true },
     { key = "clutterraw", label = "Ground clutter (raw)", cvars = { "groundEffectDensity" },
-      tiers = { "48", "64", "128" }, confirmed = true },
+      tiers = { "48", "64", "128", "256" }, confirmed = true },
     { key = "renderscale", label = "Render scale", cvars = { "RenderScale" },
       tiers = { "0.5", "0.6", "0.7", "0.8", "0.9", "1" }, confirmed = false },
+    -- The game-menu settings measured since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1); a client that
+    -- lacks one skips it.
+    { key = "viewdistance", label = "View distance", cvars = { "graphicsViewDistance" }, confirmed = true },
+    { key = "environment", label = "Environment detail", cvars = { "graphicsEnvironmentDetail" }, confirmed = true },
+    { key = "particles", label = "Particle density", cvars = { "graphicsParticleDensity" }, confirmed = true },
+    { key = "spells", label = "Spell density", cvars = { "graphicsSpellDensity" }, confirmed = true },
+    { key = "projected", label = "Projected textures", cvars = { "graphicsProjectedTextures" }, confirmed = true },
+    { key = "depth", label = "Depth effects", cvars = { "graphicsDepthEffects" }, confirmed = true },
+    { key = "outline", label = "Outline mode", cvars = { "graphicsOutlineMode" }, confirmed = true },
+    { key = "filtering", label = "Texture filtering", cvars = { "textureFilteringMode" },
+      tiers = { "0", "1", "2", "3", "4", "5" }, confirmed = true },
+    { key = "antialias", label = "Anti-aliasing", cvars = { "ffxAntiAliasingMode" }, tiers = { "0", "1", "2", "3" }, confirmed = true },
+    { key = "msaa", label = "Multisampling", cvars = { "MSAAQuality" }, tiers = { "0", "1", "2", "3" }, confirmed = true },
 }
 
 local function firstExisting(row)
@@ -191,10 +204,30 @@ local function firstExisting(row)
     return nil
 end
 
+-- A level of an explicit list the game refused in a test (256 grass on a client that will not draw it, spec A1) is left out of
+-- the list from then on: the page, Maximum and the next test offer only what the client holds.
 local function tiersFor(row, cvar)
-    if row.tiers then return row.tiers end
     local st = bench.state()
+    if row.tiers then
+        local refused = st and st.refused and st.refused[cvar:lower()]
+        if not refused then return row.tiers end
+        local list = {}
+        for _, tier in ipairs(row.tiers) do
+            if not refused[tier] then list[#list + 1] = tier end
+        end
+        return list
+    end
     return st and st.tiers[cvar]
+end
+
+-- Remembers that the game refused `value` of a setting with an explicit list.
+local function rememberRefused(cvar, value)
+    local st = bench.state()
+    if not st then return end
+    st.refused = st.refused or {}
+    local key = cvar:lower()
+    st.refused[key] = st.refused[key] or {}
+    st.refused[key][value] = true
 end
 
 -- Returns resolved, skipped. resolved entries: {key, label, cvar, tiers}; skipped entries: {key, reason}.
@@ -355,7 +388,7 @@ bench.restore = restore
 local GUARDED = {
     "graphics", "raidgraphics", "ground", "shadow", "ssao", "giquality", "light", "liquid", "water", "texture",
     "view", "lod", "horizon", "farclip", "sun", "particle", "weather", "spell", "render", "fps", "vsync", "bloom",
-    "depth", "compute", "outline", "projected", "refraction", "ripple", "reflection", "pbr",
+    "depth", "compute", "outline", "projected", "refraction", "ripple", "reflection", "pbr", "antialias", "msaa",
 }
 
 function restore.isGuarded(name)
@@ -1288,6 +1321,7 @@ function bench.run(onDone, opts)
                 local now = GetCVar(setting.cvar)
                 if not sameValue(now, value) then
                     measured[value] = { status = "rejected", reason = "rejected, clamped to " .. tostring(now) }
+                    if isRaw(setting.cvar) then rememberRefused(setting.cvar, value) end
                     return nextTier()
                 end
                 nextInfo = { cvar = setting.cvar, value = value }

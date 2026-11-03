@@ -15,10 +15,21 @@ local WANT = {
     { "graphicsComputeEffects", "Extra effects detail", "Extra effects the graphics card calculates. Hard to notice, moderate cost." },
     { "giQuality", "Light bounce", LIGHT },
     { "graphicsLightMode", "Light bounce", LIGHT },
+    -- the game-menu settings measured since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1), by page
+    { "graphicsDepthEffects", "Depth effects", "Heat haze and the soft blur of things far away. Small cost." },
+    { "graphicsOutlineMode", "Outlines", "The outline around what you point at or target. Small cost." },
+    { "graphicsParticleDensity", "Particle detail", "How many sparks, smoke and magic particles are drawn. Busy fights cost more." },
+    { "graphicsSpellDensity", "Spell effects", "How many spell effects from other players are drawn. Lower helps in raids." },
+    { "graphicsProjectedTextures", "Ground markings", "Spell circles and other markings drawn on the ground. Some fights need them." },
+    { "textureFilteringMode", "Texture filtering", "How sharp the ground and walls look at an angle. Small cost." },
+    { "ffxAntiAliasingMode", "Edge smoothing", "Smooths jagged edges after the picture is drawn. Small cost." },
+    { "MSAAQuality", "Edge smoothing (multisample)", "Smooths jagged edges while the picture is drawn. Costs a lot at high levels." },
+    { "graphicsViewDistance", "View distance", "How far away the world is drawn. Costs a lot of speed in open places." },
+    { "graphicsEnvironmentDetail", "Environment detail", "How many trees, rocks and buildings are drawn, and how detailed they are far away." },
     { "graphicsLiquidDetail", "Water detail", "How detailed water and other liquids look." },
     { "graphicsTextureResolution", "Texture sharpness", "How crisp surfaces look up close. Costs graphics memory more than speed." },
     { "graphicsGroundClutter", "Grass and plants", "How much grass, flowers and small plants cover the ground." },
-    { "groundEffectDensity", "Grass and plants (exact amount)", "The same thing with a finer dial: 48 is sparse, 128 is lush." },
+    { "groundEffectDensity", "Grass and plants (exact amount)", "The same thing with a finer dial: 48 is sparse, 128 is lush, 256 is the most." },
     { "RenderScale", "Picture sharpness", "100% is full sharpness. Lower is faster but blurrier." },
 }
 
