@@ -40,9 +40,9 @@ An addon for **WoW Forever**.
 The **Home** page switches profile and starts the tests. The **Picture size** page has a slider and size buttons for picture sharpness, up to 200%. Both keep the size in the profile in use. A warning says that high values can crash some graphics cards, and holding Shift while you enter the world skips a saved size above 100% for that session.
 
 <p align="center">
-  <img src=".previews/home.png" alt="My settings, Home page: the four profiles and the two test buttons" width="355">
+  <img src=".previews/home.png" alt="My settings, Home page: the four profiles with their colour dots, the profile in use in the pill by the close button, and the two test buttons" width="355">
   &nbsp;&nbsp;
-  <img src=".previews/picture-size.png" alt="My settings, Picture size page: the picture sharpness slider" width="355">
+  <img src=".previews/picture-size.png" alt="My settings, Picture size page: the size buttons with their fps costs and the picture sharpness slider" width="355">
 </p>
 
 ## Profiles
