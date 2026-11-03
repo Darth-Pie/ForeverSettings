@@ -1327,6 +1327,13 @@ t2-pageof-msaa|test_settings|S5-2,S5-2c|killed
 t2-nav-gap-wrong|test_settings|S6-2|killed
 t2-ranking-view|test_recommend|R1-1,R1-1b|killed
 t2-name-msaa|test_names|N1-1|killed
+av-entry-case|test_advanced|AV-5|killed
+av-available-all|test_advanced|AV-5|killed
+av-risky-all|test_advanced|AV-5|killed
+av-levelword-missing|test_advanced|AV-6|killed
+av-farclip-safe|test_advanced|AV-1|killed
+av-guard-ffx|test_advanced|AV-4|killed
+av-known-ffx|test_advanced|AV-4|killed
 control-comment|test_bench||survive
 control-missing|test_bench||error
 control-syntax|test_bench||error'

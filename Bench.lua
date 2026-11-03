@@ -389,6 +389,7 @@ local GUARDED = {
     "graphics", "raidgraphics", "ground", "shadow", "ssao", "giquality", "light", "liquid", "water", "texture",
     "view", "lod", "horizon", "farclip", "sun", "particle", "weather", "spell", "render", "fps", "vsync", "bloom",
     "depth", "compute", "outline", "projected", "refraction", "ripple", "reflection", "pbr", "antialias", "msaa",
+    "ffx", "fog", "resample",
 }
 
 function restore.isGuarded(name)

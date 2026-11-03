@@ -65,6 +65,10 @@ names=$(grep -n '^Names\.lua$' "$toc" | cut -d: -f1)
 if [ -z "$names" ] || [ -z "$first" ] || [ -z "$second" ] || [ "$first" -ge "$names" ] || [ "$names" -ge "$second" ]; then
   tocfail "Names.lua must be listed after ForeverSettings.lua and before Bench.lua"
 fi
+advancedLine=$(grep -n '^Advanced\.lua$' "$toc" | cut -d: -f1)
+if [ -z "$advancedLine" ] || [ -z "$names" ] || [ -z "$second" ] || [ "$names" -ge "$advancedLine" ] || [ "$advancedLine" -ge "$second" ]; then
+  tocfail "Advanced.lua must be listed after Names.lua and before Bench.lua"
+fi
 settings=$(grep -n '^Settings\.lua$' "$toc" | cut -d: -f1)
 if [ -z "$settings" ] || [ -z "$third" ] || [ -z "$guide" ] || [ "$third" -ge "$settings" ] || [ "$settings" -ge "$guide" ]; then
   tocfail "Settings.lua must be listed after UI.lua and before Guide.lua"
@@ -77,7 +81,7 @@ graphLine=$(grep -n '^Graph\.lua$' "$toc" | cut -d: -f1)
 if [ -z "$graphLine" ] || [ -z "$settings" ] || [ -z "$guide" ] || [ "$settings" -ge "$graphLine" ] || [ "$graphLine" -ge "$guide" ]; then
   tocfail "Graph.lua must be listed after Settings.lua and before Guide.lua"
 fi
-for f in ForeverSettings.toc ForeverSettings.lua Names.lua Bench.lua Profiles.lua Recommend.lua UI.lua Skin.lua Settings.lua Graph.lua Guide.lua Results.lua; do
+for f in ForeverSettings.toc ForeverSettings.lua Names.lua Advanced.lua Bench.lua Profiles.lua Recommend.lua UI.lua Skin.lua Settings.lua Graph.lua Guide.lua Results.lua; do
   [ "$(head -c 3 "$SRC/$f" | od -An -tx1 | tr -d ' ')" != "efbbbf" ] || tocfail "$f has a byte order mark"
   [ "$(tr -cd '\r' < "$SRC/$f" | wc -c)" -eq 0 ] || tocfail "$f has carriage returns"
 done

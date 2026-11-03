@@ -8,6 +8,7 @@
 
 ForeverSettings.lua
 Names.lua
+Advanced.lua
 Bench.lua
 Profiles.lua
 Recommend.lua

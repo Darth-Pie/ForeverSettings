@@ -382,6 +382,9 @@ function H.boot(cvars, opts)
     if opts.names ~= false and NAMES_SRC and NAMES_SRC ~= "" then
         assert(load(NAMES_SRC, "=Names.lua"))("ForeverSettings", ns)
     end
+    if opts.advanced ~= false and ADVANCED_SRC and ADVANCED_SRC ~= "" then
+        assert(load(ADVANCED_SRC, "=Advanced.lua"))("ForeverSettings", ns)
+    end
     if opts.bench ~= false and BENCH_SRC and BENCH_SRC ~= "" then
         assert(load(BENCH_SRC, "=Bench.lua"))("ForeverSettings", ns)
     end

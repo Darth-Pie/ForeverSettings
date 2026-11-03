@@ -2177,6 +2177,14 @@ end
   't2-nav-gap-wrong': ['Settings.lua', `        if entry.key == "test" then gap = 14 end`, `        if entry.key == "results" then gap = 14 end`],
   't2-ranking-view': ['Recommend.lua', `    graphicsViewDistance = { weight = 8, raise = true },`, ``],
   't2-name-msaa': ['Names.lua', `"Edge smoothing (multisample)", "Smooths jagged edges while`, `"Edge smoothing", "Smooths jagged edges while`],
+  // The Advanced catalogue (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A6)
+  'av-entry-case': ['Advanced.lua', `return type(cvar) == "string" and BY_CVAR[cvar:lower()] or nil`, `return type(cvar) == "string" and BY_CVAR[cvar] or nil`],
+  'av-available-all': ['Advanced.lua', `        if GetCVar(entry.cvar) ~= nil then list[#list + 1] = entry end`, `        list[#list + 1] = entry`],
+  'av-risky-all': ['Advanced.lua', `        if entry.risky then list[#list + 1] = entry end`, `        list[#list + 1] = entry`],
+  'av-levelword-missing': ['Advanced.lua', `    return entry.levelWords and entry.levelWords[value] or value`, `    return value`],
+  'av-farclip-safe': ['Advanced.lua', `risky = true, safe = "1000", page = "adv-distance" },`, `risky = true, safe = "2000", page = "adv-distance" },`],
+  'av-guard-ffx': ['Bench.lua', `    "ffx", "fog", "resample",`, `    "fog", "resample",`],
+  'av-known-ffx': ['ForeverSettings.lua', `    "ffxGlow", "ffxDeath", "volumeFogLevel",`, `    "volumeFogLevel",`],
 };
 
 function main() {
@@ -2188,7 +2196,7 @@ function main() {
     require(path.join(path.resolve(pkgDir), 'node_modules', 'fengari'));
 
   const read = (file) => (fs.existsSync(path.join(srcDir, file)) ? fs.readFileSync(path.join(srcDir, file), 'utf8') : '');
-  const sources = { 'ForeverSettings.lua': read('ForeverSettings.lua'), 'Bench.lua': read('Bench.lua'), 'Profiles.lua': read('Profiles.lua'), 'UI.lua': read('UI.lua'), 'Guide.lua': read('Guide.lua'), 'Recommend.lua': read('Recommend.lua'), 'Results.lua': read('Results.lua'), 'Names.lua': read('Names.lua'), 'Settings.lua': read('Settings.lua'), 'Graph.lua': read('Graph.lua'), 'Skin.lua': read('Skin.lua') };
+  const sources = { 'ForeverSettings.lua': read('ForeverSettings.lua'), 'Bench.lua': read('Bench.lua'), 'Profiles.lua': read('Profiles.lua'), 'UI.lua': read('UI.lua'), 'Guide.lua': read('Guide.lua'), 'Recommend.lua': read('Recommend.lua'), 'Results.lua': read('Results.lua'), 'Names.lua': read('Names.lua'), 'Settings.lua': read('Settings.lua'), 'Graph.lua': read('Graph.lua'), 'Skin.lua': read('Skin.lua'), 'Advanced.lua': read('Advanced.lua') };
   if (!sources['ForeverSettings.lua']) throw new Error('ForeverSettings.lua not found in ' + srcDir);
 
   if (mutation) {
@@ -2219,6 +2227,7 @@ function main() {
   setGlobal('SKIN_SRC', sources['Skin.lua']);
   setGlobal('SETTINGS_SRC', sources['Settings.lua']);
   setGlobal('GRAPH_SRC', sources['Graph.lua']);
+  setGlobal('ADVANCED_SRC', sources['Advanced.lua']);
   setGlobal('HARNESS_SRC', fs.readFileSync(path.join(__dirname, 'harness.lua'), 'utf8'));
 
   const test = fs.readFileSync(testPath, 'utf8');
