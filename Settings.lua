@@ -379,9 +379,12 @@ function settings.model(st, ctx)
         local live = ctx.live(entry.cvar)
         local card = { cvar = entry.cvar, name = entry.name, line = entry.line, kept = held[entry.cvar] ~= nil, page = entry.page,
             enabled = locked == nil and editing ~= nil, noCosts = true, tag = entry.risky and "risky" or nil, levels = {} }
+        local refused = (adv.refused or {})[entry.cvar:lower()] or {}          -- levels this client turned into others
         for _, value in ipairs(entry.levels) do
-            local text = ns.advanced.levelText(entry, value)
-            card.levels[#card.levels + 1] = { value = value, text = text, short = text, selected = live ~= nil and sameValue(live, value) }
+            if not refused[value] then
+                local text = ns.advanced.levelText(entry, value)
+                card.levels[#card.levels + 1] = { value = value, text = text, short = text, selected = live ~= nil and sameValue(live, value) }
+            end
         end
         if entry.risky then view.advanced.risky[entry.page] = true end
         view.advanced.cards[#view.advanced.cards + 1] = card
@@ -539,7 +542,8 @@ local function context(withCosts)
         if entry.kind ~= "crowd" then hasReport = true end             -- a crowd entry has no rows of its own: it is no report
     end
     ctx.advanced = { on = fsdb ~= nil and fsdb.advanced == true, entries = ns.advanced and ns.advanced.available() or {},
-        raidToo = fsdb ~= nil and fsdb.raidToo == true, raidSwitchOff = GetCVar("RAIDsettingsEnabled") == "0", hasReport = hasReport }
+        raidToo = fsdb ~= nil and fsdb.raidToo == true, raidSwitchOff = GetCVar("RAIDsettingsEnabled") == "0", hasReport = hasReport,
+        refused = fsdb and fsdb.advancedRefused or {} }
     if withCosts then
         -- The costs of the profile in use (Crowded prefers the crowd test); Original and Maximum read the quiet-spot test.
         ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(TAB_TEXT[ctx.active] and ctx.active or "everyday")
@@ -787,14 +791,29 @@ function settings.click(key)
     local pickedCvar, value = key:match("^level:([^:]+):(.+)$")
     if pickedCvar then
         ns.profiles.setProfileValue(profile, pickedCvar, value, true)
-        -- An Advanced level the game will not take is not kept, or every loading screen would say so in chat: the card shows what the
-        -- game holds, and the window says what it kept (the fresh review of 2026-11-03, finding 5).
+        -- An Advanced level the game will not take is not kept, or every loading screen would say so in chat (the fresh review of
+        -- 2026-11-03, finding 5). The window says what the game did and where the setting is now (a risky one goes back to the
+        -- player's own value), and the level is not offered again on this client (owner's look 2026-11-03).
         local entry = ns.advanced and ns.advanced.entry(pickedCvar)
         local held = GetCVar(pickedCvar)
         if entry and held ~= nil and not sameValue(held, value) then
+            local own = ns.profiles.state().original.values[pickedCvar]
             ns.profiles.unsetProfileValue(profile, pickedCvar, true)
-            state.notice = "The game would not take " .. entry.name .. " at " .. ns.advanced.levelText(entry, value) .. ": it kept "
-                .. ns.advanced.levelText(entry, held) .. "."
+            local fsdb = ns.db()
+            fsdb.advancedRefused = fsdb.advancedRefused or {}
+            local key = pickedCvar:lower()
+            fsdb.advancedRefused[key] = fsdb.advancedRefused[key] or {}
+            fsdb.advancedRefused[key][value] = true
+            local now = GetCVar(pickedCvar) or held
+            local function level(v)                       -- the card's own word for a value the game reads back ("0.200000")
+                for _, lv in ipairs(entry.levels) do
+                    if sameValue(lv, v) then return ns.advanced.levelText(entry, lv) end
+                end
+                return tostring(v)
+            end
+            local where = "It's at " .. level(now) .. " now."
+            if entry.risky and own ~= nil and sameValue(now, own) then where = "It's back at " .. level(now) .. ", your own setting." end
+            state.notice = "The game turned " .. entry.name .. " " .. level(value) .. " into " .. level(held) .. ", so it wasn't kept. " .. where
         end
         draw()
     end

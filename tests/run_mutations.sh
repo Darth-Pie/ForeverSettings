@@ -1373,6 +1373,12 @@ fx-unset-any-advanced|test_advanced|AV-SAFE-7|killed
 fx-spelling-catalogue|test_advanced|AV-SPELL-1|killed
 fx-clamp-kept|test_settings|AD-8|killed
 fx-clamp-silent|test_settings|AD-8|killed
+cl-refused-not-hidden|test_settings|AD-8,AD-8b|killed
+cl-refused-not-saved|test_settings|AD-8,AD-8b|killed
+cl-refused-not-read|test_settings|AD-8,AD-8b|killed
+cl-own-words-always|test_settings|AD-8b|killed
+cl-own-words-never|test_settings|AD-8|killed
+cl-now-not-read|test_settings|AD-8|killed
 control-comment|test_bench||survive
 control-missing|test_bench||error
 control-syntax|test_bench||error'

@@ -2421,14 +2421,30 @@ test("AD-7b with wrapped text, Maximum's read-only line and a combat banner, eve
 end)
 
 -- The fresh review of 2026-11-03, finding 5: a level the client clamps was kept silently, and every loading screen said so in chat.
-test("AD-8 a level the game will not take is not kept: the card shows what the game holds and the window says so", function()
+-- Owner's look 2026-11-03 (Shadow map size 4096 on retail): "it kept 2048" read wrong beside a card that showed 1024, and 4096
+-- stayed on offer. The words now say what happened and where the setting is; the refused level is not offered again.
+test("AD-8 a level the game will not take is not kept: the window says what the game did and where the setting is now, and the level goes", function()
     local e, s, db = advBoot()
     SETFAIL.farclip = { ask = "10000", to = "8000" }
     s.open("adv-distance")
     byKey(window(), "level:farclip:10000"):Click()
     local f = window()
-    return db.profiles.everyday.values.farclip == nil and byKey(f, "keep:farclip"):GetChecked() == false
-        and hasText(f, "The game would not take View distance (further) at 10000: it kept 8000."), allText(f)
+    local said = hasText(f, "The game turned View distance (further) 10000 into 8000, so it wasn't kept. It's back at 1000, your own setting.")
+    local gone = byKey(f, "level:farclip:10000") == nil and byKey(f, "level:farclip:8000") ~= nil
+    s.open("adv-distance")                                 -- a later draw (and the next session: it is saved) still leaves it out
+    return db.profiles.everyday.values.farclip == nil and byKey(f, "keep:farclip"):GetChecked() == false and CVARS.farclip == "1000"
+        and said and gone and byKey(window(), "level:farclip:10000") == nil and db.advancedRefused.farclip["10000"] == true, allText(f)
+end)
+
+test("AD-8b a refused level of a setting that is not risky leaves the game's value in place and says so", function()
+    local e, s, db = advBoot()
+    SETFAIL.groundEffectDist = { ask = "500", to = "400" }
+    s.open("adv-distance")
+    byKey(window(), "level:groundEffectDist:500"):Click()
+    local f = window()
+    return db.profiles.everyday.values.groundEffectDist == nil and CVARS.groundEffectDist == "400"
+        and hasText(f, "The game turned Grass and plants distance 500 into 400, so it wasn't kept. It's at 400 now.")
+        and byKey(f, "level:groundEffectDist:500") == nil, allText(f)
 end)
 
 test("SW-1 the Advanced switch is off by default; the first turn on shows the warning with I understand and Cancel, then it switches at once", function()

@@ -2240,7 +2240,16 @@ end
         local back`],
   'fx-spelling-catalogue': ['ForeverSettings.lua', `        if entry.cvar:lower() == lower then return entry.cvar end`, ``],
   'fx-clamp-kept': ['Settings.lua', `            ns.profiles.unsetProfileValue(profile, pickedCvar, true)`, ``],
-  'fx-clamp-silent': ['Settings.lua', `            state.notice = "The game would not take " .. entry.name`, `            local _ = "The game would not take " .. entry.name`],
+  'fx-clamp-silent': ['Settings.lua', `            state.notice = "The game turned " .. entry.name`, `            local _ = "The game turned " .. entry.name`],
+  // A refused Advanced level: clearer words and not offered again (owner's look 2026-11-03)
+  'cl-refused-not-hidden': ['Settings.lua', `            if not refused[value] then
+                local text = ns.advanced.levelText(entry, value)`, `            if true then
+                local text = ns.advanced.levelText(entry, value)`],
+  'cl-refused-not-saved': ['Settings.lua', `            fsdb.advancedRefused[key][value] = true`, ``],
+  'cl-refused-not-read': ['Settings.lua', `        refused = fsdb and fsdb.advancedRefused or {} }`, `        refused = {} }`],
+  'cl-own-words-always': ['Settings.lua', `            if entry.risky and own ~= nil and sameValue(now, own) then where`, `            if true then where`],
+  'cl-own-words-never': ['Settings.lua', `            if entry.risky and own ~= nil and sameValue(now, own) then where`, `            if false then where`],
+  'cl-now-not-read': ['Settings.lua', `            local now = GetCVar(pickedCvar) or held`, `            local now = held`],
 };
 
 function main() {
