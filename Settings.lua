@@ -914,7 +914,7 @@ local function build()
     -- The frames Guide.lua and Results.lua draw into: the whole page area, each shown only on its own page.
     p.hosts = {}
     for key in pairs(HOSTED) do
-        local host = CreateFrame("Frame", nil, area)
+        local host = CreateFrame("Frame", key == "test" and "ForeverSettingsTestPage" or "ForeverSettingsResultsPage", area)
         host:SetPoint("TOPLEFT", area, "TOPLEFT", 0, 0)
         host:SetSize(AREA_W, PAGE_H - TOP - SUMMARY_BOTTOM)
         host:Hide()
@@ -933,9 +933,9 @@ local function build()
         sinceRefresh = sinceRefresh + elapsed
         if sinceRefresh < REFRESH then return end
         sinceRefresh = 0
-        -- A running test redraws its progress, and notices a run that ended elsewhere; the results follow combat.
+        -- A running test redraws its progress, and notices a run that ended elsewhere. Combat and a test starting or ending are
+        -- in the signature, so the results' Save button and graph points follow them through the redraw below.
         if ns.guide and ns.guide.refresh then guarded(ns.guide.refresh) end
-        if ns.results and ns.results.refresh then guarded(ns.results.refresh) end
         if signature(context()) ~= lastSignature then draw() end
     end)
     -- While a test runs the window cannot be put away (the close button, Escape, code): it comes straight back. Closing it at any

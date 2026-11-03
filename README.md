@@ -22,7 +22,7 @@ An addon for **WoW Forever**.
 
 1. Stand somewhere quiet and click the minimap button, then **Find my best settings**.
 2. Pick the frame rate you're aiming for (your monitor's refresh rate is a good choice) and press **Start**. It takes roughly 5 to 10 minutes and runs on its own. Don't move or open windows while it runs.
-3. See what each change does, then **Save**. Your own settings are put back after the test.
+3. See what each change does, then **Save**. Your own settings are put back after the test. Want a different level for one setting? Click its point on the graph: the estimate follows, and **Save** keeps the levels shown.
 4. Later, in a busy place (a city, a raid): **Find my crowded settings**.
 
 <p align="center">
@@ -37,7 +37,7 @@ An addon for **WoW Forever**.
   <img src=".previews/my-settings.png" alt="My settings, Light and shadows page: Shadow detail, Soft corner shadows and Extra effects detail, with the fps cost under each level" width="720">
 </p>
 
-The **Home** page switches profile and starts the tests. The **Picture size** page has a slider and size buttons for picture sharpness, up to 200%. Both keep the size in the profile in use. A warning says that high values can crash some graphics cards, and holding Shift while you enter the world skips a saved size above 100% for that session.
+The **Home** page switches profile and starts the tests. The test itself runs on the **Find my settings** page, and its result opens on **My results**, where your saved results can be shown again. The **Picture size** page has a slider and size buttons for picture sharpness, up to 200%. Both keep the size in the profile in use. A warning says that high values can crash some graphics cards, and holding Shift while you enter the world skips a saved size above 100% for that session.
 
 <p align="center">
   <img src=".previews/home.png" alt="My settings, Home page: the four profiles with their colour dots, the profile in use in the pill by the close button, and the two test buttons" width="355">

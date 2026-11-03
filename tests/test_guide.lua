@@ -495,13 +495,22 @@ end)
 
 -- Task 6: the frame adapter (spec sections 3, 5, 6, 9). The tests read what the player can read: the texts shown on
 -- the window's font strings and the labels of its buttons.
-local WINDOW = "ForeverSettingsGuide"
+-- The guided test is a page of My settings (spec 2026-11-03-tests-and-results-in-my-settings-design.md M2): it draws into the
+-- host frame of Find my settings, and Escape belongs to the window.
+local PAGE = "ForeverSettingsTestPage"
+local WINDOW = "ForeverSettingsSettings"
 local BOX_LABEL = "I have closed other programs and will stay still, camera included, until it finishes"
 local function guideFrame()
+    for _, f in ipairs(H.frames()) do
+        if f.name == PAGE then return f end
+    end
+end
+local function hubFrame()
     for _, f in ipairs(H.frames()) do
         if f.name == WINDOW then return f end
     end
 end
+local function isSelected(button) return button ~= nil and button.skinState ~= nil and button.skinState.selected == true end
 local function shownText(f)
     local list = {}
     for _, fs in ipairs(f.fontStrings) do
@@ -590,11 +599,11 @@ end)
 test("G6-4 while Running the progress is redrawn every 0.5 s of frame time and not sooner", function()
     local e, g, b = newRun()
     startVia(g, "run")
-    local f = guideFrame()
+    local f, w = guideFrame(), hubFrame()
     b.progress = function() return { phase = "sweep", label = "Shadows", done = 2, total = 9 } end
-    f.scripts.OnUpdate(f, 0.2)
+    w.scripts.OnUpdate(w, 0.2)
     local early = not hasText(f, "Now testing: Shadows")
-    f.scripts.OnUpdate(f, 0.6)
+    w.scripts.OnUpdate(w, 0.6)
     return early and hasText(f, "Now testing: Shadows") and hasText(f, "Step 2 of about 9"), shownText(f)
 end)
 
@@ -654,23 +663,24 @@ test("G6-8 a Running view for a test the window did not start ends with that tes
     local f = guideFrame()
     local showing = f ~= nil and f:IsShown() and g.state().view == "running"
     e.pump(60, runCost)
-    return showing and b.active() == false and not f:IsShown() and g.state().view == "intro" and g.state().ticked == false,
-        tostring(g.state().view)
+    -- the page's view goes: Find my settings shows its two test buttons again
+    return showing and b.active() == false and not f:IsShown() and g.state() == nil and g.running() == false,
+        tostring(g.state() and g.state().view)
 end)
 
 test("G6-10 hiding the window while a test runs (the title bar's X) shows it again, and a finished test's result is on screen", function()
     local e, g, b = newRun()
     startVia(g, "run")
-    local f = guideFrame()
-    f:Hide()
-    local back = f:IsShown() and g.state().view == "running" and b.active() == true
+    local f, w = guideFrame(), hubFrame()
+    w:Hide()
+    local back = w:IsShown() and f:IsShown() and g.state().view == "running" and b.active() == true
     e.pump(0.3, runCost)
     SPEED = 1
     e.pump(5, runCost)
     SPEED = 0
     local stopped = g.state().view == "stopped" and g.state().reason == "movement" and f:IsShown() and hasText(f, "You moved")
-    f:Hide()
-    return back and stopped and not f:IsShown(), shownText(f)
+    w:Hide()
+    return back and stopped and not w:IsShown(), shownText(f)
 end)
 
 local function reportFrame()
@@ -679,7 +689,7 @@ local function reportFrame()
     end
 end
 
-test("G6-11 Show report opens the report window and closes the Finished window, so the two never overlap", function()
+test("G6-11 Show report opens the report window over My settings, which keeps the Finished view", function()
     local e, g, b = newRun()
     startVia(g, "run")
     e.pump(60, runCost)
@@ -687,7 +697,8 @@ test("G6-11 Show report opens the report window and closes the Finished window, 
     local onItsOwn = reportFrame() ~= nil and reportFrame():IsShown()
     findButton(f, "Show report"):Click()
     local r = reportFrame()
-    return g.state().view == "done" and not onItsOwn and r ~= nil and r:IsShown() and not f:IsShown(), tostring(r and r:IsShown())
+    return g.state().view == "done" and not onItsOwn and r ~= nil and r:IsShown() and f:IsShown() and hasText(f, "The test is finished."),
+        tostring(r and r:IsShown())
 end)
 
 -- Recommender, Task 6: the setup kind (plan 2026-10-29-recommender.md)
@@ -800,7 +811,7 @@ test("G7-6 a valid setup run closes the guided window and hands its entry and ta
     startSetup(g, 165)
     e.pump(120, runCost)
     local f = guideFrame()
-    return #calls == 1 and calls[1][1] ~= nil and calls[1][1].valid == true and calls[1][2] == 165 and f ~= nil and not f:IsShown()
+    return #calls == 1 and calls[1][1] ~= nil and calls[1][1].valid == true and calls[1][2] == 165 and f ~= nil
         and g.state().view == "done" and g.state().kind == "setup" and #shown == 0 and not b.active(),
         tostring(#calls) .. " " .. tostring(g.state().view) .. " " .. outText()
 end)
@@ -835,7 +846,8 @@ test("G7-8 without a results window a valid setup run shows the ordinary Done vi
     startSetup(g, 165)
     e.pump(120, runCost)
     local f = guideFrame()
-    return g.state().view == "done" and f:IsShown() and hasText(f, "The test is finished."), tostring(g.state().view)
+    return g.state().view == "done" and f:IsShown() and hasText(f, "The test is finished.") and outText() == "",
+        tostring(g.state().view) .. " / " .. outText()
 end)
 
 test("G7-9 the six target buttons are drawn only in the setup Intro, and choosing one highlights it", function()
@@ -847,7 +859,7 @@ test("G7-9 the six target buttons are drawn only in the setup Intro, and choosin
         if not findButton(f, label) then found = false end
     end
     findButton(f, "165"):Click()
-    local picked = g.state().target == 165 and findButton(f, "165").locked == true and findButton(f, "60").locked ~= true
+    local picked = g.state().target == 165 and isSelected(findButton(f, "165")) and not isSelected(findButton(f, "60"))
     boxOf(f):Click()
     local ready = findButton(f, "Start"):IsEnabled() == true and hasText(f, "How smooth do you want it?")
     g.open("run")
@@ -1015,10 +1027,10 @@ test("G8-4 the two mode buttons are drawn only in the setup Intro, the selected 
     g.open("setup")
     local f = guideFrame()
     local quick, thorough = findButton(f, "Quick (about 5 minutes)"), findButton(f, "Thorough (about 7 minutes)")
-    local first = quick.locked == true and thorough.locked ~= true
+    local first = isSelected(quick) and not isSelected(thorough)
     thorough:Click()
-    local second = g.state().mode == "thorough" and findButton(f, "Thorough (about 7 minutes)").locked == true
-        and findButton(f, "Quick (about 5 minutes)").locked ~= true and hasText(f, "This takes about 7 minutes,")
+    local second = g.state().mode == "thorough" and isSelected(findButton(f, "Thorough (about 7 minutes)"))
+        and not isSelected(findButton(f, "Quick (about 5 minutes)")) and hasText(f, "This takes about 7 minutes,")
     g.open("run")
     local hiddenInRun = findButton(f, "Quick (about 5 minutes)") == nil and findButton(f, "Thorough (about 7 minutes)") == nil
     g.open("setup")
@@ -1155,7 +1167,7 @@ test("G9-5 a valid crowd run closes the guided window and hands the crowd recomm
     local f = guideFrame()
     local entry = calls[1] and calls[1][1]
     return #calls == 1 and entry and entry.kind == "crowd" and entry.valid == true and #entry.rows > 0
-        and math.abs(entry.baselineMs - 7.0) < 0.1 and calls[1][2] == 90 and f ~= nil and not f:IsShown()
+        and math.abs(entry.baselineMs - 7.0) < 0.1 and calls[1][2] == 90 and f ~= nil
         and g.state().view == "done" and g.state().kind == "crowd" and #shown == 0 and not b.active(), outText()
 end)
 
@@ -1197,7 +1209,7 @@ test("G9-8 the target buttons and their prompt are drawn in the crowd Intro, wit
     for _, label in ipairs({ "60", "90", "120", "144", "165", "240" }) do
         if not findButton(f, label) then found = false end
     end
-    local crowdWords = hasText(f, "How smooth do you want it in crowds?") and findButton(f, "60").locked == true
+    local crowdWords = hasText(f, "How smooth do you want it in crowds?") and isSelected(findButton(f, "60"))
     g.open("run")
     local gone = findButton(f, "60") == nil and not hasText(f, "How smooth do you want it in crowds?")
     g.open("setup")
@@ -1552,6 +1564,74 @@ test("QT-12 a guided test that is refused prints no 'cannot run' line, and the w
     startSetup(g, 165)
     local f = guideFrame()
     return g.state().view == "stopped" and not outText():find("cannot run", 1, true) and hasText(f, "You are in combat."), outText()
+end)
+
+-- The guided test as a page of My settings (spec 2026-11-03-tests-and-results-in-my-settings-design.md M2)
+local function escapeListed()
+    for _, name in ipairs(UISpecialFrames) do if name == WINDOW then return true end end
+    return false
+end
+local function pageButton(w, key)
+    local found
+    local function walk(f)
+        if f.key == key and f.shown then found = f end
+        for _, c in ipairs(f.children) do if c.shown ~= false then walk(c) end end
+    end
+    walk(w)
+    return found
+end
+
+test("GP-1 the page is drawn from the flat widgets: no stock template, skin buttons for the targets, modes and actions, a skin tick box", function()
+    local e, g = newSetup()
+    g.open("setup")
+    local f = guideFrame()
+    local templated, plain = 0, 0
+    for _, c in ipairs(f.children) do
+        if c.template then templated = templated + 1 end
+        if c.kind == "Button" and c.shown and c.skinState == nil then plain = plain + 1 end
+    end
+    local box = boxOf(f)
+    return f ~= nil and f:IsShown() and hubFrame():IsShown() and templated == 0 and plain == 0 and box ~= nil and box.kind == "CheckButton"
+        and findButton(f, "165") ~= nil and findButton(f, "Start") ~= nil and findButton(f, "Start")._point[1] == "BOTTOMRIGHT",
+        templated .. " " .. plain
+end)
+
+test("GP-2 Cancel and Close bring back Find my settings' two test buttons, and the window stays open", function()
+    local e, g = newRun()
+    g.open("run")
+    local w = hubFrame()
+    findButton(guideFrame(), "Cancel"):Click()
+    local chooser = g.state() == nil and not guideFrame():IsShown() and pageButton(w, "run:setup") ~= nil and pageButton(w, "run:crowd") ~= nil
+        and w:IsShown()
+    pageButton(w, "run:setup"):Click()
+    local intro = g.state() ~= nil and g.state().view == "intro" and g.state().kind == "setup" and guideFrame():IsShown()
+    return chooser and intro, tostring(chooser) .. tostring(intro)
+end)
+
+test("GP-3 a real run locks the window to its page; Stop lifts the lock, and so does a run that ends elsewhere", function()
+    local e, g, b = newRun()
+    startVia(g, "run")
+    local w = hubFrame()
+    local locked = g.running() and not escapeListed() and pageButton(w, "page:home").enabled == false
+    w.close:Click()
+    local stays = w:IsShown()
+    g.click("stop")
+    e.pump(1, runCost)
+    local freed = g.state().view == "stopped" and escapeListed() and pageButton(w, "page:home").enabled == true
+    w.close:Click()
+    local closes = not w:IsShown()
+    -- a run started from chat (not this window): the page follows it, and its end frees the window
+    local e2, g2, b2 = newRun()
+    b2.run()
+    e2.pump(0.3, runCost)
+    e2.slash("bench")
+    local w2 = hubFrame()
+    local follows = g2.running() and not escapeListed()
+    e2.pump(60, runCost)
+    w2.scripts.OnUpdate(w2, 0.6)
+    local ended = not g2.running() and escapeListed() and pageButton(w2, "run:setup") ~= nil
+    return locked and stays and freed and closes and follows and ended,
+        tostring(locked) .. tostring(stays) .. tostring(freed) .. tostring(closes) .. tostring(follows) .. tostring(ended)
 end)
 
 return H.results()

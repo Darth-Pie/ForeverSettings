@@ -249,27 +249,14 @@ const MUTATIONS = {
   'menu-bypasses-guide': ['UI.lua', `            elseif ns.guide and (name == "run" or name == "check") then`, `            elseif false then`],
   // Guide (Task 6)
   'ui-start-enabled-unticked': ['Guide.lua', `            button:SetEnabled(spec.enabled)`, `            button:SetEnabled(true)`],
-  'ui-escape-while-running': ['Guide.lua', `    syncEscape(view.escapeCloses)`, `    syncEscape(true)`],
-  'ui-escape-duplicates': ['Guide.lua', `        if UISpecialFrames[i] == WINDOW_NAME then tremove(UISpecialFrames, i) end`, `        if false then tremove(UISpecialFrames, i) end`],
-  'ui-refresh-off': ['Guide.lua', `        if sinceRefresh < REFRESH then return end`, `        if sinceRefresh < REFRESH + 1e9 then return end`],
-  'ui-refresh-every-frame': ['Guide.lua', `        if sinceRefresh < REFRESH then return end`, `        if sinceRefresh < 0 then return end`],
-  'ui-no-fallback': ['Guide.lua', `    local ok, made = pcall(CreateFrame, kind, name, parent, template)`, `    local ok, made = true, CreateFrame(kind, name, parent, template)`],
   'ui-windows-constant': ['Guide.lua', `    return ns.bench.countWindows(resolved, currents)`, `    return 3`],
-  'ui-render-unguarded': ['Guide.lua', `    local ok, err = pcall(fn)`, `    local ok, err = true, fn()`],
-  'ui-foreign-running-stays': ['Guide.lua', `        if ns.bench and not ns.bench.active() then`, `        if false then`],
   'ui-button-key-fixed': ['Guide.lua', `            button.key = spec.key`, `            button.key = button.key or spec.key`],
-  'ui-box-click-ignored': ['Guide.lua', `        box:SetScript("OnClick", function(self) guide.setTicked(self:GetChecked() and true or false) end)`, `        box:SetScript("OnClick", function(self) end)`],
-  'ui-box-state-not-pushed': ['Guide.lua', `            box:SetChecked(view.checkbox.checked)`, `            local _ = view.checkbox.checked`],
-  'ui-hide-ignored': ['Guide.lua', `    if frame then frame:Hide() end`, `    local _ = frame`],
-  'ui-hide-while-running-allowed': ['Guide.lua', `        if state and state.view == "running" then self:Show() end`, `        local _ = self`],
-  'ui-hide-always-reshown': ['Guide.lua', `        if state and state.view == "running" then self:Show() end`, `        self:Show()`],
   // Found in the owner's first real run (Window 47 of 45; report and Finished windows overlapping)
   'rerun-total-not-extended': ['Bench.lua', `                                progressState.total = progressState.total + #tiers + 1`, `                                local _ = tiers`],
   'rerun-total-off-by-one': ['Bench.lua', `progressState.total = progressState.total + #tiers + 1`, `progressState.total = progressState.total + #tiers`],
   'report-auto-when-guided': ['UI.lua', `    if ns.guide and ns.guide.handlesReport and ns.guide.handlesReport() then return end`, `    local _ = ns.guide`],
   'guided-flag-any-running': ['Guide.lua', `    return state ~= nil and state.view == "running" and state.started == true
         and (state.kind == "run" or state.kind == "setup" or state.kind == "crowd")`, `    return state ~= nil and state.view == "running"`],
-  'report-click-keeps-window': ['Guide.lua', `        dismiss()   -- the report takes the stage; the two windows are the same size class and would overlap`, `        local _ = nil`],
   // Recommend (Task 1)
   'margin-ignored': ['Recommend.lua', `    result.budgetMs = 1000 / target * (1 - margin)`, `    result.budgetMs = 1000 / target`],
   'no-raise-ignored': ['Recommend.lua', `            if rule and rule.raise and not noRaise then chosen = top end`, `            if rule and not noRaise then chosen = top end`],
@@ -425,7 +412,6 @@ const MUTATIONS = {
   'setup-opens-report': ['Guide.lua', `        and (state.kind == "run" or state.kind == "setup" or state.kind == "crowd")`, `        and (state.kind == "run" or state.kind == "crowd")`],
   'handoff-off': ['Guide.lua', `if (kind == "setup" or kind == "crowd") and state.view == "done" and ns.results then`, `if false then`],
   'invalid-run-hands-off': ['Guide.lua', `if (kind == "setup" or kind == "crowd") and state.view == "done" and ns.results then`, `if (kind == "setup" or kind == "crowd") and ns.results then`],
-  'results-missing-errors': ['Guide.lua', `if (kind == "setup" or kind == "crowd") and state.view == "done" and ns.results then`, `if (kind == "setup" or kind == "crowd") and state.view == "done" then`],
   'target-buttons-always-shown': ['Guide.lua', `        for _, button in ipairs(p.targets) do button:Hide() end`, `        local _ = p.targets`],
   'estimate-uses-run-count': ['Guide.lua', `        ctx.windows = ctx.windowsByMode[state.mode == "thorough" and "thorough" or "quick"]`, `        ctx.windows = windowCount()`],
   'target-lost-on-again': ['Guide.lua', `if (kind == "setup" or kind == "crowd") and state.view == "intro" then
@@ -435,7 +421,6 @@ const MUTATIONS = {
   // Results, recommender Task 7
   'headline-ignores-fraction': ['Results.lua', `bar(p.texMain, color, CHART_X, left, entryRow.fraction * CHART_WIDTH, 14)`, `bar(p.texMain, color, CHART_X, left, CHART_WIDTH, 14)`],
   'target-line-at-now': ['Results.lua', `CHART_X + h.target.fraction * CHART_WIDTH, top, 2, left - top)`, `CHART_X + h.now.fraction * CHART_WIDTH, top, 2, left - top)`],
-  'apply-passes-all-values': ['Results.lua', `for _, change in ipairs(current.result.changes) do values[change.cvar] = change.to end`, `for _, s in ipairs(current.result.settings) do values[s.cvar] = s.chosen end`],
   'apply-skips-adopt': ['Results.lua', `local ok, info = ns.profiles.adopt(profile, values, true)`, `local ok, info = true, {}`],
   'replace-wording-always': ['Results.lua', `text = replace and ("Replace my " .. who .. " settings with these") or ("Save these as my " .. who .. " settings") }`, `text = "Replace my " .. who .. " settings with these" }`],
   'later-writes': ['Results.lua', `    if key == "later" then
@@ -443,18 +428,10 @@ const MUTATIONS = {
         ns.profiles.adopt("everyday", {})
         results.hide()`],
   'combat-not-disabled': ['Results.lua', `if p.apply then p.apply:SetEnabled(why == nil) end`, `if p.apply then p.apply:SetEnabled(true) end`],
-  'refresh-off': ['Results.lua', `        if sinceRefresh < REFRESH then return end`, `        if true then return end`],
   'apply-failure-closes': ['Results.lua', `        current.notice = REFUSED[info] or ("Could not save: " .. tostring(info))`, `        current.notice = REFUSED[info] or ("Could not save: " .. tostring(info))
         results.hide()`],
-  'draw-error-rethrown': ['Results.lua', `        frame:Show()
-    end)
-    if not ok then fail(err) end`, `        frame:Show()
-    end)
-    if not ok then error(err) end`],
   'fallback-silent': ['Results.lua', `    for _, line in ipairs(m.lines) do ns.say(line) end`, `    local _ = m`],
   'error-said-every-time': ['Results.lua', `    if err ~= lastError then`, `    if true then`],
-  'escape-not-listed': ['Results.lua', `    if not listedForEscape then tinsert(UISpecialFrames, FRAME_NAME) end`, `    if false then tinsert(UISpecialFrames, FRAME_NAME) end`],
-  'hide-keeps-offer': ['Results.lua', `    f:SetScript("OnHide", function() current = nil end)`, `    f:SetScript("OnHide", function() end)`],
   'notmeasured-text-changed': ['Results.lua', `chosen.name .. ": not measured (" .. tostring(chosen.reason) .. ")"`, `chosen.name .. ": missing (" .. tostring(chosen.reason) .. ")"`],
   // Routes and menu, recommender Task 8
   'slash-setup-wrong-kind': ['ForeverSettings.lua', `            ns.guide.open("setup")`, `            ns.guide.open("run")`],
@@ -495,7 +472,6 @@ end
   'settle-steady-always': ['Bench.lua', `    return math.abs(a - b) <= K.SETTLE_STEADY * math.min(a, b)`, `    return true`],
   'settle-judges-first-slice': ['Bench.lua', `    local a, b = slices[n - 1], slices[n]`, `    local a, b = slices[1], slices[n]`],
   'flag-noeffect-raw': ['Guide.lua', `        return "Some settings made no measurable difference in this spot; the report lists them."`, `        return flag`],
-  'ui-fallback-box-stuck': ['Guide.lua', `        box:SetScript("OnClick", function() guide.setTicked(not (state and state.ticked)) end)`, `        box:SetScript("OnClick", function() guide.setTicked(false) end)`],
   'ui-tick-static': ['UI.lua', `                local element = parent:CreateCheckbox(item.text, item.isChecked or function() return item.checked end, item.run)`, `                local element = parent:CreateCheckbox(item.text, function() return item.checked end, item.run)`],
   'busy-ignores-suspended': ['Profiles.lua', `    return (ns.suspended or (ns.bench and ns.bench.active and ns.bench.active())) and true or false`, `    return (ns.bench and ns.bench.active and ns.bench.active()) and true or false`],
   'check-control-evidence-off': ['Bench.lua', `        ns.say(windowLine("control window", controlResult))`, `        local _ = controlResult`],
@@ -695,7 +671,6 @@ end
         local replace =`],
   'crowd-saved-line-everyday': ['Results.lua', `        local line = profile == "crowded" and SAVED_CROWD or SAVED`, `        local line = SAVED`],
   'check-lines-never': ['Results.lua', `    if #m.checkLines > 0 then paragraph(table.concat(m.checkLines, "\\n")) end`, `    if false then paragraph(table.concat(m.checkLines, "\\n")) end`],
-  'after-bar-ignores-measured': ['Results.lua', `    local model = ns.recommend.chartModel(result, verify)`, `    local model = ns.recommend.chartModel(result)`],
   'hint-not-drawn': ['Results.lua', `    paragraph(m.hint)`, `    local _ = m.hint`],
   'title-fixed': ['Results.lua', `    p.title:SetText(m.title or "Your best settings")`, `    p.title:SetText("Your best settings")`],
   'crowd-unreachable-offers-apply': ['Results.lua', `    if m.saveKind and not current.saved then`, `    if (m.saveKind or current.result.kind == "crowd") and not current.saved then`],
@@ -727,9 +702,6 @@ end
   'crowd-nodata-quiet-text': ['Recommend.lua', `        result.summary = crowd and NODATA_CROWD or NODATA`, `        result.summary = NODATA`],
   'crowd-nodata-text-changed': ['Recommend.lua', `steady reading in this crowd,`, `steady reading here,`],
   'prepare-failure-ignored': ['Guide.lua', `            if not prepared then`, `            if false then`],
-  'prepare-failure-not-shown': ['Guide.lua', `                ns.say("the results could not be prepared: " .. tostring(shown))
-                present()`, `                ns.say("the results could not be prepared: " .. tostring(shown))
-                local _ = nil`],
 
   // The plain words (words and menu, Task 1)
   'names-row-missing': ['Names.lua', `    { "giQuality", "Light bounce", LIGHT },`, ``],
@@ -827,7 +799,6 @@ end
   'chart-name-ignores-cvar': ['Recommend.lua', `cvar = s.cvar, name = nameOf(s.cvar, s.setting), changed = changing`, `cvar = s.cvar, name = s.setting, changed = changing`],
   'chart-names-required': ['Recommend.lua', `    if ns.names then return ns.names.label(cvar, fallback) end
     return fallback`, `    return ns.names.label(cvar, fallback)`],
-  'results-text-raw': ['Results.lua', `        row.label:SetText(item.name)`, `        row.label:SetText(item.cvar)`],
   'results-level-raw': ['Graph.lua', `                    say(p.text, item.x - 20, plot.y + plot.height + 6, 40)`, `                    say(p.value, item.x - 20, plot.y + plot.height + 6, 40)`],
   'results-notmeasured-raw': ['Results.lua', `put(p.fsPanel, chosen.name .. ": not measured (" ..`, `put(p.fsPanel, chosen.cvar .. ": not measured (" ..`],
   'results-measured-missing': ['Results.lua', `    paragraph(current.extras and current.extras.measuredLine)`, `    local _ = current.extras`],
@@ -836,7 +807,6 @@ end
   'results-again-wrong-kind': ['Results.lua', `ns.guide.open(kind)`, `ns.guide.open("setup")`],
   'results-again-keeps-window': ['Results.lua', `        local kind = current.extras and current.extras.again
         results.hide()`, `        local kind = current.extras and current.extras.again`],
-  'results-third-button-missing': ['Results.lua', `    p.buttons = { makeButton(f), makeButton(f), makeButton(f) }`, `    p.buttons = { makeButton(f), makeButton(f) }`],
 
   // The plain menu and the saved results behind its green checks (words and menu, Task 7)
   'menu-order-wrong': ['UI.lua', `    add(profileItem("everyday"))
@@ -1050,30 +1020,19 @@ end
   'graph-draw-nil-axis-draws': ['Graph.lua', `        if entry and axis then`, `        if entry then`],
 
   // The rebuilt results window (results window, Task 4)
-  'results-w2-size-old': ['Results.lua', `local WIDTH, HEIGHT = 760, 540`, `local WIDTH, HEIGHT = 680, 480`],
-  'results-w2-scroll-back': ['Results.lua', `    p.panel = CreateFrame("Frame", nil, f)`, `    p.panel = CreateFrame("ScrollFrame", nil, f)`],
   'results-w2-verdict-missing': ['Results.lua', `    if m.verdict and m.verdict ~= "" then`, `    if false then`],
   'results-w2-changes-unlimited': ['Results.lua', `        if i > MAX_CHANGE_LINES then break end`, `        if false then break end`],
-  'results-w2-list-reversed': ['Results.lua', `        list[#list + 1] = { cvar = g.cvar, name = g.name, changed = g.changed, graph = g }`, `        table.insert(list, 1, { cvar = g.cvar, name = g.name, changed = g.changed, graph = g })`],
   'results-w2-list-unmeasured-first': ['Results.lua', `        list[#list + 1] = { cvar = n.cvar or n.setting, name = n.name or n.setting, reason = n.plain or n.reason }`, `        table.insert(list, 1, { cvar = n.cvar or n.setting, name = n.name or n.setting, reason = n.plain or n.reason })`],
   'results-w2-list-dot-always': ['Results.lua', `        if item.changed then row.dot:Show() else row.dot:Hide() end`, `        row.dot:Show()`],
-  'results-w2-list-unmeasured-white': ['Results.lua', `        local color = item.graph and { 1, 1, 1, 1 } or GREY`, `        local color = { 1, 1, 1, 1 }`],
-  'results-w2-list-name-from-label': ['Results.lua', `        list[#list + 1] = { cvar = g.cvar, name = g.name, changed = g.changed, graph = g }`, `        list[#list + 1] = { cvar = g.cvar, name = g.cvar, changed = g.changed, graph = g }`],
   'results-w2-list-uncapped': ['Results.lua', `    local rowsShown = math.min(#list, MAX_ROWS)`, `    local rowsShown = #list`],
-  'results-w2-select-default-missing': ['Results.lua', `        selected = model.selected or (first and (first.cvar or first.setting)) or nil }`, `        selected = (first and (first.cvar or first.setting)) or nil }`],
-  'results-w2-select-nodata-default-missing': ['Results.lua', `        selected = model.selected or (first and (first.cvar or first.setting)) or nil }`, `        selected = model.selected }`],
-  'results-w2-select-kept-across-show': ['Results.lua', `        selected = model.selected or (first and (first.cvar or first.setting)) or nil }`, `        selected = (current and current.selected) or model.selected or (first and (first.cvar or first.setting)) or nil }`],
   'results-w2-select-click-ignored': ['Results.lua', `    row:SetScript("OnClick", function(self) results.select(self.cvar) end)`, `    row:SetScript("OnClick", function() end)`],
   'results-w2-select-unknown-accepted': ['Results.lua', `    if not current or not entryFor(listOf(current.model), cvar) then return end`, `    if not current then return end`],
-  'results-w2-select-highlight-missing': ['Results.lua', `        if item.cvar == open then row:LockHighlight() else row:UnlockHighlight() end`, `        row:UnlockHighlight()`],
   'results-w2-unmeasured-shows-graph': ['Results.lua', `    if chosen and chosen.graph and p.graph then`, `    if chosen and p.graph then`],
   'results-w2-panel-title-raw': ['Results.lua', `        put(p.fsPanel, chosen.name .. ": fps if only this setting changes", 0, 0, PANEL_WIDTH)`, `        put(p.fsPanel, chosen.cvar .. ": fps if only this setting changes", 0, 0, PANEL_WIDTH)`],
-  'results-w2-graph-not-drawn': ['Results.lua', `        p.graph:draw(GRAPH_RECT, chosen.graph, m.axis)`, `        local _ = m.axis`],
   'results-w2-panel-sentences-missing': ['Results.lua', `        for _, line in ipairs(chosen.graph.lines) do`, `        for _, line in ipairs({}) do`],
   'results-w2-leftover-rows': ['Results.lua', `    release(p.rows)`, `    local _ = p.rows`],
   'results-w2-leftover-header': ['Results.lua', `    release(p.fsMain, true)`, `    local _ = p.fsMain`],
   'results-w2-leftover-panel': ['Results.lua', `    release(p.fsPanel, true)`, `    local _ = p.fsPanel`],
-  'results-w2-paragraph-overflow-kept': ['Results.lua', `        if y + h > PANEL_Y - 4 then`, `        if false then`],
 
   // The Save button and a silent switch and adopt (results window, Task 5)
   'save-silent-switch-prints': ['Profiles.lua', `    speak(silent, "Profile: " .. label .. " (" .. summary .. ")")`, `    ns.say("Profile: " .. label .. " (" .. summary .. ")")`],
@@ -1144,9 +1103,6 @@ end
   'save-visible-for-unreachable': ['Results.lua', `    if m.saveKind and not current.saved then`, `    if not current.saved then`],
   'save-hidden-for-nochange': ['Results.lua', `    if m.saveKind and not current.saved then`, `    if m.saveKind == "changes" and not current.saved then`],
   'save-stays-after-saving': ['Results.lua', `    if m.saveKind and not current.saved then`, `    if m.saveKind then`],
-  'save-changes-not-handed-over': ['Results.lua', `    if current.model.saveKind == "changes" then
-        for _, change in ipairs(current.result.changes) do values[change.cvar] = change.to end`, `    if false then
-        for _, change in ipairs(current.result.changes) do values[change.cvar] = change.to end`],
   'save-not-silent': ['Results.lua', `ns.profiles.adopt(profile, values, true)`, `ns.profiles.adopt(profile, values)`],
   'save-prints-to-chat': ['Results.lua', `        current.saved, current.notice = line, nil`, `        current.saved, current.notice = line, nil
         ns.say(line)`],
@@ -1159,19 +1115,9 @@ end
   'save-close-text-old': ['Results.lua', `    specs[#specs + 1] = { key = "later", text = "Close" }`, `    specs[#specs + 1] = { key = "later", text = m.canApply and "Not now" or "Close" }`],
 
   // The fix pass after the fresh review of the whole build (results window, Task 6)
-  'fix-change-lines-no-fit-rule': ['Results.lua', `        if right + h > PANEL_Y - 4 then
-            fs:SetText("")
-            fs:Hide()
-            break`, `        if false then
-            fs:SetText("")
-            fs:Hide()
-            break`],
   'fix-change-pointer-count-wrong': ['Results.lua', `(#m.lines - (#placed - 1))`, `(#m.lines - #placed)`],
   'fix-change-pointer-missing': ['Results.lua', `        last.fs:SetText(pointer)`, `        local _ = pointer`],
   'fix-footer-not-above-notice': ['Results.lua', `    p.footer:SetPoint("BOTTOMLEFT", p.notice, "TOPLEFT", 0, 4)`, `    p.footer:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", CHART_X, 62)`],
-  'fix-notice-over-buttons': ['Results.lua', `    p.notice:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", CHART_X, 40)`, `    p.notice:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", CHART_X, 30)`],
-  'fix-button-widths-old': ['Results.lua', `local BUTTON_WIDTHS = { apply = 250, again = 150, later = 150 }`, `local BUTTON_WIDTHS = { apply = 210, again = 210, later = 210 }`],
-  'fix-button-gap-wrong': ['Results.lua', `local BUTTON_GAP = 12`, `local BUTTON_GAP = 0`],
   'fix-buttons-not-centred': ['Results.lua', `    local edge = -total / 2`, `    local edge = 0`],
   'fix-reason-raw': ['Results.lua', `name = n.name or n.setting, reason = n.plain or n.reason }`, `name = n.name or n.setting, reason = n.reason }`],
   'fix-plain-reason-not-added': ['Recommend.lua', `            plain = recommend.plainReason(n.reason) }`, `            plain = n.reason }`],
@@ -2066,6 +2012,97 @@ end
   'pg-test-hides-window': ['Settings.lua', `ns.ui.openSaved then ns.ui.openSaved(testKey) end`, `ns.ui.openSaved then ns.ui.openSaved(testKey) settings.hide() end`],
   'pg-show-hides-window': ['Settings.lua', `if info.results[showKey] and ns.ui and ns.ui.openSaved then ns.ui.openSaved(showKey) end`, `if info.results[showKey] and ns.ui and ns.ui.openSaved then ns.ui.openSaved(showKey) settings.hide() end`],
   'pg-host-width': ['Settings.lua', `        host:SetSize(AREA_W, PAGE_H - TOP - SUMMARY_BOTTOM)`, `        host:SetSize(AREA_W + 3, PAGE_H - TOP - SUMMARY_BOTTOM)`],
+  // The guided test as a page of My settings (spec 2026-11-03-tests-and-results-in-my-settings-design.md M2); the first five
+  // re-anchor older rows on the page code
+  'ui-refresh-off': ['Settings.lua', `        if ns.guide and ns.guide.refresh then guarded(ns.guide.refresh) end`, `        local _ = ns.guide`],
+  'ui-refresh-every-frame': ['Settings.lua', `        if sinceRefresh < REFRESH then return end
+        sinceRefresh = 0
+        -- A running test`, `        sinceRefresh = 0
+        -- A running test`],
+  'ui-foreign-running-stays': ['Guide.lua', `    if ns.bench and not ns.bench.active() then
+        state = nil
+    end`, `    local _ = ns.bench`],
+  'ui-box-click-ignored': ['Guide.lua', `p.box:SetScript("OnClick", function(self) guide.setTicked(self:GetChecked() and true or false) end)`, `p.box:SetScript("OnClick", function() end)`],
+  'ui-box-state-not-pushed': ['Guide.lua', `        p.box:SetChecked(view.checkbox.checked)`, `        local _ = view.checkbox.checked`],
+  'ui-hide-ignored': ['Guide.lua', `local function dismiss()
+    state = nil`, `local function dismiss()
+    local _ = state`],
+  'report-click-keeps-window': ['Guide.lua', `        ns.ui.showReport(state.entry)    -- the report window`, `        local entry = state.entry dismiss() ns.ui.showReport(entry)    -- the report window`],
+  'gp-onhide-closes': ['Settings.lua', `        if ns.guide and ns.guide.running and ns.guide.running() then
+            self:Show()`, `        if false then
+            self:Show()`],
+  'gp-show-not-opening': ['Guide.lua', `    if ns.settings and ns.settings.open then ns.settings.open("test") end`, `    local _ = ns.settings`],
+  'gp-render-not-redrawing': ['Guide.lua', `    if ns.settings and ns.settings.redraw then ns.settings.redraw() end`, `    local _ = ns.settings`],
+  'gp-has-view-always': ['Guide.lua', `function guide.hasView()
+    return state ~= nil`, `function guide.hasView()
+    return true`],
+  'gp-target-not-selected': ['Guide.lua', `            button:SetSelected(view.targets.selected == view.targets.list[i])`, `            button:SetSelected(false)`],
+  'gp-mode-not-selected': ['Guide.lua', `            button:SetSelected(view.modes.selected == spec.key)`, `            button:SetSelected(false)`],
+  'gp-buttons-left': ['Guide.lua', `button:SetPoint("BOTTOMRIGHT", into, "BOTTOMRIGHT", -(count - i) * (BUTTON_W + BUTTON_GAP), 0)`, `button:SetPoint("BOTTOMLEFT", into, "BOTTOMLEFT", 0, 0)`],
+  'gp-stock-target': ['Guide.lua', `        local button = skin.button(into, tostring(n), TARGET_W, ROW_H)`, `        local button = CreateFrame("Button", nil, into, "UIPanelButtonTemplate")
+        button:SetText(tostring(n))
+        button.SetSelected, button.SetLabel = function() end, function(self, t) self:SetText(t) end`],
+  'gp-refresh-not-redrawing': ['Guide.lua', `        state = nil
+    end
+    draw()`, `        state = nil
+    end`],
+  'gp-running-any-view': ['Guide.lua', `function guide.running()
+    return state ~= nil and state.view == "running"`, `function guide.running()
+    return state ~= nil`],
+  // The results as a page of My settings, with picks (spec 2026-11-03-tests-and-results-in-my-settings-design.md M3, M5); the
+  // first nineteen re-anchor older rows on the page code
+  'apply-passes-all-values': ['Results.lua', `for _, change in ipairs(current.view.changes) do values[change.cvar] = change.to end`, `for _, s in ipairs(current.view.settings) do values[s.cvar] = s.chosen end`],
+  'draw-error-rethrown': ['Results.lua', `    local ok, err = pcall(draw)
+    if not ok then fail(err) end`, `    local ok, err = pcall(draw)
+    if not ok then error(err) end`],
+  'hide-keeps-offer': ['Results.lua', `function results.endOffer()
+    current = nil`, `function results.endOffer()
+    local _ = current`],
+  'after-bar-ignores-measured': ['Results.lua', `    current.model = ns.recommend.chartModel(current.view, current.verify)`, `    current.model = ns.recommend.chartModel(current.view)`],
+  'results-text-raw': ['Results.lua', `row.label:SetText(item.name .. (item.picked and " (your pick)" or ""))`, `row.label:SetText(item.cvar)`],
+  'results-third-button-missing': ['Results.lua', `    for i = 1, 4 do
+        local button = skin.button(into, "", 120, 26)`, `    for i = 1, 2 do
+        local button = skin.button(into, "", 120, 26)`],
+  'results-w2-scroll-back': ['Results.lua', `    p.panel = CreateFrame("Frame", nil, into)`, `    p.panel = CreateFrame("ScrollFrame", nil, into)`],
+  'results-w2-list-reversed': ['Results.lua', `        list[#list + 1] = { cvar = g.cvar, name = g.name, changed = g.changed, graph = g, picked = picked }`, `        table.insert(list, 1, { cvar = g.cvar, name = g.name, changed = g.changed, graph = g, picked = picked })`],
+  'results-w2-list-unmeasured-white': ['Results.lua', `row.label:SetTextColor(skin.color(item.graph and "bright" or "dim"))`, `row.label:SetTextColor(skin.color("bright"))`],
+  'results-w2-list-name-from-label': ['Results.lua', `        list[#list + 1] = { cvar = g.cvar, name = g.name, changed = g.changed, graph = g, picked = picked }`, `        list[#list + 1] = { cvar = g.cvar, name = g.cvar, changed = g.changed, graph = g, picked = picked }`],
+  'results-w2-select-default-missing': ['Results.lua', `    current.selected = current.model.selected or (first and (first.cvar or first.setting)) or nil`, `    current.selected = (first and (first.cvar or first.setting)) or nil`],
+  'results-w2-select-nodata-default-missing': ['Results.lua', `    current.selected = current.model.selected or (first and (first.cvar or first.setting)) or nil`, `    current.selected = current.model.selected`],
+  'results-w2-select-highlight-missing': ['Results.lua', `        row:SetSelected(item.cvar == open)`, `        row:SetSelected(false)`],
+  'results-w2-graph-not-drawn': ['Results.lua', `        p.graph:draw(GRAPH_RECT, chosen.graph, m.axis,
+            { onPick = onPick, pickColor = profileOf(current.result) == "crowded" and "crowded" or "everyday" })`, `        local _ = m.axis`],
+  'results-w2-paragraph-overflow-kept': ['Results.lua', `        if y + h > panelY - 4 then`, `        if false then`],
+  'save-changes-not-handed-over': ['Results.lua', `    if current.model.saveKind == "changes" then
+        for _, change in ipairs(current.view.changes)`, `    if false then
+        for _, change in ipairs(current.view.changes)`],
+  'fix-change-lines-no-fit-rule': ['Results.lua', `        if right + h > panelY - 4 then`, `        if false then`],
+  'fix-notice-over-buttons': ['Results.lua', `p.notice:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", CHART_X, 34)`, `p.notice:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", CHART_X, 26)`],
+  'fix-button-widths-old': ['Results.lua', `local BUTTON_WIDTHS = { apply = 250, reset = 190, again = 120, later = 90 }`, `local BUTTON_WIDTHS = { apply = 210, reset = 190, again = 210, later = 210 }`],
+  'fix-button-gap-wrong': ['Results.lua', `local BUTTON_GAP = 8`, `local BUTTON_GAP = 0`],
+  'rp-pick-in-combat': ['Results.lua', `    if not current or refusal() then return end
+    current.picks[cvar] = value`, `    if not current then return end
+    current.picks[cvar] = value`],
+  'rp-pick-keeps-saved': ['Results.lua', `    current.picks[cvar] = value
+    current.saved, current.notice = nil, nil`, `    current.picks[cvar] = value`],
+  'rp-reset-missing': ['Results.lua', `    if key == "reset" then
+        current.picks = {}`, `    if key == "reset" then
+        local _ = current.picks`],
+  'rp-reset-shown-always': ['Results.lua', `if (m.picked or 0) > 0 then specs[#specs + 1] = { key = "reset"`, `if true then specs[#specs + 1] = { key = "reset"`],
+  'rp-onpick-in-combat': ['Results.lua', `local onPick = refusal() == nil and function(value) results.pick(cvar, value) end or nil`, `local onPick = function(value) results.pick(cvar, value) end`],
+  'rp-pick-colour-ignored': ['Results.lua', `pickColor = profileOf(current.result) == "crowded" and "crowded" or "everyday" })`, `pickColor = "everyday" })`],
+  'rp-your-pick-missing': ['Results.lua', `(item.picked and " (your pick)" or "")`, `""`],
+  'rp-save-ignores-picks': ['Results.lua', `for _, change in ipairs(current.view.changes) do values[change.cvar] = change.to end`, `for _, change in ipairs(current.result.changes) do values[change.cvar] = change.to end`],
+  'rp-show-not-opening': ['Results.lua', `        if ns.settings and ns.settings.open then ns.settings.open("results") end`, `        local _ = ns.settings`],
+  'rp-close-keeps-offer': ['Results.lua', `function results.hide()
+    current = nil`, `function results.hide()
+    local _ = current`],
+  'rp-again-keeps-offer': ['Results.lua', `        local kind = current.extras and current.extras.again
+        results.hide()`, `        local kind = current.extras and current.extras.again`],
+  'rp-has-offer-always': ['Results.lua', `function results.hasOffer()
+    return current ~= nil`, `function results.hasOffer()
+    return true`],
+  'rp-picks-not-applied': ['Results.lua', `    current.view = ns.recommend.withPicks(current.result, current.picks)`, `    current.view = ns.recommend.withPicks(current.result, {})`],
 };
 
 function main() {

@@ -41,16 +41,25 @@ local function T1()
         rows("graphicsSSAO", 4.0, { { "0", -0.6 }, { "1", -0.3 }, { "2", 0, current = true } }))
 end
 
--- Finding things on the window
+-- Finding things on the page: the results are a page of My settings (spec 2026-11-03-tests-and-results-in-my-settings-design.md
+-- M3), drawn into the host frame of My results; Escape belongs to the window.
 local function window()
     for _, f in ipairs(H.frames()) do
-        if f.name == "ForeverSettingsResults" then return f end
+        if f.name == "ForeverSettingsResultsPage" then return f end
+    end
+end
+local function hubFrame()
+    for _, f in ipairs(H.frames()) do
+        if f.name == "ForeverSettingsSettings" then return f end
     end
 end
 local function walk(f, fn)
     fn(f)
-    for _, c in ipairs(f.children) do walk(c, fn) end
+    for _, c in ipairs(f.children) do
+        if c.shown ~= false then walk(c, fn) end
+    end
 end
+local function isSelected(row) return row ~= nil and row.skinState ~= nil and row.skinState.selected == true end
 local function texts(f)
     local list = {}
     walk(f, function(frame)
@@ -92,6 +101,14 @@ local function texturesOf(f, color)
     end)
     return list
 end
+-- The bars are the page's own textures (the graph's round points, in its panel, share the after bar's accent on purpose).
+local function barsOf(f, color)
+    local list = {}
+    for _, tex in ipairs(f.textures) do
+        if tex.shown and sameColor(tex._color, color) then list[#list + 1] = tex end
+    end
+    return list
+end
 local function findButton(f, label)
     local found
     walk(f, function(frame)
@@ -102,7 +119,7 @@ end
 local function listed()
     local n = 0
     for _, name in ipairs(UISpecialFrames) do
-        if name == "ForeverSettingsResults" then n = n + 1 end
+        if name == "ForeverSettingsSettings" then n = n + 1 end
     end
     return n
 end
@@ -113,8 +130,8 @@ local APPLIED = "Saved as your Everyday settings and switched on. Your original 
 local SAVE_E, SAVE_C = "Save these as my Everyday settings", "Save these as my Crowded settings"
 local REPL_E, REPL_C = "Replace my Everyday settings with these", "Replace my Crowded settings with these"
 
--- The setting list and the graph, as the window draws them
-local GOLD = { 1.00, 0.82, 0.00, 1 }
+-- The setting list and the graph, as the page draws them; the mark beside a setting the test changes is in the target's colour.
+local GOLD = { 0xff / 255, 0x99 / 255, 0x33 / 255, 1 }
 local function rowsOf(f)       -- the setting list: one button per setting, key "setting:<cvar>", in the order drawn
     local list = {}
     walk(f, function(frame)
@@ -228,7 +245,7 @@ test("RW-7 in combat the apply button is greyed with the reason and comes back w
     local button = findButton(f, SAVE_E)
     local greyed = button ~= nil and button:IsEnabled() == false and hasText(f, "You are in combat; try again afterwards.")
     COMBAT = false
-    f.scripts.OnUpdate(f, 0.6)
+    hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
     return greyed and button:IsEnabled() == true and not hasText(f, "You are in combat"), allText(f)
 end)
 
@@ -253,9 +270,9 @@ test("RW-11 once the window has been closed by its title bar nothing can be appl
     e.ns.profiles.adopt = function() calls = calls + 1 return true, {} end
     r.show(T1(), 250)
     local f = window()
-    f:Hide()
+    hubFrame().close:Click()
     r.click("apply")
-    return calls == 0 and not f:IsShown(), tostring(calls)
+    return calls == 0 and not hubFrame():IsShown() and r.hasOffer() == false, tostring(calls)
 end)
 
 test("RW-12 a redraw that needs fewer bars than the one before leaves nothing of it behind and raises nothing", function()
@@ -427,6 +444,21 @@ test("RW-20 a crowd where nothing saves much is shown with its sentence and only
         and findButton(f, REPL_C) == nil, allText(f)
 end)
 
+test("RW-9b a page whose drawing fails inside My settings prints the changes and says so once, as the results", function()
+    local e, r = boot()
+    STRINGHEIGHT = function() error("no heights today") end
+    local ok1 = pcall(r.show, T1(), 250)
+    local ok2 = pcall(r.show, T1(), 250)
+    STRINGHEIGHT = nil
+    local said, page = 0, 0
+    for _, line in ipairs(OUT) do
+        if line:find("the results window could not be drawn", 1, true) then said = said + 1 end
+        if line:find("page could not be drawn", 1, true) then page = page + 1 end
+    end
+    return ok1 and ok2 and said == 1 and page == 0 and outText():find("no heights today", 1, true) ~= nil
+        and outText():find("Shadow detail: 2 to 1, saves about 28 fps.", 1, true) ~= nil, tostring(said) .. " " .. page .. " " .. outText()
+end)
+
 test("RW-9 a window that cannot be drawn prints the changes and says so once", function()
     local e, r = boot()
     local real = _G.CreateFrame
@@ -511,7 +543,7 @@ local function sevenChanges()
     return entry(4.0, table.unpack(groups))
 end
 
-test("RW-30 the window is 760 by 540, has no scroll box, and opens at the top with nothing printed to chat", function()
+test("RW-30 the page is the page area of My settings (675 by 502), has no scroll box, and opens with nothing printed to chat", function()
     local e, r = boot()
     r.show(T1(), 250)
     local f = window()
@@ -519,7 +551,7 @@ test("RW-30 the window is 760 by 540, has no scroll box, and opens at the top wi
     for _, fr in ipairs(H.frames()) do
         if fr.kind == "ScrollFrame" then scrolls = scrolls + 1 end
     end
-    return f ~= nil and f._width == 760 and f._height == 540 and scrolls == 0 and f:IsShown() and outText() == "",
+    return f ~= nil and f._width == 675 and f._height == 502 and scrolls == 0 and f:IsShown() and hubFrame():IsShown() and outText() == "",
         tostring(f and f._width) .. "x" .. tostring(f and f._height) .. " scroll boxes " .. scrolls
 end)
 
@@ -530,7 +562,7 @@ test("RW-31 the verdict, the bars and the changes in fps are drawn, each once", 
     local verdict = "These 2 changes should take you from about 250 fps to about 333 fps."
     return countExact(f, verdict) == 1 and hasText(f, "Now: about 250 fps") and hasText(f, "With these changes: about 333 fps")
         and countExact(f, "Shadow detail: 2 to 1, saves about 28 fps.") == 1 and countExact(f, "Soft corner shadows: 2 to 0, saves about 44 fps.") == 1
-        and #texturesOf(f, r.COLORS.now) == 1 and #texturesOf(f, r.COLORS.after) == 1, allText(f)
+        and #barsOf(f, r.COLORS.now) == 1 and #barsOf(f, r.COLORS.after) == 1, allText(f)
 end)
 
 test("RW-32 more than six changes: five lines and a pointer to the list for the rest", function()
@@ -554,7 +586,7 @@ test("RW-33 the list has a row per setting in order of swing, a dot on the ones 
         rows("graphicsSSAO", 4.0, { { "2", 0, current = true } })), 250)
     local rows3 = rowsOf(f)
     local greyed = rowNames(f) == "Shadow detail|Soft corner shadows" and rows3[2].label._textColor[1] < 0.7
-        and rows3[1].label._textColor[1] == 1 and dotsIn(f) == 1
+        and near(rows3[1].label._textColor[1], 0xee / 255) and dotsIn(f) == 1
     return changed and nochange and greyed, rowNames(f)
 end)
 
@@ -563,19 +595,19 @@ test("RW-34 the first changed setting is open; a click or select shows another, 
     r.show(T1(), 250)
     local f = window()
     local rows1 = rowsOf(f)
-    local first = r.selected() == "graphicsShadowQuality" and rows1[1].locked == true and rows1[2].locked == false
+    local first = r.selected() == "graphicsShadowQuality" and isSelected(rows1[1]) and not isSelected(rows1[2])
         and countExact(f, "Shadow detail: fps if only this setting changes") == 1 and #pointButtons(f) == 3
         and countExact(f, "0 to 1 costs about 56 fps.") == 1 and countExact(f, "now") == 1 and countExact(f, "recommended") == 1
     rows1[2]:Click()
-    local second = r.selected() == "graphicsSSAO" and rowsOf(f)[2].locked == true and rowsOf(f)[1].locked == false
+    local second = r.selected() == "graphicsSSAO" and isSelected(rowsOf(f)[2]) and not isSelected(rowsOf(f)[1])
         and countExact(f, "Soft corner shadows: fps if only this setting changes") == 1 and countExact(f, "Shadow detail: fps if only this setting changes") == 0
         and countExact(f, "0 to 1 costs about 24 fps.") == 1 and countExact(f, "0 to 1 costs about 56 fps.") == 0 and #pointButtons(f) == 3
     r.select("nonsense")
     local keeps = r.selected() == "graphicsSSAO"
-    f.scripts.OnUpdate(f, 0.6)
+    hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
     local kept = r.selected() == "graphicsSSAO"
     r.select("graphicsShadowQuality")
-    local selectCall = r.selected() == "graphicsShadowQuality" and rowsOf(f)[1].locked == true
+    local selectCall = r.selected() == "graphicsShadowQuality" and isSelected(rowsOf(f)[1])
     r.select("graphicsSSAO")
     r.show(T1(), 250)
     return first and second and keeps and kept and selectCall and r.selected() == "graphicsShadowQuality", tostring(r.selected())
@@ -589,7 +621,7 @@ test("RW-35 an unmeasured setting that is opened shows its reason and no graph",
     local f = window()
     rowsOf(f)[2]:Click()
     return r.selected() == "graphicsSSAO" and countExact(f, "Soft corner shadows: not measured (the test couldn't measure it)") == 1
-        and #pointButtons(f) == 0 and countExact(f, "now") == 0 and rowsOf(f)[2].locked == true
+        and #pointButtons(f) == 0 and countExact(f, "now") == 0 and isSelected(rowsOf(f)[2])
         and countContaining(f, " costs about ") == 0, allText(f)
 end)
 
@@ -647,10 +679,10 @@ test("SV-1 the buttons are Save, Run it again and Close in that order, with the 
     local f = window()
     local save, again, close = findButton(f, SAVE_E), findButton(f, "Run it again"), findButton(f, "Close")
     local ordered = save and again and close and save._point[4] < again._point[4] and again._point[4] < close._point[4]
-    -- spec 3.3: widths 250, 150 and 150 with 12 pixels between, centred, so the longest label fits its button
+    -- widths 250, 120 and 90 with 8 pixels between, centred, so the longest label fits its button and four fit the page
     local function gap(a, b) return (b._point[4] - b._width / 2) - (a._point[4] + a._width / 2) end
-    local sized = save._width == 250 and again._width == 150 and close._width == 150 and near(gap(save, again), 12)
-        and near(gap(again, close), 12) and near((save._point[4] - save._width / 2) + (close._point[4] + close._width / 2), 0)
+    local sized = save._width == 250 and again._width == 120 and close._width == 90 and near(gap(save, again), 8)
+        and near(gap(again, close), 8) and near((save._point[4] - save._width / 2) + (close._point[4] + close._width / 2), 0)
     r.show(crowdFor(e), 100, nil, { again = "crowd" })
     local crowd = findButton(f, SAVE_C) ~= nil and findButton(f, SAVE_E) == nil and findButton(f, "Run it again") ~= nil
     e.ns.db().profiles.crowded.values = { graphicsShadowQuality = "3" }
@@ -780,7 +812,7 @@ test("RW-41 change lines that wrap in the client are cut to what fits above the 
     local bottoms = {}
     walk(f, function(frame)
         for _, fs in ipairs(frame.fontStrings) do
-            if fs.shown and fs._text and fs._text ~= "" and fs._point and fs._point[4] == 420 then
+            if fs.shown and fs._text and fs._text ~= "" and fs._point and fs._point[4] == 330 then
                 bottoms[#bottoms + 1] = -fs._point[5] + STRINGHEIGHT(fs)
             end
         end
@@ -788,7 +820,7 @@ test("RW-41 change lines that wrap in the client are cut to what fits above the 
     STRINGHEIGHT = nil
     local worst = 0
     for _, b in ipairs(bottoms) do worst = math.max(worst, b) end
-    return #bottoms >= 2 and worst <= 246 and countExact(f, "and 3 more changes: pick them in the list below.") == 1
+    return #bottoms >= 2 and worst <= 208 and countExact(f, "and 3 more changes: pick them in the list below.") == 1
         and countContaining(f, ", costs ") == 4, tostring(worst) .. " [" .. table.concat(bottoms, ",") .. "] " .. allText(f):gsub("\n", " | ")
 end)
 
@@ -806,7 +838,7 @@ test("RW-42 the footer stands above the saved line, so one that wraps does not r
         end
     end)
     return notice ~= nil and footer ~= nil and footer._point[1] == "BOTTOMLEFT" and footer._point[2] == notice
-        and footer._point[3] == "TOPLEFT" and notice._point[1] == "BOTTOMLEFT" and notice._point[5] >= 40, allText(f)
+        and footer._point[3] == "TOPLEFT" and notice._point[1] == "BOTTOMLEFT" and notice._point[5] >= 30, allText(f)
 end)
 
 test("RW-39 the list shows at most ten settings, and an open setting that is not listed can still be selected by name", function()
@@ -831,6 +863,140 @@ test("RW-40 a paragraph that would run into the list is left out and the ones ab
     r.show(T1(), 250)
     local roomy = hasText(f, "Next, in a busy place")
     return crowded and roomy and outText() == "", allText(f)
+end)
+
+-- Picks on the graph, staged until Save (spec 2026-11-03-tests-and-results-in-my-settings-design.md M5)
+local RESET = "Back to the recommendation"
+local function snapshot(e)
+    local db = e.ns.db()
+    local function copy(t) local c = {} for k, v in pairs(t or {}) do c[k] = v end return c end
+    return { copy(db.profiles.everyday.values), copy(db.profiles.crowded.values), copy(db.want), copy(CVARS), db.active, #SETLOG }
+end
+local function unchanged(e, before)
+    local now = snapshot(e)
+    local function same(a, b)
+        for k, v in pairs(a) do if b[k] ~= v then return false end end
+        for k, v in pairs(b) do if a[k] ~= v then return false end end
+        return true
+    end
+    return same(before[1], now[1]) and same(before[2], now[2]) and same(before[3], now[3]) and same(before[4], now[4])
+        and before[5] == now[5] and before[6] == now[6]
+end
+local function marksOf(f, role)
+    local list = {}
+    walk(f, function(frame) if frame ~= f and frame.graphMark == role and frame.shown then list[#list + 1] = frame end end)
+    return list
+end
+
+test("R-PK-0 a result shown while My settings is on another page brings the window to My results", function()
+    local e, r = boot()
+    e.ns.settings.open("light")
+    r.show(T1(), 250)
+    local hub = hubFrame()
+    local onPage = e.ns.settings.state().page == "results" and hub:IsShown() and window():IsShown()
+    return onPage and hasText(window(), "Your best settings"), tostring(e.ns.settings.state().page)
+end)
+
+test("R-PK-1 a click on a point stages that level: nothing is written, the estimate and verdict follow, the list marks it, and Back to the recommendation appears", function()
+    local e, r = boot()
+    emptyEveryday(e)
+    r.show(T1(), 250, { ok = true, appliedMs = 3.1, baselineMs = 4.0 })
+    local f = window()
+    local before = snapshot(e)
+    local noReset = findButton(f, RESET) == nil
+    pointButtons(f)[1]:Click()                             -- Shadow detail 0
+    local staged = unchanged(e, before) and hasText(f, "These 2 changes should take you from about 250 fps to about 417 fps (an estimate).")
+        and hasText(f, "With these changes: about 417 fps (estimate)")
+        and hasText(f, "Checked before your changes: about 323 fps. Run the test again to measure your picks.")
+        and rowsOf(f)[1].label._text == "Shadow detail (your pick)" and findButton(f, RESET) ~= nil
+        and #marksOf(f, "picked") == 1 and countExact(f, "your pick") == 1
+    return noReset and staged and outText() == "", allText(f)
+end)
+
+test("R-PK-2 clicking the recommended level again takes the pick back; Back to the recommendation clears every pick", function()
+    local e, r = boot()
+    emptyEveryday(e)
+    r.show(T1(), 250)
+    local f = window()
+    pointButtons(f)[1]:Click()                             -- pick 0
+    pointButtons(f)[2]:Click()                             -- the recommended 1: no pick
+    local undone = findButton(f, RESET) == nil and hasText(f, "These 2 changes should take you from about 250 fps to about 333 fps.")
+        and rowsOf(f)[1].label._text == "Shadow detail"
+    pointButtons(f)[1]:Click()
+    rowsOf(f)[2]:Click()
+    pointButtons(f)[3]:Click()                             -- Soft corner shadows kept at 2
+    local two = hasText(f, "This change should take you")
+    findButton(f, RESET):Click()
+    local back = findButton(f, RESET) == nil and hasText(f, "These 2 changes should take you from about 250 fps to about 333 fps.")
+        and #marksOf(f, "picked") == 0
+    return undone and two and back, allText(f)
+end)
+
+test("R-PK-6 Save saves the levels the page shows, picks included, and nothing else writes", function()
+    local e, r = boot()
+    emptyEveryday(e)
+    local calls = {}
+    e.ns.profiles.adopt = function(profile, values, silent) calls[#calls + 1] = { profile, values, silent } return true, {} end
+    r.show(T1(), 250)
+    local f = window()
+    pointButtons(f)[1]:Click()                             -- Shadow detail 0 instead of the recommended 1
+    findButton(f, SAVE_E):Click()
+    local c = calls[1]
+    local saved = countExact(f, APPLIED) == 1 and findButton(f, SAVE_E) == nil
+    pointButtons(f)[2]:Click()                             -- a new pick after a save: Save is on offer again
+    local again = findButton(f, SAVE_E) ~= nil and countExact(f, APPLIED) == 0
+    return #calls == 1 and c[1] == "everyday" and c[2].graphicsShadowQuality == "0" and c[2].graphicsSSAO == "0" and c[3] == true
+        and saved and again, tostring(c and c[2].graphicsShadowQuality) .. tostring(saved) .. tostring(again)
+end)
+
+test("R-PK-5 a pick on a crowd result is drawn in the Crowded colour", function()
+    local e, r = boot()
+    emptyCrowded(e)
+    r.show(crowdFor(e), 100)
+    local f = window()
+    pointButtons(f)[1]:Click()
+    local picked = marksOf(f, "picked")[1]
+    return picked ~= nil and sameColor(picked.box.fill._color, e.ns.graph.COLORS.pickedCrowd), tostring(picked)
+end)
+
+test("R-PK-7 closing the window ends the offer: a pick or a Save that still arrives writes nothing", function()
+    local e, r = boot()
+    emptyEveryday(e)
+    local calls = 0
+    e.ns.profiles.adopt = function() calls = calls + 1 return true, {} end
+    r.show(T1(), 250)
+    local f = window()
+    local before = snapshot(e)
+    hubFrame().close:Click()
+    r.pick("graphicsShadowQuality", "0")
+    r.click("apply")
+    return calls == 0 and unchanged(e, before) and r.hasOffer() == false, tostring(calls)
+end)
+
+test("R-PK-8 in combat the points do not react and Save is greyed; the picks stay and work again afterwards", function()
+    local e, r = boot()
+    emptyEveryday(e)
+    r.show(T1(), 250)
+    local f = window()
+    pointButtons(f)[1]:Click()
+    COMBAT = true
+    hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
+    local inert = pointButtons(f)[2].scripts.OnClick == nil and findButton(f, SAVE_E):IsEnabled() == false
+    r.pick("graphicsShadowQuality", "1")                   -- a click that still arrives is refused
+    local kept = rowsOf(f)[1].label._text == "Shadow detail (your pick)"
+    COMBAT = false
+    hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
+    pointButtons(f)[2]:Click()
+    local again = rowsOf(f)[1].label._text == "Shadow detail" and findButton(f, SAVE_E):IsEnabled() == true
+    return inert and kept and again, tostring(inert) .. tostring(kept) .. tostring(again)
+end)
+
+test("R-PK-9 Close ends the offer and shows the saved results again; the window stays open", function()
+    local e, r = boot()
+    r.show(T1(), 250, nil, { again = "setup" })
+    findButton(window(), "Close"):Click()
+    return r.hasOffer() == false and not window():IsShown() and hubFrame():IsShown() and e.ns.settings.state().page == "results",
+        tostring(r.hasOffer())
 end)
 
 return H.results()

@@ -1,32 +1,28 @@
--- Results.lua: the results window of the recommender (specs 2026-10-29-recommender-design.md section 5 and
--- 2026-10-30-results-window-design.md). It only draws what Recommend.chartModel computes (the verdict, the bars, the
--- changes, the setting list and one graph at a time through Graph.lua) and passes the one click, Save and switch, to
--- Profiles. Loaded after Guide.lua.
+-- Results.lua: the results page of My settings, My results (specs 2026-10-29-recommender-design.md section 5,
+-- 2026-10-30-results-window-design.md and 2026-11-03-tests-and-results-in-my-settings-design.md M3, M5). It only draws what
+-- Recommend.chartModel computes (the verdict, the bars, the changes, the setting list and one graph at a time through Graph.lua)
+-- and passes the one click that writes, Save and switch, to Profiles. A click on a graph point stages that level until Save.
+-- Loaded after Guide.lua.
 local _, ns = ...
 
 local results = {}
 ns.results = results
 
-local FRAME_NAME = "ForeverSettingsResults"
-local WIDTH, HEIGHT = 760, 540
-local CHART_X, CHART_WIDTH = 20, 380        -- the bars: where they start and how long a bar of the full scale is
-local CHANGES_X, CHANGES_WIDTH = 420, 320   -- the changes, to the right of the bars
+local skin = ns.skin
+local CHART_X, CHART_WIDTH = 0, 300         -- the bars: where they start and how long a bar of the full scale is
+local CHANGES_X, CHANGES_WIDTH = 330, 345   -- the changes, to the right of the bars
 local MAX_CHANGE_LINES = 6                  -- more changes than this are cut to one line fewer and a pointer to the list
-local PANEL_HEIGHT = 186                    -- the setting list and the graph are anchored above the bottom block of the window
+local PANEL_HEIGHT = 186                    -- the setting list and the graph are anchored above the bottom block of the page
 local BOTTOM_BLOCK = 104                    -- buttons (36), then room for the saved line (up to three small lines) and the footer
-local PANEL_Y = HEIGHT - BOTTOM_BLOCK - PANEL_HEIGHT
-local LIST_X, LIST_WIDTH, ROW_HEIGHT, MAX_ROWS = 20, 200, 18, 10
-local PANEL_X, PANEL_WIDTH = 230, 510
+local LIST_X, LIST_WIDTH, ROW_HEIGHT, MAX_ROWS = 0, 180, 18, 10
+local PANEL_X, PANEL_WIDTH = 196, 479
 local GRAPH_RECT = { x = 0, y = 18, width = PANEL_WIDTH, height = 122 }       -- inside the panel: a title above, up to three sentences below
-local BUTTON_WIDTHS = { apply = 250, again = 150, later = 150 }
-local BUTTON_GAP = 12
-local REFRESH = 0.5                         -- seconds of frame time between checks of combat and of a running test
+local BUTTON_WIDTHS = { apply = 250, reset = 190, again = 120, later = 90 }
+local BUTTON_GAP = 8
 
 local SAVED = "Saved as your Everyday settings and switched on. Your original settings are kept: choose Original in the minimap menu to go back."
 local SAVED_CROWD = "Saved as your Crowded settings and switched on. Your original settings are kept: choose Everyday or Original in the minimap menu "
     .. "to go back, or use the key you bound to toggle Everyday and Crowded."
-local GOOD = { 0.3, 0.85, 0.4 }             -- the colour of the line that says the settings were saved
-local BAD = { 1, 0.2, 0.2 }                 -- and of the line that says why they were not
 
 -- Which profile the open result is written to: a crowd result goes to Crowded, any other to Everyday.
 local function profileOf(result)
@@ -37,40 +33,19 @@ local REFUSED = {
     busy = "A test is running; try again afterwards.",
 }
 
--- Bar colours; the tests tell the bars apart by them.
-results.COLORS = {
-    now = { 0.55, 0.55, 0.55, 1 }, after = { 0.20, 0.60, 0.90, 1 }, target = { 1.00, 0.82, 0.00, 1 },
-}
+local function paletteColor(name)
+    local r, g, b, a = skin.color(name)
+    return { r, g, b, a }
+end
+-- Bar colours, from the window's palette; the tests tell the bars apart by them.
+results.COLORS = { now = paletteColor("dim"), after = paletteColor("accent"), target = paletteColor("warning") }
 local COLORS = results.COLORS
-local GREY = { 0.5, 0.5, 0.5, 1 }           -- the label of a setting that could not be measured
+local GOOD = paletteColor("profileEveryday")   -- the colour of the line that says the settings were saved
+local BAD = paletteColor("danger")             -- and of the line that says why they were not
 
-local current                -- {entry, target, result, model, selected, notice} while a recommendation is on offer
-local frame, parts           -- built on first use
+local current                -- {entry, target, result, picks, view, model, verify, extras, selected, notice, saved} while on offer
+local host, parts            -- built on the first draw into the host of My results
 local lastError
-local sinceRefresh = 0
-
--- A frame from a template; a client without that template gets the plain frame of `fallbackKind` (default: the same
--- kind) instead.
-local function make(kind, name, parent, template, fallbackKind)
-    local ok, made = pcall(CreateFrame, kind, name, parent, template)
-    if ok and made then return made, true end
-    return CreateFrame(fallbackKind or kind, name, parent), false
-end
-
--- A plain button has no text of its own: it is given a font string to carry the label.
-local function giveLabel(button)
-    local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    button:SetFontString(fs)
-    button:SetHighlightFontObject(GameFontHighlight)
-    button:SetDisabledFontObject(GameFontDisable)
-end
-
-local function text(parent, font, width)
-    local fs = parent:CreateFontString(nil, "OVERLAY", font)
-    fs:SetWidth(width)
-    fs:SetJustifyH("LEFT")
-    return fs
-end
 
 -- The height a font string needs for its text: the client's answer, else a line count.
 local function heightOf(fs, str)
@@ -102,16 +77,8 @@ local function release(pool, hasText)
     end
     pool.used = 0
 end
-local function fontMaker(font)
-    return function(parent)
-        local fs = parent:CreateFontString(nil, "OVERLAY", font)
-        fs:SetJustifyH("LEFT")
-        return fs
-    end
-end
-local function textureMaker(parent)
-    return parent:CreateTexture(nil, "ARTWORK")
-end
+local function textMaker(parent) return skin.text(parent, "normal", "text") end
+local function textureMaker(parent) return parent:CreateTexture(nil, "ARTWORK") end
 
 -- A line of text at (x, y) below the top of the pool's parent.
 local function put(pool, str, x, y, width)
@@ -132,34 +99,31 @@ local function bar(pool, color, x, y, width, height)
     return tex
 end
 
-local function makeButton(f)
-    local button, templated = make("Button", nil, f, "UIPanelButtonTemplate")
-    if not templated then giveLabel(button) end
-    button:SetSize(210, 24)
-    button:SetScript("OnClick", function(self) results.click(self.key) end)
-    return button
-end
-
--- A row of the setting list: a plain button with its own label and the dot that marks a setting the test changes.
+-- A row of the setting list: its name (bright when measured, dim when not), the dot that marks a setting the result changes,
+-- and the selected fill on the open one.
 local function makeRow(parent)
     local row = CreateFrame("Button", nil, parent)
     row:SetSize(LIST_WIDTH, ROW_HEIGHT)
-    row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    row.skinState = { selected = false }
+    row.bg = row:CreateTexture(nil, "BACKGROUND")
+    row.bg:SetAllPoints()
+    row.label = skin.text(row, "normal", "bright", LIST_WIDTH - 16)
     row.label:SetPoint("LEFT", row, "LEFT", 12, 0)
-    row.label:SetJustifyH("LEFT")
     row.dot = row:CreateTexture(nil, "ARTWORK")
     row.dot:SetSize(6, 6)
     row.dot:SetColorTexture(COLORS.target[1], COLORS.target[2], COLORS.target[3], COLORS.target[4])
     row.dot:SetPoint("LEFT", row, "LEFT", 2, 0)
-    local highlight = row:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetAllPoints()
-    highlight:SetColorTexture(1, 1, 1, 0.15)
-    row:SetHighlightTexture(highlight)
+    function row:SetSelected(on)
+        self.skinState.selected = on and true or false
+        local r, g, b = skin.color("selected")
+        self.bg:SetColorTexture(r, g, b, on and 1 or 0)
+    end
+    row:SetSelected(false)
     row:SetScript("OnClick", function(self) results.select(self.cvar) end)
     return row
 end
 
--- Why Save and switch would be refused right now, from the same facts the switch checks: "combat", "busy" or nil.
+-- Why Save and switch (and a pick) would be refused right now, from the same facts the switch checks: "combat", "busy" or nil.
 local function refusal()
     if InCombatLockdown() then return "combat" end
     if ns.suspended or (ns.bench and ns.bench.active and ns.bench.active()) then return "busy" end
@@ -186,62 +150,46 @@ local function updateButtons()
     if notice == "" then p.notice:Hide() else p.notice:Show() end
 end
 
-local function build()
-    local f, templated = make("Frame", FRAME_NAME, UIParent, "BasicFrameTemplateWithInset")
-    f:SetSize(WIDTH, HEIGHT)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-    if templated then
-        if f.SetTitle then f:SetTitle("ForeverSettings") end
-    else
-        local background = f:CreateTexture(nil, "BACKGROUND")
-        background:SetAllPoints()
-        background:SetColorTexture(0, 0, 0, 0.85)
+local function build(into)
+    local width = into._width
+    if type(width) ~= "number" then
+        local w = into:GetWidth()
+        width = type(w) == "number" and w or 675
     end
-    local p = {}
-    p.title = text(f, "GameFontNormalLarge", WIDTH - 40)
-    p.footer = text(f, "GameFontNormalSmall", WIDTH - 40)
-    p.notice = text(f, "GameFontNormalSmall", WIDTH - 40)
-    p.notice:SetTextColor(BAD[1], BAD[2], BAD[3])
-    p.panel = CreateFrame("Frame", nil, f)
+    local height = into._height
+    if type(height) ~= "number" then
+        local h = into:GetHeight()
+        height = type(h) == "number" and h or 502
+    end
+    local p = { width = width, height = height }
+    p.title = skin.text(into, "large", "accent", width)
+    p.footer = skin.text(into, "small", "dim", width)
+    p.notice = skin.text(into, "small", "danger", width)
+    p.panel = CreateFrame("Frame", nil, into)
     p.panel:SetSize(PANEL_WIDTH, PANEL_HEIGHT)
     p.graph = ns.graph and ns.graph.new(p.panel) or nil
-    p.fsMain, p.texMain = newPool(f, fontMaker("GameFontHighlight")), newPool(f, textureMaker)
-    p.fsPanel = newPool(p.panel, fontMaker("GameFontHighlight"))
-    p.rows = newPool(f, makeRow)
-    p.buttons = { makeButton(f), makeButton(f), makeButton(f) }
-    f:SetScript("OnUpdate", function(_, elapsed)
-        if not current then return end
-        sinceRefresh = sinceRefresh + elapsed
-        if sinceRefresh < REFRESH then return end
-        sinceRefresh = 0
-        updateButtons()
-    end)
-    -- Closing the window by any route ends the offer: nothing is applied from a window that is not on screen.
-    f:SetScript("OnHide", function() current = nil end)
-    local listedForEscape = false
-    for _, name in ipairs(UISpecialFrames) do
-        if name == FRAME_NAME then listedForEscape = true end
+    p.fsMain, p.texMain = newPool(into, textMaker), newPool(into, textureMaker)
+    p.fsPanel = newPool(p.panel, textMaker)
+    p.rows = newPool(into, makeRow)
+    p.buttons = {}
+    for i = 1, 4 do
+        local button = skin.button(into, "", 120, 26)
+        button:SetScript("OnClick", function(self) results.click(self.key) end)
+        p.buttons[i] = button
     end
-    if not listedForEscape then tinsert(UISpecialFrames, FRAME_NAME) end
-    frame, parts = f, p
-    return f
+    host, parts = into, p
 end
 
-local function ensure()
-    return frame or build()
-end
-
--- The setting list of the open result: measured settings (the graphs, in the model's order) then the unmeasured ones.
+-- The setting list of the open result: measured settings (the graphs, in the model's order) then the unmeasured ones; a setting
+-- whose level was picked on the graph says so.
 local function listOf(model)
     local list = {}
     for _, g in ipairs(model.graphs) do
-        list[#list + 1] = { cvar = g.cvar, name = g.name, changed = g.changed, graph = g }
+        local picked = false
+        for _, point in ipairs(g.points) do
+            if point.picked then picked = true end
+        end
+        list[#list + 1] = { cvar = g.cvar, name = g.name, changed = g.changed, graph = g, picked = picked }
     end
     for _, n in ipairs(model.notMeasured) do
         list[#list + 1] = { cvar = n.cvar or n.setting, name = n.name or n.setting, reason = n.plain or n.reason }
@@ -256,21 +204,19 @@ local function entryFor(list, cvar)
     return nil
 end
 
--- Draws the current model: the verdict, the bars, the changes, the paragraphs that fit, the setting list with its graph,
--- the footer and the buttons.
+-- Draws the current model into the host: the verdict, the bars, the changes, the paragraphs that fit, the setting list with its
+-- graph, the footer and the buttons.
 local function draw()
-    local f = ensure()
-    local p = parts
-    local m = current.model
-    local y = 30
-
+    local f, p, m = host, parts, current.model
+    local height = p.height
+    local panelY = height - BOTTOM_BLOCK - PANEL_HEIGHT
     p.title:SetText(m.title or "Your best settings")
     p.title:ClearAllPoints()
-    p.title:SetPoint("TOPLEFT", f, "TOPLEFT", CHART_X, -y)
-    y = 58
+    p.title:SetPoint("TOPLEFT", f, "TOPLEFT", CHART_X, -2)
+    local y = 30
 
     if m.verdict and m.verdict ~= "" then
-        local fs = put(p.fsMain, m.verdict, CHART_X, y, WIDTH - 40)
+        local fs = put(p.fsMain, m.verdict, CHART_X, y, p.width)
         y = y + heightOf(fs, m.verdict) + 8
     end
 
@@ -280,7 +226,7 @@ local function draw()
         local h = m.headline
         local top = left
         local function row(entryRow, color)
-            put(p.fsMain, entryRow.label, CHART_X, left, WIDTH - 40)
+            put(p.fsMain, entryRow.label, CHART_X, left, CHANGES_X - 10)
             left = left + 16
             bar(p.texMain, color, CHART_X, left, entryRow.fraction * CHART_WIDTH, 14)
             left = left + 20
@@ -288,7 +234,7 @@ local function draw()
         row(h.now, COLORS.now)
         if h.after then row(h.after, COLORS.after) end
         bar(p.texMain, COLORS.target, CHART_X + h.target.fraction * CHART_WIDTH, top, 2, left - top)
-        put(p.fsMain, h.target.label, CHART_X, left, WIDTH - 40)
+        put(p.fsMain, h.target.label, CHART_X, left, CHANGES_X - 10)
         left = left + 24
     end
     -- The changes, as many as fit above the list (and at most MAX_CHANGE_LINES): when some are left out, the last line that
@@ -298,7 +244,7 @@ local function draw()
         if i > MAX_CHANGE_LINES then break end
         local fs = put(p.fsMain, line, CHANGES_X, right, CHANGES_WIDTH)
         local h = heightOf(fs, line)
-        if right + h > PANEL_Y - 4 then
+        if right + h > panelY - 4 then
             fs:SetText("")
             fs:Hide()
             break
@@ -318,9 +264,9 @@ local function draw()
     -- only when there is still room above the list (a paragraph that would run into it is left out).
     local function paragraph(str)
         if str == nil or str == "" then return end
-        local fs = put(p.fsMain, str, CHART_X, y, WIDTH - 40)
+        local fs = put(p.fsMain, str, CHART_X, y, p.width)
         local h = heightOf(fs, str)
-        if y + h > PANEL_Y - 4 then
+        if y + h > panelY - 4 then
             fs:SetText("")
             fs:Hide()
         else
@@ -340,20 +286,23 @@ local function draw()
         local item = list[i]
         local row = take(p.rows)
         row.key, row.cvar = "setting:" .. item.cvar, item.cvar
-        row.label:SetText(item.name)
-        local color = item.graph and { 1, 1, 1, 1 } or GREY
-        row.label:SetTextColor(color[1], color[2], color[3], color[4])
+        row.label:SetText(item.name .. (item.picked and " (your pick)" or ""))
+        row.label:SetTextColor(skin.color(item.graph and "bright" or "dim"))
         if item.changed then row.dot:Show() else row.dot:Hide() end
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", f, "TOPLEFT", LIST_X, -(PANEL_Y + (i - 1) * ROW_HEIGHT))
-        if item.cvar == open then row:LockHighlight() else row:UnlockHighlight() end
+        row:SetPoint("TOPLEFT", f, "TOPLEFT", LIST_X, -(panelY + (i - 1) * ROW_HEIGHT))
+        row:SetSelected(item.cvar == open)
     end
     p.panel:ClearAllPoints()
-    p.panel:SetPoint("TOPLEFT", f, "TOPLEFT", PANEL_X, -PANEL_Y)
+    p.panel:SetPoint("TOPLEFT", f, "TOPLEFT", PANEL_X, -panelY)
     local chosen = open and entryFor(list, open) or nil
     if chosen and chosen.graph and p.graph then
         put(p.fsPanel, chosen.name .. ": fps if only this setting changes", 0, 0, PANEL_WIDTH)
-        p.graph:draw(GRAPH_RECT, chosen.graph, m.axis)
+        -- A click on a point picks its level (staged until Save), except in combat and during a test.
+        local cvar = chosen.cvar
+        local onPick = refusal() == nil and function(value) results.pick(cvar, value) end or nil
+        p.graph:draw(GRAPH_RECT, chosen.graph, m.axis,
+            { onPick = onPick, pickColor = profileOf(current.result) == "crowded" and "crowded" or "everyday" })
         local sy = GRAPH_RECT.y + GRAPH_RECT.height + 4
         for _, line in ipairs(chosen.graph.lines) do
             put(p.fsPanel, line, 0, sy, PANEL_WIDTH)
@@ -372,13 +321,13 @@ local function draw()
     -- The saved line (or the reason a click was refused) sits just above the buttons and may wrap onto two or three lines;
     -- the footer stands on top of it, so the two never run into each other.
     p.notice:ClearAllPoints()
-    p.notice:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", CHART_X, 40)
+    p.notice:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", CHART_X, 34)
     p.footer:SetText(m.footer)
     p.footer:ClearAllPoints()
     p.footer:SetPoint("BOTTOMLEFT", p.notice, "TOPLEFT", 0, 4)
 
-    -- Save (when there is something worth saving and it has not been saved yet), Run it again (a result opened from the
-    -- menu or a guided test), Close.
+    -- Save (when there is something worth saving and it has not been saved yet), Back to the recommendation (when a level was
+    -- picked), Run it again (a result opened from the menu or a guided test), Close (back to the list of saved results).
     local specs = {}
     if m.saveKind and not current.saved then
         local profile = profileOf(current.result)
@@ -386,6 +335,7 @@ local function draw()
         local who = profile == "crowded" and "Crowded" or "Everyday"
         specs[1] = { key = "apply", text = replace and ("Replace my " .. who .. " settings with these") or ("Save these as my " .. who .. " settings") }
     end
+    if (m.picked or 0) > 0 then specs[#specs + 1] = { key = "reset", text = "Back to the recommendation" } end
     if current.extras and current.extras.again then specs[#specs + 1] = { key = "again", text = "Run it again" } end
     specs[#specs + 1] = { key = "later", text = "Close" }
     p.apply = nil
@@ -398,11 +348,13 @@ local function draw()
         if spec then
             local width = BUTTON_WIDTHS[spec.key]
             button.key = spec.key
-            button:SetText(spec.text)
-            button:SetSize(width, 24)
+            button:SetLabel(spec.text)
+            button:SetSize(width, 26)
+            button.label:SetWidth(width - 8)
             button:ClearAllPoints()
-            button:SetPoint("BOTTOM", f, "BOTTOM", edge + width / 2, 12)
+            button:SetPoint("BOTTOM", f, "BOTTOM", edge + width / 2, 0)
             edge = edge + width + BUTTON_GAP
+            button:SetEnabled(true)
             button:Show()
             if spec.key == "apply" then p.apply = button end
         else
@@ -412,7 +364,7 @@ local function draw()
     updateButtons()
 end
 
--- The window could not be drawn: say so once per distinct error and print what it would have shown.
+-- The page could not be drawn: say so once per distinct error and print what it would have shown.
 local function fail(err)
     if err ~= lastError then
         lastError = err
@@ -426,31 +378,47 @@ local function fail(err)
     for _, n in ipairs(m.notMeasured) do ns.say("Not measured: " .. (n.name or n.setting) .. " (" .. n.reason .. ")") end
 end
 
--- Opens the window for a valid history entry (or a crowd entry from Recommend.crowdEntry) and the player's target frame
+-- What the page shows follows the picks: the result with them (recommend.withPicks) and its model.
+local function recompute()
+    current.view = ns.recommend.withPicks(current.result, current.picks)
+    current.model = ns.recommend.chartModel(current.view, current.verify)
+end
+
+local function redraw()
+    if ns.settings and ns.settings.redraw then ns.settings.redraw() end
+end
+
+-- Opens My results for a valid history entry (or a crowd entry from Recommend.crowdEntry) and the player's target frame
 -- rate. `verify` is the check of the recommendation (Bench.lua, bench.verify), when there was one.
 function results.show(entry, target, verify, extras)
     local result = ns.recommend.choose(entry, target)
-    local model = ns.recommend.chartModel(result, verify)
-    local first = model.notMeasured[1]
-    current = { entry = entry, target = target, result = result, verify = verify, extras = extras, model = model,
-        selected = model.selected or (first and (first.cvar or first.setting)) or nil }
-    sinceRefresh = 0
+    current = { entry = entry, target = target, result = result, verify = verify, extras = extras, picks = {} }
+    recompute()
+    local first = current.model.notMeasured[1]
+    current.selected = current.model.selected or (first and (first.cvar or first.setting)) or nil
     local ok, err = pcall(function()
-        draw()
-        frame:Show()
+        if ns.settings and ns.settings.open then ns.settings.open("results") end
     end)
     if not ok then fail(err) end
+    if not (host and host:IsShown()) then fail("My settings could not show the page") end
 end
 
--- Opens the graph (or the reason) of one setting of the open result; an unknown setting or no open window changes nothing.
-function results.select(cvar)
-    if not current or not entryFor(listOf(current.model), cvar) then return end
-    current.selected = cvar
+-- Draws the open result into `into` (the host of My results); My settings calls it.
+function results.renderPage(into)
+    if not current then return end
+    if host ~= into then build(into) end
     local ok, err = pcall(draw)
     if not ok then fail(err) end
 end
 
--- The setting that is open in the window, or nil.
+-- Opens the graph (or the reason) of one setting of the open result; an unknown setting or no open result changes nothing.
+function results.select(cvar)
+    if not current or not entryFor(listOf(current.model), cvar) then return end
+    current.selected = cvar
+    redraw()
+end
+
+-- The setting that is open on the page, or nil.
 function results.selected()
     return current and current.selected or nil
 end
@@ -463,16 +431,32 @@ function results.endOffer()
     current = nil
 end
 
+-- A click on a graph point: stages that level for that setting until Save. The recommended level (or, for a setting nothing is
+-- recommended for, the level in use) takes the pick back, and a level that is not measured counts for nothing (withPicks decides
+-- both). Refused in combat and during a test; nothing is written. Staging is this one function: applying straight to the profile
+-- instead would change it alone.
+function results.pick(cvar, value)
+    if not current or refusal() then return end
+    current.picks[cvar] = value
+    current.saved, current.notice = nil, nil
+    recompute()
+    redraw()
+end
+
+-- Puts the open result away: the page shows the list of saved results again.
 function results.hide()
-    if frame then frame:Hide() end
+    current = nil
+    redraw()
 end
 
+-- The frame the page draws into (for the tests): the host of My results.
 function results.frame()
-    return frame
+    return ns.settings and ns.settings.host and ns.settings.host("results") or host
 end
 
--- A button of the window: `apply` saves the result as Everyday or Crowded through Profiles.adopt (the recommended values,
--- or what the game has now when nothing needs changing), `again` runs the test again, `later` closes.
+-- A button of the page: `apply` saves the levels the page shows as Everyday or Crowded through Profiles.adopt (the
+-- recommendation with the picks, or what the game has now when nothing needs changing), `reset` takes back every pick, `again`
+-- runs the test again, `later` closes the result.
 function results.click(key)
     if not current then return end
     if key == "later" then
@@ -485,15 +469,21 @@ function results.click(key)
         if kind and ns.guide and ns.guide.open then ns.guide.open(kind) end
         return
     end
+    if key == "reset" then
+        current.picks = {}
+        recompute()
+        redraw()
+        return
+    end
     if key ~= "apply" or not current.model.saveKind or current.saved then return end
     if not (ns.profiles and ns.profiles.adopt) then
         ns.say("profiles module not loaded")
         return
     end
-    -- Profiles refuses (combat, a running test) before anything is written, and says nothing in chat: the window says why.
+    -- Profiles refuses (combat, a running test) before anything is written, and says nothing in chat: the page says why.
     local values = {}
     if current.model.saveKind == "changes" then
-        for _, change in ipairs(current.result.changes) do values[change.cvar] = change.to end
+        for _, change in ipairs(current.view.changes) do values[change.cvar] = change.to end
     end
     local profile = profileOf(current.result)
     local ok, info = ns.profiles.adopt(profile, values, true)
@@ -502,8 +492,7 @@ function results.click(key)
         local kept = type(info) == "table" and type(info.mismatched) == "table" and #info.mismatched or 0
         if kept > 0 then line = line .. " The game kept " .. kept .. " setting" .. (kept == 1 and "" or "s") .. " at a different level than saved." end
         current.saved, current.notice = line, nil
-        local drawn, err = pcall(draw)
-        if not drawn then fail(err) end
+        redraw()
     else
         current.notice = REFUSED[info] or ("Could not save: " .. tostring(info))
         updateButtons()

@@ -304,30 +304,20 @@ end
 -- One state table decides what the window says; the frame adapter at the end of this file draws it.
 local state = nil
 
--- Drawing never raises into the caller: a window that cannot be drawn says why, once per distinct error, and the
--- state (and anything already running) carries on. Nothing is started because of a failed draw.
-local lastError
-local function guarded(fn)
-    local ok, err = pcall(fn)
-    if not ok and err ~= lastError then
-        lastError = err
-        ns.say("the guide window could not be drawn: " .. tostring(err) .. " (tell the person who gave you this addon)")
-    end
-end
-
+-- The guide is a page of My settings (spec 2026-11-03-tests-and-results-in-my-settings-design.md M2): showing it opens that
+-- page, a change redraws the window, and closing a view leaves the page's two test buttons. My settings guards its own
+-- drawing (a window that cannot be drawn says why, once, and nothing is started because of it).
 local function draw()
-    guarded(guide.render)
+    guide.render()
 end
 
 local function present()
-    guarded(function()
-        guide.render()
-        guide.show()
-    end)
+    guide.show()
 end
 
 local function dismiss()
-    guarded(guide.hide)
+    state = nil
+    draw()
 end
 
 -- The current state: {view, kind, ticked, reason, problems, entry, result}; nil before the first open.
@@ -465,7 +455,7 @@ local function start()
     end
     ns.bench.watch = guide.panelReason
     local function showResults(shown, verify)
-        dismiss()
+        -- My results takes the window (results.show); the Finished view stays behind it on Find my settings.
         local ok, err = pcall(ns.results.show, shown, target, verify)
         if not ok then
             ns.say("the results window could not be shown: " .. tostring(err))
@@ -552,139 +542,19 @@ function guide.click(key)
     elseif key == "full" then
         guide.open("run")
     elseif key == "report" then
-        dismiss()   -- the report takes the stage; the two windows are the same size class and would overlap
-        ns.ui.showReport(state.entry)
+        ns.ui.showReport(state.entry)    -- the report window opens over My settings; the Finished view stays on the page
     elseif key == "cancel" or key == "close" then
         dismiss()
     end
 end
 
--- The window (spec sections 3, 5 and 9): the thin adapter that draws guide.model. Everything it shows comes from the
--- model; it holds no rules of its own except where Escape may close it and when to redraw.
-local WINDOW_NAME = "ForeverSettingsGuide"
-local WIDTH = 480
-local REFRESH = 0.5      -- seconds of frame time between redraws while Running (spec section 6)
-local frame, parts       -- built on first use
-local sinceRefresh = 0
-
--- A frame from a template; a client without that template gets the plain frame of `fallbackKind` (default: the same
--- kind) and the second result says it is not the templated one.
-local function make(kind, name, parent, template, fallbackKind)
-    local ok, made = pcall(CreateFrame, kind, name, parent, template)
-    if ok and made then return made, true end
-    return CreateFrame(fallbackKind or kind, name, parent), false
-end
-
--- A plain button has no text of its own: it is given a font string to carry the label.
-local function giveLabel(button)
-    local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    button:SetFontString(fs)
-    button:SetHighlightFontObject(GameFontHighlight)
-    button:SetDisabledFontObject(GameFontDisable)
-end
-
-local function text(parent, font, width)
-    local fs = parent:CreateFontString(nil, "OVERLAY", font)
-    fs:SetWidth(width or (WIDTH - 36))
-    fs:SetJustifyH("LEFT")
-    return fs
-end
-
-local function makeButton(f)
-    local button, templated = make("Button", nil, f, "UIPanelButtonTemplate")
-    if not templated then giveLabel(button) end
-    button:SetSize(120, 24)
-    button:SetScript("OnClick", function(self) guide.click(self.key) end)
-    return button
-end
-
-local function build()
-    local f, templated = make("Frame", WINDOW_NAME, UIParent, "BasicFrameTemplateWithInset")
-    f:SetSize(WIDTH, 300)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-    if templated then
-        if f.SetTitle then f:SetTitle("ForeverSettings") end
-    else
-        local background = f:CreateTexture(nil, "BACKGROUND")
-        background:SetAllPoints()
-        background:SetColorTexture(0, 0, 0, 0.85)
-    end
-    local p = { buttons = {} }
-    p.title = text(f, "GameFontNormalLarge")
-    p.banner = text(f, "GameFontNormalLarge")
-    p.banner:SetTextColor(1, 0.2, 0.2)
-    p.progress = text(f, "GameFontNormal")
-    p.body = text(f, "GameFontHighlight")
-    p.prompt = text(f, "GameFontHighlight")
-    p.targets = {}
-    for i, n in ipairs(ns.recommend and ns.recommend.TARGETS or {}) do
-        local button = makeButton(f)
-        button:SetSize(56, 24)
-        button.key = "target:" .. n
-        button:SetText(tostring(n))
-        p.targets[i] = button
-    end
-    p.modes = {}
-    for i, key in ipairs({ "quick", "thorough" }) do
-        local button = makeButton(f)
-        button:SetSize(210, 24)
-        button.key = "mode:" .. key
-        p.modes[i] = button
-    end
-    local box, boxTemplated = make("CheckButton", nil, f, "UICheckButtonTemplate", "Button")
-    box:SetSize(26, 26)
-    if boxTemplated then
-        p.boxLabel = text(f, "GameFontHighlight", WIDTH - 70)
-        p.boxLabel:SetPoint("LEFT", box, "RIGHT", 4, 0)
-        box:SetScript("OnClick", function(self) guide.setTicked(self:GetChecked() and true or false) end)
-    else
-        giveLabel(box)
-        box:SetSize(WIDTH - 36, 26)
-        box:SetScript("OnClick", function() guide.setTicked(not (state and state.ticked)) end)
-    end
-    p.box, p.boxTemplated = box, boxTemplated
-    p.buttons[1], p.buttons[2] = makeButton(f), makeButton(f)
-    f:SetScript("OnUpdate", function(_, elapsed)
-        if not state or state.view ~= "running" then return end
-        sinceRefresh = sinceRefresh + elapsed
-        if sinceRefresh < REFRESH then return end
-        sinceRefresh = 0
-        if ns.bench and not ns.bench.active() then
-            -- The test this view showed is over and nothing here will end the view (a `mark`, or a run started
-            -- elsewhere): the window goes away.
-            state = { view = "intro", kind = state.kind, ticked = false }
-            guide.hide()
-            return
-        end
-        draw()
-    end)
-    -- The title bar's X, and Escape if the client ignores the list change, hide the frame like any other. While a test
-    -- runs the banner has to stay, so it comes straight back; Stop is the way out.
-    f:SetScript("OnHide", function(self)
-        if state and state.view == "running" then self:Show() end
-    end)
-    frame, parts = f, p
-    return f
-end
-
-local function ensure()
-    return frame or build()
-end
-
--- The window may be closed with Escape in every view except Running; the list is rebuilt, so the name is in it once
--- or not at all.
-local function syncEscape(allowed)
-    for i = #UISpecialFrames, 1, -1 do
-        if UISpecialFrames[i] == WINDOW_NAME then tremove(UISpecialFrames, i) end
-    end
-    if allowed then tinsert(UISpecialFrames, WINDOW_NAME) end
-end
+-- The page (spec 2026-11-03-tests-and-results-in-my-settings-design.md M2): the thin adapter that draws guide.model into the
+-- host frame My settings gives it, from Skin.lua widgets. Everything it shows comes from the model. My settings keeps the
+-- window up while a test runs and refreshes the page every half second.
+local skin = ns.skin
+local BUTTON_W, BUTTON_H, BUTTON_GAP = 140, 26, 8
+local TARGET_W, MODE_W, ROW_H = 56, 210, 24
+local host, parts            -- built on the first draw into the host
 
 -- The height a font string needs for its text: the client's answer, else a line count.
 local function heightOf(fs, str)
@@ -701,10 +571,46 @@ local function windowCount()
     return ns.bench.countWindows(resolved, currents)
 end
 
--- Draws the current state: the model's title, lines, banner, progress, tick box and buttons, stacked from the top.
-function guide.render()
+local function clicked(self) guide.click(self.key) end
+
+local function build(into)
+    local width = into:GetWidth()
+    if type(width) ~= "number" or width <= 0 then width = into._width or 675 end
+    local p = { width = width, buttons = {}, targets = {}, modes = {} }
+    p.title = skin.text(into, "large", "accent", width)
+    p.banner = skin.text(into, "normal", "danger", width)
+    p.progress = skin.text(into, "normal", "accentLight", width)
+    p.body = skin.text(into, "normal", "text", width)
+    p.prompt = skin.text(into, "normal", "bright", width)
+    for i, n in ipairs(ns.recommend and ns.recommend.TARGETS or {}) do
+        local button = skin.button(into, tostring(n), TARGET_W, ROW_H)
+        button.key = "target:" .. n
+        button:SetScript("OnClick", clicked)
+        p.targets[i] = button
+    end
+    for i, key in ipairs({ "quick", "thorough" }) do
+        local button = skin.button(into, "", MODE_W, ROW_H)
+        button.key = "mode:" .. key
+        button:SetScript("OnClick", clicked)
+        p.modes[i] = button
+    end
+    p.box = skin.check(into)
+    p.box:SetScript("OnClick", function(self) guide.setTicked(self:GetChecked() and true or false) end)
+    p.boxLabel = skin.text(into, "normal", "text", width - 28)
+    p.boxLabel:SetPoint("LEFT", p.box, "RIGHT", 8, 0)
+    for i = 1, 2 do
+        local button = skin.button(into, "", BUTTON_W, BUTTON_H)
+        button:SetScript("OnClick", clicked)
+        p.buttons[i] = button
+    end
+    host, parts = into, p
+end
+
+-- Draws the current state into `into` (the host of Find my settings): the model's title, banner, progress, lines, the frame-rate
+-- targets, Quick or Thorough, the tick box and the buttons, stacked from the top; the buttons along the bottom, at the right.
+function guide.renderPage(into)
     if not state then return end
-    local f = ensure()
+    if host ~= into then build(into) end
     local p = parts
     local ctx = { progress = ns.bench.progress(), restore = guide.restoreInfo() }
     if state.view == "intro" and state.kind == "run" then
@@ -717,97 +623,104 @@ function guide.render()
     end
     local view = guide.model(state, ctx)
 
-    local y = 34
+    local y = 2
     local function place(fs, str, gap)
         fs:SetText(str)
         fs:ClearAllPoints()
-        fs:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -y)
+        fs:SetPoint("TOPLEFT", into, "TOPLEFT", 0, -y)
         fs:Show()
         y = y + heightOf(fs, str) + gap
     end
-    place(p.title, view.title, 10)
-    if view.banner then place(p.banner, view.banner, 8) else p.banner:SetText(""); p.banner:Hide() end
-    if view.progress then
-        place(p.progress, table.concat(view.progress, "\n"), 10)
-    else
-        p.progress:SetText("")
-        p.progress:Hide()
+    local function clear(fs)
+        fs:SetText("")
+        fs:Hide()
     end
-    if #view.lines > 0 then place(p.body, table.concat(view.lines, "\n"), 12) else p.body:SetText(""); p.body:Hide() end
+    place(p.title, view.title, 10)
+    if view.banner then place(p.banner, view.banner, 8) else clear(p.banner) end
+    if view.progress then place(p.progress, table.concat(view.progress, "\n"), 10) else clear(p.progress) end
+    if #view.lines > 0 then place(p.body, table.concat(view.lines, "\n"), 12) else clear(p.body) end
     if view.targets then
         place(p.prompt, view.targets.prompt, 6)
         for i, button in ipairs(p.targets) do
             button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", f, "TOPLEFT", 18 + (i - 1) * 62, -y)
-            if view.targets.selected == view.targets.list[i] then button:LockHighlight() else button:UnlockHighlight() end
+            button:SetPoint("TOPLEFT", into, "TOPLEFT", (i - 1) * (TARGET_W + 6), -y)
+            button:SetSelected(view.targets.selected == view.targets.list[i])
             button:Show()
         end
-        y = y + 34
+        y = y + ROW_H + 10
     else
-        p.prompt:SetText("")
-        p.prompt:Hide()
+        clear(p.prompt)
         for _, button in ipairs(p.targets) do button:Hide() end
     end
     if view.modes then
         for i, button in ipairs(p.modes) do
             local spec = view.modes.list[i]
-            button:SetText(spec.text)
+            button:SetLabel(spec.text)
             button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", f, "TOPLEFT", 18 + (i - 1) * 222, -y)
-            if view.modes.selected == spec.key then button:LockHighlight() else button:UnlockHighlight() end
+            button:SetPoint("TOPLEFT", into, "TOPLEFT", (i - 1) * (MODE_W + 12), -y)
+            button:SetSelected(view.modes.selected == spec.key)
             button:Show()
         end
-        y = y + 34
+        y = y + ROW_H + 10
     else
         for _, button in ipairs(p.modes) do button:Hide() end
     end
-
-    local box = p.box
     if view.checkbox then
-        box:ClearAllPoints()
-        box:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -y)
-        box:Show()
-        if p.boxTemplated then
-            box:SetChecked(view.checkbox.checked)
-            p.boxLabel:SetText(view.checkbox.text)
-            p.boxLabel:Show()
-        else
-            box:SetText((view.checkbox.checked and "[x] " or "[ ] ") .. view.checkbox.text)
-        end
-        y = y + 34
+        p.box:ClearAllPoints()
+        p.box:SetPoint("TOPLEFT", into, "TOPLEFT", 0, -y)
+        p.box:SetChecked(view.checkbox.checked)
+        p.box:Show()
+        p.boxLabel:SetText(view.checkbox.text)
+        p.boxLabel:Show()
+        y = y + 28
     else
-        box:Hide()
-        if p.boxLabel then p.boxLabel:Hide() end
+        p.box:Hide()
+        clear(p.boxLabel)
     end
-
+    -- The buttons, right-aligned along the bottom of the page, in the model's order.
     local count = #view.buttons
     for i, button in ipairs(p.buttons) do
         local spec = view.buttons[i]
         if spec then
             button.key = spec.key
-            button:SetText(spec.text)
+            button:SetLabel(spec.text)
             button:SetEnabled(spec.enabled)
             button:ClearAllPoints()
-            button:SetPoint("BOTTOM", f, "BOTTOM", count == 1 and 0 or (i == 1 and -66 or 66), 14)
+            button:SetPoint("BOTTOMRIGHT", into, "BOTTOMRIGHT", -(count - i) * (BUTTON_W + BUTTON_GAP), 0)
             button:Show()
         else
             button:Hide()
         end
     end
-    f:SetHeight(math.max(y + 52, 150))
-    syncEscape(view.escapeCloses)
 end
 
+-- Every half second while a test runs (called by My settings): the progress is redrawn, and a Running view whose test is over
+-- without this window ending it (a `mark`, a run started elsewhere) goes away.
+function guide.refresh()
+    if not state or state.view ~= "running" then return end
+    if ns.bench and not ns.bench.active() then
+        state = nil
+    end
+    draw()
+end
+
+-- Draws the window again (the page draws only while it is on screen).
+function guide.render()
+    if ns.settings and ns.settings.redraw then ns.settings.redraw() end
+end
+
+-- Shows the guide: My settings on Find my settings.
 function guide.show()
-    ensure()
-    sinceRefresh = 0
-    frame:Show()
+    if ns.settings and ns.settings.open then ns.settings.open("test") end
 end
 
+-- Puts the open view away: the page shows its two test buttons again.
 function guide.hide()
-    if frame then frame:Hide() end
+    dismiss()
 end
 
+-- The frame the page draws into (for the tests): the host of Find my settings.
 function guide.frame()
-    return frame
+    return ns.settings and ns.settings.host and ns.settings.host("test") or host
 end
+
