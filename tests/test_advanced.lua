@@ -126,4 +126,126 @@ test("AV-6 levelText gives the entry's word for a level, else the number", funct
         and a.levelText(sharp, "0.5") == "50%"
 end)
 
+-- Task 3: the profiles and the safety net (spec A4). A game on Everyday with every catalogue setting at its default.
+local function game(extra)
+    local e = H.boot(cvarsWith(extra), { fresh = true, defaults = false })
+    e.slash("profile everyday")
+    OUT, SETLOG = {}, {}
+    return e, e.ns.profiles
+end
+local function logout(e)
+    SETLOG = {}
+    e.fire("PLAYER_LOGOUT")
+end
+
+-- Review Focus 1: every way a risky value can be kept ends with the safe value in the game at logout and the kept value back
+-- after entering the world.
+test("AV-SAFE-1 a risky value kept by /fset set or by the window's edit is put back to safe at logout and applied again after entering the world", function()
+    local results = {}
+    local paths = {
+        set = function(e, p) e.slash("set farclip 10000") end,
+        window = function(e, p) p.setProfileValue("everyday", "farclip", "10000", true) end,
+        crowded = function(e, p) p.setProfileValue("crowded", "farclip", "10000", true) e.slash("profile crowded") end,
+    }
+    for name, keep in pairs(paths) do
+        local e, p = game()
+        keep(e, p)
+        local applied = CVARS.farclip == "10000"
+        logout(e)
+        local safe = CVARS.farclip == "1000" and #SETLOG == 1 and SETLOG[1] == "farclip" and ForeverSettingsDB.want.farclip == "10000"
+        e.fire("PLAYER_ENTERING_WORLD")
+        local back = CVARS.farclip == "10000"
+        if not (applied and safe and back) then results[#results + 1] = name .. ":" .. tostring(applied) .. tostring(safe) .. tostring(back) end
+    end
+    return #results == 0, table.concat(results, " ")
+end)
+
+test("AV-SAFE-2 Save as Everyday never keeps an Advanced value, so a risky value set outside the addon is the player's own and left alone at logout", function()
+    local e, p = game()
+    CVARS.farclip = "10000"                                -- the player's own console command
+    p.save("everyday", true)
+    local notKept = ForeverSettingsDB.profiles.everyday.values.farclip == nil and ForeverSettingsDB.want.farclip == nil
+    logout(e)
+    return notKept and CVARS.farclip == "10000" and #SETLOG == 0, tostring(CVARS.farclip) .. " " .. #SETLOG
+end)
+
+test("AV-SAFE-3 at logout a kept value equal to the safe one, or a game already at the safe value, is left alone; a non-risky value is never touched", function()
+    local e = game()
+    e.slash("set farclip 1000")
+    e.slash("set horizonStart 4000")
+    e.slash("set groundEffectDist 500")
+    CVARS.horizonStart = "800"                             -- already safe in the game
+    CVARS.farclip = "6000"                                 -- moved by the game's own menu after the addon applied 1000
+    logout(e)
+    return #SETLOG == 0 and CVARS.farclip == "6000" and CVARS.groundEffectDist == "500", table.concat(SETLOG, ",")
+end)
+
+test("AV-SAFE-4 a game that raises while a risky value is put back does not break the logout, and the others are still put back", function()
+    local e = game()
+    e.slash("set farclip 10000")
+    e.slash("set shadowTextureSize 4096")
+    SETFAIL.farclip = "error"
+    local ok = pcall(logout, e)
+    SETFAIL.farclip = nil
+    return ok and CVARS.shadowTextureSize == "1024", tostring(ok) .. " " .. tostring(CVARS.shadowTextureSize)
+end)
+
+test("AV-SAFE-5 Shift held at the first loading screen skips every kept risky value for the session, says so once, and applies the rest", function()
+    local e = game()
+    e.slash("set farclip 10000")
+    e.slash("set shadowTextureSize 4096")
+    e.slash("set groundEffectDist 500")
+    e.slash("set horizonStart 800")                        -- kept at its safe value: nothing to skip
+    logout(e)
+    local carried = {}                                     -- the next session: the same game and saved variables, a new addon
+    for k, v in pairs(CVARS) do carried[k] = v end
+    local e2 = H.boot(carried, { fresh = false, defaults = false })
+    CVARS.farclip, CVARS.shadowTextureSize, CVARS.groundEffectDist, CVARS.horizonStart = "1000", "1024", "70", "1600"
+    OUT = {}
+    SHIFT = true
+    e2.fire("PLAYER_ENTERING_WORLD")
+    SHIFT = false
+    local skipped = CVARS.farclip == "1000" and CVARS.shadowTextureSize == "1024" and CVARS.groundEffectDist == "500"
+        and CVARS.horizonStart == "800"
+    local said = 0
+    for _, line in ipairs(OUT) do
+        if line:find("Shift is held: the risky Advanced settings are not applied this session.", 1, true) then said = said + 1 end
+    end
+    OUT = {}
+    e2.fire("PLAYER_ENTERING_WORLD")
+    local quiet = CVARS.farclip == "1000" and #OUT == 0
+    e2.slash("set farclip 8000")
+    local manual = CVARS.farclip == "8000"
+    return skipped and said == 1 and quiet and manual, tostring(skipped) .. " " .. said .. " " .. tostring(quiet) .. " " .. tostring(manual)
+end)
+
+-- Review Focus 3: the first change of an Advanced setting is recorded in Original first.
+test("AV-ORIG-1 the first keep of an Advanced setting records the player's own value in Original, on the profile in use and on the other, and Original puts it back", function()
+    local e, p = game({ farclip = "3000", sunshafts = "2" })
+    e.slash("set farclip 10000")
+    p.setProfileValue("crowded", "sunshafts", "0", true)
+    local recorded = ForeverSettingsDB.original.values.farclip == "3000" and ForeverSettingsDB.original.values.sunshafts == "2"
+    e.slash("profile crowded")
+    local crowded = CVARS.sunshafts == "0" and CVARS.farclip == "3000"     -- Crowded keeps no farclip: Original's comes back
+    e.slash("profile everyday")
+    e.slash("profile original")
+    return recorded and crowded and CVARS.farclip == "3000" and CVARS.sunshafts == "2",
+        tostring(ForeverSettingsDB.original.values.farclip) .. " " .. tostring(ForeverSettingsDB.original.values.sunshafts)
+            .. " " .. tostring(CVARS.farclip) .. " " .. tostring(CVARS.sunshafts)
+end)
+
+-- Review Focus 2: Maximum and the test never hold an Advanced setting.
+test("AV-MAX-1 Maximum's enforced list and the test's list hold no Advanced setting, whatever Everyday keeps", function()
+    local e, p = game()
+    e.ns.bench.state().tiers.graphicsShadowQuality = { "0", "1", "2", "3", "4" }
+    e.slash("set farclip 10000")
+    e.slash("set sunshafts 2")
+    local plan = p.plan("maximum")
+    local bad = {}
+    for cvar in pairs(plan.want) do if e.ns.advanced.isAdvanced(cvar) then bad[#bad + 1] = "want:" .. cvar end end
+    for cvar in pairs(p.maxValues()) do if e.ns.advanced.isAdvanced(cvar) then bad[#bad + 1] = "max:" .. cvar end end
+    for _, entry in ipairs(e.ns.bench.resolve()) do if e.ns.advanced.isAdvanced(entry.cvar) then bad[#bad + 1] = "test:" .. entry.cvar end end
+    return #bad == 0 and plan.want.graphicsShadowQuality == "4", table.concat(bad, ",")
+end)
+
 return H.results()

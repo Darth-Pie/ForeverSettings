@@ -177,7 +177,9 @@ const MUTATIONS = {
   // Profiles (Task 6)
   'set-allowed-on-original': ['Profiles.lua', `    if db.active == "original" then`, `    if false then`],
   'set-skips-profile-save': ['Profiles.lua', `    db.profiles[db.active].values[cvar] = value`, `    local _ = value`],
-  'extra-not-recorded': ['Profiles.lua', `    if db.original.values[cvar] == nil then`, `    if false then`],
+  'extra-not-recorded': ['Profiles.lua', `    if db.active == "maximum" then return false, maximumRefusal(silent) end
+    if db.original.values[cvar] == nil then`, `    if db.active == "maximum" then return false, maximumRefusal(silent) end
+    if false then`],
   'unset-keeps-profile-value': ['Profiles.lua', `    profile.values[cvar] = nil
     db.want = profiles.plan(db.active).want`, `    local _ = profile
     db.want = profiles.plan(db.active).want`],
@@ -729,7 +731,7 @@ end
     db.want = profiles.plan(name).want
     return true`],
   'set-profile-value-ignores-busy': ['Profiles.lua', `    if refuseIfBusy(silent) then return false, "busy" end
-    db.profiles[name].values[cvar] = value`, `    db.profiles[name].values[cvar] = value`],
+    -- As setValue does:`, `    -- As setValue does:`],
   'set-profile-value-active-skips-apply': ['Profiles.lua', `    if db.active == name then return profiles.setValue(cvar, value, silent) end`, `    if false then return profiles.setValue(cvar, value, silent) end`],
   'set-profile-value-original-ok': ['Profiles.lua', `        return false, "original"
     end
@@ -2185,6 +2187,17 @@ end
   'av-farclip-safe': ['Advanced.lua', `risky = true, safe = "1000", page = "adv-distance" },`, `risky = true, safe = "2000", page = "adv-distance" },`],
   'av-guard-ffx': ['Bench.lua', `    "ffx", "fog", "resample",`, `    "fog", "resample",`],
   'av-known-ffx': ['ForeverSettings.lua', `    "ffxGlow", "ffxDeath", "volumeFogLevel",`, `    "volumeFogLevel",`],
+  // The safety net for risky Advanced settings (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A4)
+  'safe-logout-off': ['ForeverSettings.lua', `            if entry and now ~= nil and not same(now, entry.safe) then pcall(SetCVar, entry.cvar, entry.safe) end`, ``],
+  'safe-logout-unguarded': ['ForeverSettings.lua', `then pcall(SetCVar, entry.cvar, entry.safe) end`, `then SetCVar(entry.cvar, entry.safe) end`],
+  'safe-logout-safe-game-set': ['ForeverSettings.lua', `if entry and now ~= nil and not same(now, entry.safe) then`, `if entry and now ~= nil then`],
+  'risky-entry-kept-safe': ['ForeverSettings.lua', `    if entry and entry.risky and not same(value, entry.safe) then return entry end`, `    if entry and entry.risky then return entry end`],
+  'risky-entry-any': ['ForeverSettings.lua', `    if entry and entry.risky and not same(value, entry.safe) then return entry end`, `    if entry and not same(value, entry.safe) then return entry end`],
+  'shift-risky-off': ['ForeverSettings.lua', `        elseif safeStart and not (manual or explicit) and riskyEntry(name, value) then`, `        elseif false then`],
+  'shift-risky-manual': ['ForeverSettings.lua', `        elseif safeStart and not (manual or explicit) and riskyEntry(name, value) then`, `        elseif safeStart and riskyEntry(name, value) then`],
+  'shift-risky-said-each': ['ForeverSettings.lua', `            if not riskySaid then`, `            if true then`],
+  'orig-other-not-recorded': ['Profiles.lua', `    -- As setValue does: a setting Original has no value for (an Advanced one) is recorded there first.
+    if db.original.values[cvar] == nil then`, `    if false then`],
 };
 
 function main() {

@@ -33,6 +33,7 @@ local recovered = false
 local warned = {}
 local safeStart = false            -- Shift was held when the session's first loading screen came: no saved size above 100% this session
 local safeSaid = false
+local riskySaid = false             -- the same for the risky Advanced settings
 local pendingManual = false        -- what waited for combat was asked for by the player (a command, a click), so Shift does not skip it
 
 local function say(msg)
@@ -164,6 +165,14 @@ local function keptSize()
     return nil
 end
 
+-- The Advanced entry of a risky setting kept at another value than its safe one (spec
+-- 2026-11-03-advanced-page-title-switch-and-menu-design.md A4), or nil.
+local function riskyEntry(name, value)
+    local entry = ns.advanced and ns.advanced.entry and ns.advanced.entry(name)
+    if entry and entry.risky and not same(value, entry.safe) then return entry end
+    return nil
+end
+
 -- A setting named in any case, as the game and the My settings window spell it: the managed settings, then the known names.
 -- (GetCVar answers in any case; without this `/fset set renderscale 1.5` would be stored, enforced and shown under another name
 -- than the window and the logout revert look for.)
@@ -206,6 +215,12 @@ local function applyAll(manual, silent, explicit)
             if not safeSaid then
                 safeSaid = true
                 say("Shift is held: picture sharpness above 100% is not applied this session.")
+            end
+        elseif safeStart and not (manual or explicit) and riskyEntry(name, value) then
+            -- and so does a kept risky Advanced value (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A4)
+            if not riskySaid then
+                riskySaid = true
+                say("Shift is held: the risky Advanced settings are not applied this session.")
             end
         elseif current == nil then
             if not warned[name] then
@@ -495,6 +510,13 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         local kept = keptSize()
         local live = tonumber(GetCVar("RenderScale"))
         if kept and kept > 1 and live and live > 1 then pcall(SetCVar, "RenderScale", "1") end
+        -- The same for every risky Advanced setting the profile in use keeps away from its safe value (spec
+        -- 2026-11-03-advanced-page-title-switch-and-menu-design.md A4).
+        for name, value in pairs(db.want) do
+            local entry = riskyEntry(name, value)
+            local now = entry and GetCVar(entry.cvar)
+            if entry and now ~= nil and not same(now, entry.safe) then pcall(SetCVar, entry.cvar, entry.safe) end
+        end
     end
 end)
 

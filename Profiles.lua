@@ -405,6 +405,11 @@ function profiles.setProfileValue(name, cvar, value, silent)
     if name == "maximum" then return false, maximumRefusal(silent) end
     if db.active == name then return profiles.setValue(cvar, value, silent) end
     if refuseIfBusy(silent) then return false, "busy" end
+    -- As setValue does: a setting Original has no value for (an Advanced one) is recorded there first.
+    if db.original.values[cvar] == nil then
+        local live = GetCVar(cvar)
+        if live ~= nil then db.original.values[cvar] = live end
+    end
     db.profiles[name].values[cvar] = value
     return true
 end

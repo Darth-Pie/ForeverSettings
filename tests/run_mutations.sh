@@ -1334,6 +1334,15 @@ av-levelword-missing|test_advanced|AV-6|killed
 av-farclip-safe|test_advanced|AV-1|killed
 av-guard-ffx|test_advanced|AV-4|killed
 av-known-ffx|test_advanced|AV-4|killed
+safe-logout-off|test_advanced|AV-SAFE-1,AV-SAFE-4|killed
+safe-logout-unguarded|test_advanced|AV-SAFE-4|killed
+safe-logout-safe-game-set|test_advanced|AV-SAFE-3|killed
+risky-entry-kept-safe|test_advanced|AV-SAFE-3,AV-SAFE-5|killed
+risky-entry-any|test_advanced|AV-SAFE-3|killed
+shift-risky-off|test_advanced|AV-SAFE-5|killed
+shift-risky-manual|test_advanced|AV-SAFE-5|killed
+shift-risky-said-each|test_advanced|AV-SAFE-5|killed
+orig-other-not-recorded|test_advanced|AV-ORIG-1|killed
 control-comment|test_bench||survive
 control-missing|test_bench||error
 control-syntax|test_bench||error'
