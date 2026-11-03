@@ -140,12 +140,21 @@ function graph.new(parent)
     end
     local function say(text, x, y, width, color)
         local fs = take(strings)
+        fs:SetJustifyH("LEFT")                   -- the strings are pooled: a tag before is centred, so set it every time
         fs:SetWidth(width)
         fs:SetText(text)
         fs:ClearAllPoints()
         fs:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
         local c = color or COLORS.level
         fs:SetTextColor(c[1], c[2], c[3], c[4])
+    end
+    -- A tag over a point: wide enough for its words, centred on the point, and kept inside the graph's rectangle.
+    local TAG_WIDTH = { ["now"] = 50, ["recommended"] = 110, ["your pick"] = 90, ["now, your pick"] = 120 }
+    local function tag(text, cx, y, rect, color)
+        local w = TAG_WIDTH[text] or 110
+        local x = math.max(rect.x, math.min(cx - w / 2, rect.x + rect.width - w))
+        say(text, x, y, w, color)
+        strings.items[strings.used]:SetJustifyH("CENTER")
     end
     local function join(x1, y1, x2, y2)
         if useLines then
@@ -198,13 +207,13 @@ function graph.new(parent)
                 -- One tag over a point (a picked point is never the recommended one, and the recommended one is never the level
                 -- in use): the level in use picked again says both in one place.
                 if p.current and p.picked then
-                    say("now, your pick", item.x - 45, item.y - TAG_RISE, 90, pickedColor)
+                    tag("now, your pick", item.x, item.y - TAG_RISE, rect, pickedColor)
                 elseif p.current then
-                    say("now", item.x - 20, item.y - TAG_RISE, 40, COLORS.ring)
+                    tag("now", item.x, item.y - TAG_RISE, rect, COLORS.ring)
                 elseif p.picked then
-                    say("your pick", item.x - 35, item.y - TAG_RISE, 70, pickedColor)
+                    tag("your pick", item.x, item.y - TAG_RISE, rect, pickedColor)
                 elseif p.recommended then
-                    say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended)
+                    tag("recommended", item.x, item.y - TAG_RISE, rect, COLORS.recommended)
                 end
                 if k == 1 or k == #points or p.current or p.recommended or p.picked then
                     say(p.text, item.x - 20, plot.y + plot.height + 6, 40)

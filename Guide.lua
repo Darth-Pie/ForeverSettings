@@ -18,8 +18,12 @@ local TEXT = {
     ["few"] = { "The game ran too slowly to measure.", "Close other programs and try again." },
     ["no frames"] = { "The game stopped drawing frames, so the test stopped.", "Keep the game window in front, then try again." },
     ["stopped"] = { "You stopped the test.", "You can start again any time." },
-    ["control did not respond"] = { "The test could not tell the settings apart here.",
-        "This usually means the game window was not in front (alt-tab), or the frame rate is capped. Try again without switching windows." },
+    -- The control (a lower picture size) did not lower the frame time: in this spot the processor, not the graphics card, sets
+    -- the pace (owner's report 2026-11-03: the old words blamed alt-tab, which had not happened).
+    ["control did not respond"] = { "Graphics settings make no difference to the frame rate here.",
+        "In this spot the processor sets the pace, not the graphics card, so the test can't measure anything. Try a spot with a "
+            .. "wide, open view (out over a landscape, not at a wall), and check that no frame-rate limit is on. Switching to "
+            .. "another window (alt-tab) does this too." },
     ["control rejected"] = { "The game would not accept a settings change.", "Close the graphics settings and try again." },
     ["window busy"] = { "Another measurement was already running.", "Wait a moment and try again." },
     ["no snapshot"] = { "The addon could not take a copy of your settings, so it did not start.", "Nothing was changed. Tell the person who gave you this addon." },

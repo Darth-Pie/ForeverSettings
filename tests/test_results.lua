@@ -444,6 +444,22 @@ test("RW-20 a crowd where nothing saves much is shown with its sentence and only
         and findButton(f, REPL_C) == nil, allText(f)
 end)
 
+-- The owner's in-game look (2026-11-03): the target line ran from the top of the "Now" label down through the labels.
+test("RW-43 the target is a short mark over each bar, never through the bar labels", function()
+    local e, r = boot()
+    r.show(T1(), 300)
+    local f = window()
+    local marks = barsOf(f, r.COLORS.target)
+    local now, after = barsOf(f, r.COLORS.now)[1], barsOf(f, r.COLORS.after)[1]
+    local function top(tex) return -tex._point[5] end
+    local ok = #marks == 2 and now ~= nil and after ~= nil
+    for i, bar in ipairs({ now, after }) do
+        local m = marks[i]
+        ok = ok and m ~= nil and m._height == bar._height + 6 and top(m) == top(bar) - 3 and m._width == 2
+    end
+    return ok, tostring(#marks) .. " " .. tostring(marks[1] and marks[1]._height)
+end)
+
 test("RW-9b a page whose drawing fails inside My settings prints the changes and says so once, as the results", function()
     local e, r = boot()
     STRINGHEIGHT = function() error("no heights today") end
@@ -1020,6 +1036,20 @@ test("R-PK-11 Back to the recommendation after a Save offers Save again and drop
     findButton(f, SAVE_E):Click()
     findButton(f, RESET):Click()
     return findButton(f, SAVE_E) ~= nil and countExact(f, APPLIED) == 0, allText(f)
+end)
+
+-- The owner's in-game look (2026-11-03): nothing said the points can be clicked, or what a click on the recommended one does.
+local PICK_HINT = "Click a point to pick its level; Save keeps the recommended levels and your picks."
+test("R-PK-12 under the graph a line says the points can be clicked, but not while they cannot (combat)", function()
+    local e, r = boot()
+    r.show(T1(), 250)
+    local f = window()
+    local shown = countExact(f, PICK_HINT) == 1
+    COMBAT = true
+    hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
+    local hidden = countExact(f, PICK_HINT) == 0
+    COMBAT = false
+    return shown and hidden, tostring(shown) .. tostring(hidden)
 end)
 
 test("R-PK-9 Close ends the offer and shows the saved results again; the window stays open", function()

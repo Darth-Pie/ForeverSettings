@@ -20,6 +20,7 @@ local GRAPH_RECT = { x = 0, y = 18, width = PANEL_WIDTH, height = 122 }       --
 local BUTTON_WIDTHS = { apply = 250, reset = 190, again = 120, later = 90 }
 local BUTTON_GAP = 8
 
+local PICK_HINT = "Click a point to pick its level; Save keeps the recommended levels and your picks."
 local SAVED = "Saved as your Everyday settings and switched on. Your original settings are kept: choose Original in the minimap menu to go back."
 local SAVED_CROWD = "Saved as your Crowded settings and switched on. Your original settings are kept: choose Everyday or Original in the minimap menu "
     .. "to go back, or use the key you bound to toggle Everyday and Crowded."
@@ -225,16 +226,20 @@ local function draw()
     local left, right = y, y
     if m.headline then
         local h = m.headline
-        local top = left
+        local barTops = {}
         local function row(entryRow, color)
             put(p.fsMain, entryRow.label, CHART_X, left, CHANGES_X - 10)
             left = left + 16
             bar(p.texMain, color, CHART_X, left, entryRow.fraction * CHART_WIDTH, 14)
+            barTops[#barTops + 1] = left
             left = left + 20
         end
         row(h.now, COLORS.now)
         if h.after then row(h.after, COLORS.after) end
-        bar(p.texMain, COLORS.target, CHART_X + h.target.fraction * CHART_WIDTH, top, 2, left - top)
+        -- The target: a short mark over each bar, so it never runs through the labels above the bars.
+        for _, y in ipairs(barTops) do
+            bar(p.texMain, COLORS.target, CHART_X + h.target.fraction * CHART_WIDTH, y - 3, 2, 14 + 6)
+        end
         put(p.fsMain, h.target.label, CHART_X, left, CHANGES_X - 10)
         left = left + 24
     end
@@ -311,6 +316,8 @@ local function draw()
             put(p.fsPanel, line, 0, sy, PANEL_WIDTH)
             sy = sy + 14
         end
+        -- Clicking is not obvious, nor that a click on the recommended level changes nothing: one line says both.
+        if onPick then put(p.fsPanel, PICK_HINT, 0, sy, PANEL_WIDTH) end
     else
         if p.graph then p.graph:clear() end
         if chosen then put(p.fsPanel, chosen.name .. ": not measured (" .. tostring(chosen.reason) .. ")", 0, 0, PANEL_WIDTH) end

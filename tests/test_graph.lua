@@ -233,8 +233,10 @@ test("GR-5 tags and labels: now and recommended over their points, level texts o
         return found
     end
     local now, rec = stringAt(parent, "now"), stringAt(parent, "recommended")
-    local tagsOk = now and rec and near(now._point[4], lay.points[3].x - 20) and near(now._point[5], -(lay.points[3].y - 18))
-        and near(rec._point[4], lay.points[2].x - 35) and near(rec._point[5], -(lay.points[2].y - 18))
+    -- a tag is centred on its point, and one near the right edge is kept inside the rectangle
+    local tagsOk = now and rec and near(now._point[4], math.min(lay.points[3].x - 25, RECT.x + RECT.width - 50))
+        and near(now._point[5], -(lay.points[3].y - 18))
+        and near(rec._point[4], lay.points[2].x - 55) and near(rec._point[5], -(lay.points[2].y - 18))
     return tagsOk and countExact(parent3, "0") == 1 and countExact(parent3, "1") == 1 and countExact(parent3, "2") == 1
         and countExact(parent3, "now") == 1
         and countExact(parent, "now") == 1 and countExact(parent, "recommended") == 1
@@ -405,6 +407,54 @@ test("GR-16 a pick of the level in use carries one tag, now, your pick, instead 
     graph.new(parent):draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis, { pickColor = "everyday" })
     return countExact(parent, "now, your pick") == 1 and countExact(parent, "now") == 0 and countExact(parent, "your pick") == 0
         and countExact(parent, "recommended") == 1, table.concat(texts(parent), ",")
+end)
+
+-- The owner's in-game look (2026-11-03): "recommended" was cut to "recommen..." in its 70 pixel tag.
+test("GR-17 every tag is wide enough for its words, centred, and stays inside the graph's rectangle, even on the last point", function()
+    local _, graph, r = boot()
+    local width = { now = 50, recommended = 110, ["your pick"] = 90, ["now, your pick"] = 120 }
+    local ok, seen = true, 0
+    local function check(parent)
+        walk(parent, function(frame)
+            for _, fs in ipairs(frame.fontStrings) do
+                local w = fs.shown and width[fs._text]
+                if w then
+                    seen = seen + 1
+                    ok = ok and fs._width == w and fs._justifyH == "CENTER" and fs._point[4] >= RECT.x and fs._point[4] + w <= RECT.x + RECT.width
+                end
+            end
+        end)
+    end
+    -- the recommended level is the last point: its tag would run past the right edge if it were only centred
+    local last = { cvar = "x", name = "X", lines = {}, points = {
+        { value = "0", text = "0", fps = 250, current = true }, { value = "1", text = "1", fps = 300, recommended = true } } }
+    local axis = { min = 250, max = 300, step = 50, ticks = { 250, 300 } }
+    local p1 = newParent()
+    graph.new(p1):draw(RECT, last, axis)
+    check(p1)
+    local m = r.chartModel(r.withPicks(r.choose(T1(), 250), { graphicsSSAO = "2" }))
+    local p2 = newParent()
+    graph.new(p2):draw(RECT, graphOf(m, "graphicsSSAO"), m.axis, { pickColor = "everyday" })
+    check(p2)
+    return ok and seen >= 3, tostring(ok) .. " " .. seen
+end)
+
+test("GR-18 the axis numbers and level words stay left-aligned after a redraw reuses strings that were centred tags", function()
+    local _, graph, r = boot()
+    local m = modelOf(r)
+    local parent = newParent()
+    local g = graph.new(parent)
+    g:draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis)                 -- now and recommended tags
+    local plain = { cvar = "x", name = "X", lines = {}, points = {            -- no tag at all on this one
+        { value = "0", text = "0", fps = 300 }, { value = "1", text = "1", fps = 260 }, { value = "2", text = "2", fps = 250 } } }
+    g:draw(RECT, plain, m.axis)
+    local centred = 0
+    walk(parent, function(frame)
+        for _, fs in ipairs(frame.fontStrings) do
+            if fs.shown and fs._text and fs._text ~= "" and fs._justifyH == "CENTER" then centred = centred + 1 end
+        end
+    end)
+    return centred == 0, tostring(centred)
 end)
 
 test("GR-15 a redraw without onPick takes the click away from a button that had one", function()

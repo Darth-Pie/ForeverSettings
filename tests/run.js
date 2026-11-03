@@ -420,7 +420,6 @@ const MUTATIONS = {
   'stopped-drops-target': ['Guide.lua', `state = { view = "stopped", kind = kind, reason = reason, target = target, mode = mode }`, `state = { view = "stopped", kind = kind, reason = reason, mode = mode }`],
   // Results, recommender Task 7
   'headline-ignores-fraction': ['Results.lua', `bar(p.texMain, color, CHART_X, left, entryRow.fraction * CHART_WIDTH, 14)`, `bar(p.texMain, color, CHART_X, left, CHART_WIDTH, 14)`],
-  'target-line-at-now': ['Results.lua', `CHART_X + h.target.fraction * CHART_WIDTH, top, 2, left - top)`, `CHART_X + h.now.fraction * CHART_WIDTH, top, 2, left - top)`],
   'apply-skips-adopt': ['Results.lua', `local ok, info = ns.profiles.adopt(profile, values, true)`, `local ok, info = true, {}`],
   'replace-wording-always': ['Results.lua', `text = replace and ("Replace my " .. who .. " settings with these") or ("Save these as my " .. who .. " settings") }`, `text = "Replace my " .. who .. " settings with these" }`],
   'later-writes': ['Results.lua', `    if key == "later" then
@@ -1916,11 +1915,6 @@ end
                     mark(dots, "hollow", item.x, item.y, nil, COLORS.hollow)`],
   'graph-draw-ring-missing': ['Graph.lua', `                    mark(rings, "ring", item.x, item.y, nil, COLORS.ring)`, `                    local _ = rings`],
   'graph-draw-recommended-uncoloured': ['Graph.lua', `mark(dots, "recommended", item.x, item.y, COLORS.recommended)`, `mark(dots, "recommended", item.x, item.y, COLORS.point)`],
-  'graph-draw-tag-wrong-point': ['Graph.lua', `                elseif p.recommended then
-                    say("recommended"`, `                elseif p.current then
-                    say("recommended"`],
-  'graph-draw-tag-too-high': ['Graph.lua', `say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended)`, `say("recommended", item.x - 35, item.y - 28, 70, COLORS.recommended)`],
-  'graph-draw-now-tag-too-high': ['Graph.lua', `say("now", item.x - 20, item.y - TAG_RISE, 40, COLORS.ring)`, `say("now", item.x - 20, item.y - 28, 40, COLORS.ring)`],
   'graph-draw-label-all-levels': ['Graph.lua', `if k == 1 or k == #points or p.current or p.recommended or p.picked then`, `if true then`],
   'graph-draw-label-last-missing': ['Graph.lua', `if k == 1 or k == #points or p.current or p.recommended or p.picked then`, `if k == 1 or p.current or p.recommended or p.picked then`],
   'gr-palette-line': ['Graph.lua', `line = paletteColor("accentDim")`, `line = paletteColor("accent")`],
@@ -1934,7 +1928,6 @@ end
                     mark(dots, "picked"`, `                if false then
                     mark(dots, "picked"`],
   'gr-pick-colour-ignored': ['Graph.lua', `options.pickColor == "crowded" and COLORS.pickedCrowd or COLORS.picked`, `COLORS.picked`],
-  'gr-pick-tag-missing': ['Graph.lua', `say("your pick", item.x - 35, item.y - TAG_RISE, 70, pickedColor)`, `local _ = pickedColor`],
   'gr-pick-tooltip': ['Graph.lua', `    if p.picked then marks[#marks + 1] = "your pick" end`, `    local _ = p`],
   'gr-hit-small': ['Graph.lua', `graph.HIT = 20 `, `graph.HIT = 14 `],
   'gr-click-missing': ['Graph.lua', `button:SetScript("OnClick", onPick and function() onPick(value) end or nil)`, `button:SetScript("OnClick", nil)`],
@@ -2111,9 +2104,6 @@ end
   'fx-reset-keeps-saved': ['Results.lua', `        current.picks = {}
         current.saved, current.notice = nil, nil`, `        current.picks = {}`],
   'fx-row-wraps': ['Results.lua', `    row.label:SetWordWrap(false)`, `    local _ = row`],
-  'fx-tag-overlap': ['Graph.lua', `                if p.current and p.picked then
-                    say("now, your pick"`, `                if false then
-                    say("now, your pick"`],
   'fx-row-disabled-look': ['Skin.lua', `    if row.IsEnabled and not row:IsEnabled() then`, `    if false then`],
   'fx-row-enable-repaint': ['Skin.lua', `        setEnabled(self, on)
         paintRow(self)
@@ -2126,6 +2116,26 @@ end
         end`, `        if ns.guide and ns.guide.refresh then guarded(ns.guide.refresh) end`],
   'fx-refresh-full-draw': ['Guide.lua', `    if host and host:IsShown() then guide.renderPage(host) end       -- only this page while the test measures`, `    draw()`],
   'fx-close-keeps-view': ['Settings.lua', `        if ns.guide and ns.guide.hide then ns.guide.hide() end`, `        local _ = ns.guide`],
+  // The fixes after the owner's in-game look (2026-11-03); the first six re-anchor rows on the changed lines
+  'target-line-at-now': ['Results.lua', `bar(p.texMain, COLORS.target, CHART_X + h.target.fraction * CHART_WIDTH, y - 3, 2, 14 + 6)`, `bar(p.texMain, COLORS.target, CHART_X + h.now.fraction * CHART_WIDTH, y - 3, 2, 14 + 6)`],
+  'graph-draw-tag-wrong-point': ['Graph.lua', `                elseif p.recommended then
+                    tag("recommended"`, `                elseif p.current then
+                    tag("recommended"`],
+  'graph-draw-tag-too-high': ['Graph.lua', `tag("recommended", item.x, item.y - TAG_RISE, rect, COLORS.recommended)`, `tag("recommended", item.x, item.y - 28, rect, COLORS.recommended)`],
+  'graph-draw-now-tag-too-high': ['Graph.lua', `tag("now", item.x, item.y - TAG_RISE, rect, COLORS.ring)`, `tag("now", item.x, item.y - 28, rect, COLORS.ring)`],
+  'gr-pick-tag-missing': ['Graph.lua', `tag("your pick", item.x, item.y - TAG_RISE, rect, pickedColor)`, `local _ = pickedColor`],
+  'fx-tag-overlap': ['Graph.lua', `                if p.current and p.picked then
+                    tag("now, your pick"`, `                if false then
+                    tag("now, your pick"`],
+  'ig-target-through-labels': ['Results.lua', `            bar(p.texMain, COLORS.target, CHART_X + h.target.fraction * CHART_WIDTH, y - 3, 2, 14 + 6)`, `            bar(p.texMain, COLORS.target, CHART_X + h.target.fraction * CHART_WIDTH, y - 19, 2, 14 + 22)`],
+  'ig-target-once': ['Results.lua', `            barTops[#barTops + 1] = left`, `            if #barTops == 0 then barTops[1] = left end`],
+  'ig-tag-narrow': ['Graph.lua', `["recommended"] = 110`, `["recommended"] = 70`],
+  'ig-tag-not-centred': ['Graph.lua', `        strings.items[strings.used]:SetJustifyH("CENTER")`, `        local _ = strings`],
+  'ig-tag-off-the-edge': ['Graph.lua', `local x = math.max(rect.x, math.min(cx - w / 2, rect.x + rect.width - w))`, `local x = cx - w / 2`],
+  'ig-labels-stay-centred': ['Graph.lua', `        fs:SetJustifyH("LEFT")                   -- the strings are pooled`, `        local _ = fs                   -- the strings are pooled`],
+  'ig-check-blames-alt-tab': ['Guide.lua', `["control did not respond"] = { "Graphics settings make no difference to the frame rate here.",`, `["control did not respond"] = { "The test could not tell the settings apart here.",`],
+  'ig-hint-missing': ['Results.lua', `        if onPick then put(p.fsPanel, PICK_HINT, 0, sy, PANEL_WIDTH) end`, `        local _ = PICK_HINT`],
+  'ig-hint-in-combat': ['Results.lua', `        if onPick then put(p.fsPanel, PICK_HINT, 0, sy, PANEL_WIDTH) end`, `        put(p.fsPanel, PICK_HINT, 0, sy, PANEL_WIDTH)`],
 };
 
 function main() {

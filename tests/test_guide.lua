@@ -24,8 +24,10 @@ local ROWS = {
     { "few", "The game ran too slowly to measure.", "Close other programs and try again." },
     { "no frames", "The game stopped drawing frames, so the test stopped.", "Keep the game window in front, then try again." },
     { "stopped", "You stopped the test.", "You can start again any time." },
-    { "control did not respond", "The test could not tell the settings apart here.",
-        "This usually means the game window was not in front (alt-tab), or the frame rate is capped. Try again without switching windows." },
+    { "control did not respond", "Graphics settings make no difference to the frame rate here.",
+        "In this spot the processor sets the pace, not the graphics card, so the test can't measure anything. Try a spot with a "
+            .. "wide, open view (out over a landscape, not at a wall), and check that no frame-rate limit is on. Switching to "
+            .. "another window (alt-tab) does this too." },
     { "control rejected", "The game would not accept a settings change.", "Close the graphics settings and try again." },
     { "panel:settings", "You opened the game's settings, so the test stopped.", "Leave it closed while the test runs, then try again." },
     { "panel:menu", "You opened the game menu, so the test stopped.", "Leave it closed while the test runs, then try again." },
