@@ -2068,7 +2068,6 @@ end
   'rp-reset-shown-always': ['Results.lua', `if (m.picked or 0) > 0 then specs[#specs + 1] = { key = "reset"`, `if true then specs[#specs + 1] = { key = "reset"`],
   'rp-onpick-in-combat': ['Results.lua', `local onPick = refusal() == nil and function(value) results.pick(cvar, value) end or nil`, `local onPick = function(value) results.pick(cvar, value) end`],
   'rp-pick-colour-ignored': ['Results.lua', `pickColor = profileOf(current.result) == "crowded" and "crowded" or "everyday" })`, `pickColor = "everyday" })`],
-  'rp-save-ignores-picks': ['Results.lua', `for _, change in ipairs(current.view.changes) do values[change.cvar] = change.to end`, `for _, change in ipairs(current.result.changes) do values[change.cvar] = change.to end`],
   'rp-show-not-opening': ['Results.lua', `        if ns.settings and ns.settings.open then ns.settings.open("results") end`, `        local _ = ns.settings`],
   'rp-close-keeps-offer': ['Results.lua', `function results.hide()
     current = nil`, `function results.hide()

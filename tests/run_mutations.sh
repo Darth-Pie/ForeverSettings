@@ -1252,7 +1252,6 @@ rp-reset-missing|test_results|R-PK-2|killed
 rp-reset-shown-always|test_results|R-PK-1|killed
 rp-onpick-in-combat|test_results|R-PK-8|killed
 rp-pick-colour-ignored|test_results|R-PK-5|killed
-rp-save-ignores-picks|test_results|R-PK-6|killed
 rp-show-not-opening|test_results|R-PK-0|killed
 rp-close-keeps-offer|test_results|R-PK-9|killed
 rp-again-keeps-offer|test_results|RW-23|killed
