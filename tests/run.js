@@ -2109,7 +2109,6 @@ end
   'ctl-not-restored': ['Bench.lua', `                pcall(restore.putBack, originals)
                 if not c1.ok then return abort(c1.reason) end`, `                if not c1.ok then return abort(c1.reason) end`],
   'ctl-refusal-stops': ['Bench.lua', `    if #before == 0 then return nil, refused end`, `    if #refused > 0 then return nil, refused end`],
-  'ctl-refused-left-set': ['Bench.lua', `            pcall(SetCVar, c.cvar, was)`, ``],
   'ctl-check-words': ['Bench.lua', `ns.say(string.format("control (%s): frame time dropped %.1f%%: ok", control.label, drop * 100))`, `ns.say(string.format("control: frame time dropped %.1f%%: ok", drop * 100))`],
   // A click on the recommended point marks it (owner's look 2026-11-03)
   'gd-recommended-not-marked': ['Recommend.lua', `copy.chosen, copy.picked = copy.recommended, true`, `copy.chosen = copy.recommended`],
@@ -2242,7 +2241,6 @@ end
   'fx-spelling-catalogue': ['ForeverSettings.lua', `        if entry.cvar:lower() == lower then return entry.cvar end`, ``],
   'fx-clamp-kept': ['Settings.lua', `            ns.profiles.unsetProfileValue(profile, pickedCvar, true)`, ``],
   'fx-clamp-silent': ['Settings.lua', `            state.notice = "The game would not take " .. entry.name`, `            local _ = "The game would not take " .. entry.name`],
-  'fx-name-narrow': ['Settings.lua', `        if row.noCosts then corner = row.tag and 50 or 0 end`, ``],
 };
 
 function main() {

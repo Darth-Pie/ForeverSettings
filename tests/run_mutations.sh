@@ -283,7 +283,7 @@ rerun-total-not-extended|test_bench|B7-21|killed
 rerun-total-off-by-one|test_bench|B7-21|killed
 report-auto-when-guided|test_guide|G5-4|killed
 guided-flag-any-running|test_guide|G5-4b|killed
-ui-tick-static|test_ui|P7-2,P7-5|killed
+ui-tick-static|test_ui|P7-2,UM-5|killed
 capture-unguarded|test_bench|B4-8|killed
 crowd-rebase-skipped|test_recommend|CE-2|killed
 crowd-interpolation-off|test_recommend|CE-3|killed
@@ -1006,7 +1006,7 @@ sz-range-max|test_settings|S4-2|killed
 sz-step|test_settings|S4-2|killed
 sz-safe-reads-every-time|test_addon|TS-2|killed
 sz-safe-skips-manual|test_addon|TS-2|killed
-sz-safe-skips-explicit|test_addon|TS-7|killed
+sz-safe-skips-explicit|test_advanced|AV-SAFE-6b|killed
 sz-cmd-status-kept|test_addon|TS-4|killed
 sz-cmd-status-differs|test_addon|TS-8|killed
 sz-kept-any-spelling|test_addon|TS-5|killed
@@ -1266,7 +1266,6 @@ ctl-renderscale-unchanged|test_bench|B6-7|killed
 ctl-empty-not-nil|test_bench|B6-7|killed
 ctl-not-restored|test_bench|B7-23|killed
 ctl-refusal-stops|test_bench|B7-5|killed
-ctl-refused-left-set|test_bench|B7-24|killed
 ctl-check-words|test_bench|B6-14|killed
 gd-recommended-not-marked|test_recommend|W-1|killed
 gd-recommended-not-marked-page|test_results|R-PK-2|killed
@@ -1374,7 +1373,6 @@ fx-unset-any-advanced|test_advanced|AV-SAFE-7|killed
 fx-spelling-catalogue|test_advanced|AV-SPELL-1|killed
 fx-clamp-kept|test_settings|AD-8|killed
 fx-clamp-silent|test_settings|AD-8|killed
-fx-name-narrow|test_settings|AD-7b|killed
 control-comment|test_bench||survive
 control-missing|test_bench||error
 control-syntax|test_bench||error'

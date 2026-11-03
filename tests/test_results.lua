@@ -1005,8 +1005,8 @@ test("R-PK-8 in combat the points do not react and Save is greyed; the picks sta
     COMBAT = true
     hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
     local inert = pointButtons(f)[2].scripts.OnClick == nil and findButton(f, SAVE_E):IsEnabled() == false
-    r.pick("graphicsShadowQuality", "1")                   -- a click that still arrives is refused
-    local kept = rowPicked(e, rowsOf(f)[1])
+    r.pick("graphicsShadowQuality", "1")                   -- a click that still arrives is refused: the pick of 0 stands
+    local kept = rowPicked(e, rowsOf(f)[1]) and findButton(f, RESET) ~= nil
     COMBAT = false
     hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
     pointButtons(f)[2]:Click()                             -- the recommended level: the change is taken back, the point marked

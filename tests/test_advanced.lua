@@ -247,6 +247,20 @@ test("AV-SAFE-6 in a Shift session setting one setting applies that one only; th
     return other and apply and asked and waited, tostring(other) .. tostring(apply) .. tostring(asked) .. tostring(waited)
 end)
 
+test("AV-SAFE-6b in a Shift session setting another setting does not bring back a saved picture size above 100%", function()
+    local e = game({ graphicsSSAO = "1", RenderScale = "1" })
+    e.slash("set RenderScale 1.5")
+    logout(e)
+    local carried = {}
+    for k, v in pairs(CVARS) do carried[k] = v end
+    local e2 = H.boot(carried, { fresh = false, defaults = false })
+    SHIFT = true
+    e2.fire("PLAYER_ENTERING_WORLD")
+    SHIFT = false
+    e2.slash("set graphicsSSAO 0")
+    return CVARS.graphicsSSAO == "0" and CVARS.RenderScale == "1", tostring(CVARS.RenderScale)
+end)
+
 -- The fresh review of 2026-11-03, finding 3: taking a risky value out of the profile left the addon's value in the game, and the
 -- logout net no longer saw it.
 test("AV-SAFE-7 unticking a kept risky value puts the player's own value back in the game, so nothing risky is left behind", function()

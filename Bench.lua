@@ -762,9 +762,9 @@ function bench.pickControl(resolved, current)
     return { label = "every setting at its cheapest", changes = changes }
 end
 
--- Sets every change of a control. A change the game does not accept is put back and left out, as the sweep leaves out a
--- level the game refuses. Returns the values the accepted ones had before and the list of refused changes; nil (and the
--- refused list) when the game accepted none.
+-- Sets every change of a control. A change the game does not accept is left out, as the sweep leaves out a level the game
+-- refuses (whatever the game kept instead stays until the snapshot is put back after the control window). Returns the values the
+-- accepted ones had before and the list of refused changes; nil (and the refused list) when the game accepted none.
 local function applyControl(control)
     local before, refused = {}, {}
     for _, c in ipairs(control.changes) do
@@ -773,7 +773,6 @@ local function applyControl(control)
         if sameValue(GetCVar(c.cvar), c.value) then
             before[#before + 1] = { cvar = c.cvar, value = was }
         else
-            pcall(SetCVar, c.cvar, was)
             refused[#refused + 1] = c
         end
     end
