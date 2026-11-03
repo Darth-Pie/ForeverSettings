@@ -1,17 +1,23 @@
--- Graph.lua: draws one cost graph of the results window (spec 2026-10-30-results-window-design.md section 3.4): the frame
--- rate each measured level of a setting would give, joined by a line, with the level in use ringed and the recommended
--- one tagged. The geometry (graph.layout) is pure; graph.new draws it with the client's frames. Loaded after Settings.lua
--- and before Guide.lua; Results.lua is the only caller.
+-- Graph.lua: draws one cost graph of the results page (specs 2026-10-30-results-window-design.md section 3.4 and
+-- 2026-11-03-tests-and-results-in-my-settings-design.md M4, M5): the frame rate each measured level of a setting would give,
+-- joined by a line, with the level in use ringed, the recommended one tagged and a picked one in its profile's colour; a
+-- click on a point can choose its level. The geometry (graph.layout) is pure; graph.new draws it with the client's frames.
+-- Loaded after Settings.lua and before Guide.lua; Results.lua is the only caller.
 local _, ns = ...
 
 local graph = {}
 ns.graph = graph
 
--- Colours as RGBA. They differ from each other because the tests tell the elements apart by them.
+-- Colours as RGBA, from the window's palette. They differ from each other because the tests tell the elements apart by them.
+local function paletteColor(name)
+    local r, g, b, a = ns.skin.color(name)
+    return { r, g, b, a }
+end
 graph.COLORS = {
-    line = { 0.20, 0.55, 0.85, 1 }, point = { 0.20, 0.65, 0.95, 1 }, hollow = { 0.45, 0.80, 1.00, 1 },
-    ring = { 0.95, 0.95, 0.95, 1 }, recommended = { 1.00, 0.82, 0.00, 1 },
-    grid = { 0.35, 0.35, 0.40, 0.5 }, axis = { 0.75, 0.75, 0.80, 1 },
+    grid = paletteColor("divider"), axis = paletteColor("border"), line = paletteColor("accentDim"), point = paletteColor("accentLight"),
+    hollow = paletteColor("dim"), ring = paletteColor("bright"), recommended = paletteColor("accent"),
+    picked = paletteColor("profileEveryday"), pickedCrowd = paletteColor("profileCrowded"),
+    label = paletteColor("dim"), level = paletteColor("text"),
 }
 local COLORS = graph.COLORS
 
@@ -19,7 +25,8 @@ local COLORS = graph.COLORS
 -- (top: a tag stands TAG_RISE above its point, so even a point on the top of the axis keeps its tag inside the rectangle).
 graph.MARGIN = { left = 44, right = 14, top = 22, bottom = 26 }
 
-local POINT, HIT, RING = 8, 14, 14          -- sizes of a point, of the button over it, and of the ring around the current one
+graph.HIT = 20                              -- the button over each point: big enough to click
+local POINT, HIT, RING = 8, graph.HIT, 16   -- sizes of a point, of the button over it, and of the ring around the current one
 local TAG_RISE = 18                         -- how far above its point a tag stands (the tag is one small line of text)
 local DOT, DOT_STEP = 2, 6                  -- the squares that stand in for a line: their size and how far apart they are
 
@@ -73,15 +80,29 @@ local function tooltipLines(entry, p)
     local marks = {}
     if p.current then marks[#marks + 1] = "now" end
     if p.recommended then marks[#marks + 1] = "recommended" end
+    if p.picked then marks[#marks + 1] = "your pick" end
     if p.doubtful then marks[#marks + 1] = "this reading looks off" end
     local second = string.format("about %.0f fps if only this setting changes", p.fps)
     if #marks > 0 then second = second .. " (" .. table.concat(marks, ", ") .. ")" end
     return entry.name .. ": " .. p.text, second
 end
 
--- A graph drawn into `parent`. g:draw(rect, entry, axis) replaces what it drew before; g:clear() hides it all.
+-- A round mark (spec M4): a small frame holding a rounded box, `size` pixels, drawn from the corner pictures. Its role
+-- (point, recommended, picked, hollow, ring) is set at each draw.
+local function newMark(parent, size, radius)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(size, size)
+    f.box = ns.skin.box(f, radius, "fill", "fill")
+    return f
+end
+
+-- A graph drawn into `parent`. g:draw(rect, entry, axis, options) replaces what it drew before; options = {onPick, pickColor}:
+-- with onPick a click on a point calls onPick(level), without it a point only shows its tooltip; pickColor ("everyday" or
+-- "crowded") is the colour of a picked point. g:clear() hides it all.
 function graph.new(parent)
     local g = {}
+    local dots = newPool(function() return newMark(parent, POINT, ns.skin.RADIUS.control) end)
+    local rings = newPool(function() return newMark(parent, RING, ns.skin.RADIUS.window) end)
     local textures = newPool(function() return parent:CreateTexture(nil, "ARTWORK") end)
     local strings = newPool(function()
         local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -105,13 +126,17 @@ function graph.new(parent)
         tex:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
         tex:SetSize(w, h)
     end
-    -- The outline of a square `size` wide centred on (cx, cy).
-    local function outline(color, cx, cy, size)
-        local left, top = cx - size / 2, cy - size / 2
-        box(color, left, top, size, 1)
-        box(color, left, top + size - 1, size, 1)
-        box(color, left, top, 1, size)
-        box(color, left + size - 1, top, 1, size)
+    -- A round mark centred on (cx, cy): filled in `fillColor` (nil: clear) with an edge in `edgeColor` (nil: the fill's).
+    local function mark(pool, role, cx, cy, fillColor, edgeColor)
+        local m = take(pool)
+        m.graphMark = role
+        local size = pool == rings and RING or POINT
+        m:ClearAllPoints()
+        m:SetPoint("TOPLEFT", parent, "TOPLEFT", cx - size / 2, -(cy - size / 2))
+        local f = fillColor or { 0, 0, 0, 0 }
+        m.box.fill:SetColorTexture(f[1], f[2], f[3], fillColor and f[4] or 0)
+        local e = edgeColor or fillColor
+        m.box.edge:SetColorTexture(e[1], e[2], e[3], e[4])
     end
     local function say(text, x, y, width, color)
         local fs = take(strings)
@@ -119,7 +144,8 @@ function graph.new(parent)
         fs:SetText(text)
         fs:ClearAllPoints()
         fs:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
-        if color then fs:SetTextColor(color[1], color[2], color[3], color[4]) else fs:SetTextColor(1, 1, 1, 1) end
+        local c = color or COLORS.level
+        fs:SetTextColor(c[1], c[2], c[3], c[4])
     end
     local function join(x1, y1, x2, y2)
         if useLines then
@@ -140,14 +166,16 @@ function graph.new(parent)
         end
     end
 
-    function g:draw(rect, entry, axis)
-        textures.used, strings.used, buttons.used, segments.used = 0, 0, 0, 0
+    function g:draw(rect, entry, axis, options)
+        options = options or {}
+        local pickedColor = options.pickColor == "crowded" and COLORS.pickedCrowd or COLORS.picked
+        textures.used, strings.used, buttons.used, segments.used, dots.used, rings.used = 0, 0, 0, 0, 0, 0
         if entry and axis then
             local lay = graph.layout(entry, axis, rect)
             local plot = lay.plot
             for _, tick in ipairs(lay.ticks) do
                 box(COLORS.grid, plot.x, tick.y, plot.width, 1)
-                say(tick.label, rect.x, tick.y - 6, graph.MARGIN.left - 6)
+                say(tick.label, rect.x, tick.y - 6, graph.MARGIN.left - 6, COLORS.label)
             end
             box(COLORS.axis, plot.x, plot.y, 1, plot.height)
             box(COLORS.axis, plot.x, plot.y + plot.height, plot.width, 1)
@@ -155,17 +183,25 @@ function graph.new(parent)
             for k = 1, #points - 1 do join(points[k].x, points[k].y, points[k + 1].x, points[k + 1].y) end
             for k, item in ipairs(points) do
                 local p = item.point
-                if p.doubtful then
-                    outline(COLORS.hollow, item.x, item.y, POINT)
+                if p.picked then
+                    mark(dots, "picked", item.x, item.y, pickedColor)
+                elseif p.doubtful then
+                    mark(dots, "hollow", item.x, item.y, nil, COLORS.hollow)
+                elseif p.recommended then
+                    mark(dots, "recommended", item.x, item.y, COLORS.recommended)
                 else
-                    box(p.recommended and COLORS.recommended or COLORS.point, item.x - POINT / 2, item.y - POINT / 2, POINT, POINT)
+                    mark(dots, "point", item.x, item.y, COLORS.point)
                 end
                 if p.current then
-                    outline(COLORS.ring, item.x, item.y, RING)
-                    say("now", item.x - 20, item.y - TAG_RISE, 40)
+                    mark(rings, "ring", item.x, item.y, nil, COLORS.ring)
+                    say("now", item.x - 20, item.y - TAG_RISE, 40, COLORS.ring)
                 end
-                if p.recommended then say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended) end
-                if k == 1 or k == #points or p.current or p.recommended then
+                if p.picked then
+                    say("your pick", item.x - 35, item.y - TAG_RISE, 70, pickedColor)
+                elseif p.recommended then
+                    say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended)
+                end
+                if k == 1 or k == #points or p.current or p.recommended or p.picked then
                     say(p.text, item.x - 20, plot.y + plot.height + 6, 40)
                 end
                 local button = take(buttons)
@@ -179,12 +215,17 @@ function graph.new(parent)
                     GameTooltip:Show()
                 end)
                 button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                -- A click chooses the level only when the caller allows it (not in combat, not during a test).
+                local onPick, value = options.onPick, p.value
+                button:SetScript("OnClick", onPick and function() onPick(value) end or nil)
             end
         end
         release(textures)
         release(strings)
         release(buttons)
         release(segments)
+        release(dots)
+        release(rings)
     end
 
     function g:clear()

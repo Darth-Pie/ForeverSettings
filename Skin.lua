@@ -9,7 +9,7 @@ ns.skin = skin
 -- Palette A (spec H3). The last three are the button states derived from it.
 local HEX = {
     fill = "14161b", border = "3a3f4b", divider = "262a33", control = "2f3440", selected = "232850",
-    accent = "9a9cff", accentLight = "c9caff", text = "d8dbe3", bright = "eef0f6", dim = "8b90a0",
+    accent = "9a9cff", accentLight = "c9caff", accentDim = "6f72c8", text = "d8dbe3", bright = "eef0f6", dim = "8b90a0",
     warning = "ff9933", danger = "e06060",
     hover = "1b1e28", pressed = "2c3266", textDisabled = "5d6170",
     -- The colour of each profile (spec 2026-11-02-edit-the-profile-in-use-design.md P5).

@@ -46,10 +46,20 @@ local function graphOf(model, cvar)
 end
 local RECT = { x = 0, y = 0, width = 510, height = 122 }       -- the rectangle Results.lua gives the graph
 
--- What is on a frame, shown
+-- What is on a frame, shown (a hidden child frame shows none of its textures)
 local function walk(f, fn)
     fn(f)
-    for _, c in ipairs(f.children) do walk(c, fn) end
+    for _, c in ipairs(f.children) do
+        if c.shown ~= false then walk(c, fn) end
+    end
+end
+-- The round points and rings (spec 2026-11-03 M4): small frames with a rounded box, read by their role and paint.
+local function marks(f, role)
+    local list = {}
+    walk(f, function(frame)
+        if frame ~= f and frame.graphMark == role and frame.shown then list[#list + 1] = frame end
+    end)
+    return list
 end
 local function sameColor(a, b)
     if not a then return false end
@@ -171,28 +181,28 @@ test("GR-3 the points are joined by the client's lines, or by a row of small squ
         and raised and #texturesOf(parent3, graph.COLORS.line) >= 2 * 37, tostring(#lines) .. " " .. tostring(#dots)
 end)
 
-test("GR-4 points: filled squares, the recommended one in its own colour, outlined squares for doubtful ones, a ring on the current one", function()
+test("GR-4 points: round dots, the recommended one in its own colour, an outline for doubtful ones, a round ring on the current one", function()
     local _, graph, r = boot()
     local m = modelOf(r)
     local parent = newParent()
     local g = graph.new(parent)
     g:draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis)
-    local filled = texturesOf(parent, graph.COLORS.point)
-    local recommended = texturesOf(parent, graph.COLORS.recommended)
-    local ring = texturesOf(parent, graph.COLORS.ring)
+    local filled, recommended, rings = marks(parent, "point"), marks(parent, "recommended"), marks(parent, "ring")
     local grid = texturesOf(parent, graph.COLORS.grid)
     local axis = texturesOf(parent, graph.COLORS.axis)
-    local okFilled = #filled == 2 and filled[1]._width == 8 and filled[1]._height == 8 and #recommended == 1 and recommended[1]._width == 8
-    -- a curve with two doubtful points: four outlined squares each
+    local okFilled = #filled == 2 and filled[1]._width == 8 and filled[1]._height == 8 and sameColor(filled[1].box.fill._color, graph.COLORS.point)
+        and #recommended == 1 and recommended[1]._width == 8 and sameColor(recommended[1].box.fill._color, graph.COLORS.recommended)
+        and #rings == 1 and rings[1]._width == 16 and sameColor(rings[1].box.edge._color, graph.COLORS.ring) and rings[1].box.fill._color[4] == 0
+    -- a curve with two doubtful points: an outlined dot each
     local odd = r.chartModel(r.choose(entry(4.0, rows("graphicsShadowQuality", 4.0,
         { { "0", -1.5 }, { "1", -0.30 }, { "2", -0.9 }, { "3", 0, current = true } })), 100))
     local parent2 = newParent()
     local g2 = graph.new(parent2)
     g2:draw(RECT, odd.graphs[1], odd.axis)
-    local hollow = texturesOf(parent2, graph.COLORS.hollow)
-    local filled2 = texturesOf(parent2, graph.COLORS.point)
-    return okFilled and #ring == 4 and #grid == #m.axis.ticks and #axis == 2 and #hollow == 8 and #filled2 == 2,
-        #filled .. " " .. #recommended .. " " .. #ring .. " " .. #grid .. " " .. #axis .. " " .. #hollow .. " " .. #filled2
+    local hollow = marks(parent2, "hollow")
+    local okHollow = #hollow == 2 and sameColor(hollow[1].box.edge._color, graph.COLORS.hollow) and hollow[1].box.fill._color[4] == 0
+    return okFilled and okHollow and #grid == #m.axis.ticks and #axis == 2 and #marks(parent2, "point") == 2,
+        #filled .. " " .. #recommended .. " " .. #rings .. " " .. #grid .. " " .. #axis .. " " .. #hollow
 end)
 
 test("GR-5 tags and labels: now and recommended over their points, level texts only under the ends and the marked points", function()
@@ -314,6 +324,89 @@ test("GR-9 a tag over a point at the top of the axis stays inside the rectangle,
         return found ~= nil and -found._point[5] >= rect.y
     end
     return tagsOk("recommended") and tagsOk("now")
+end)
+
+-- The new look and the clicks (spec 2026-11-03-tests-and-results-in-my-settings-design.md M4, M5)
+local function rgbOf(e, name) local r, g, b, a = e.ns.skin.color(name) return { r, g, b, a } end
+local function hexIs(color, hex)
+    return color ~= nil and near(color[1], tonumber(hex:sub(1, 2), 16) / 255) and near(color[2], tonumber(hex:sub(3, 4), 16) / 255)
+        and near(color[3], tonumber(hex:sub(5, 6), 16) / 255)
+end
+
+test("GR-11 the graph's colours come from the window's palette and every element has its own", function()
+    local e, graph = boot()
+    local c = graph.COLORS
+    local want = { grid = "divider", axis = "border", line = "accentDim", point = "accentLight", hollow = "dim", ring = "bright",
+        recommended = "accent", picked = "profileEveryday", pickedCrowd = "profileCrowded" }
+    local ok, seen = true, {}
+    for key, name in pairs(want) do
+        ok = ok and sameColor(c[key], rgbOf(e, name))
+        local id = table.concat(c[key] or {}, ",")
+        if seen[id] then ok = false end
+        seen[id] = true
+    end
+    return ok and hexIs(c.line, "6f72c8"), tostring(ok)
+end)
+
+test("GR-12 points and rings are drawn from the rounded-box pictures: an 8 pixel dot, a 16 pixel ring", function()
+    local _, graph, r = boot()
+    local m = modelOf(r)
+    local parent = newParent()
+    graph.new(parent):draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis)
+    local dot, ring = marks(parent, "point")[1], marks(parent, "ring")[1]
+    local function pictures(frame, file)
+        local n = 0
+        for _, tex in ipairs(frame.textures) do
+            if tex._texture and tex._texture:find(file, 1, true) then n = n + 1 end
+        end
+        return n
+    end
+    return dot ~= nil and ring ~= nil and pictures(dot, "fill4.tga") == 4 and pictures(ring, "ring8.tga") == 4 and ring._height == 16,
+        tostring(dot and pictures(dot, "fill4.tga")) .. " " .. tostring(ring and pictures(ring, "ring8.tga"))
+end)
+
+test("GR-13 a picked point is drawn in the colour of the profile it will be saved to, with the tag your pick, and its tooltip says so", function()
+    local _, graph, r = boot()
+    local m = r.chartModel(r.withPicks(r.choose(T1(), 250), { graphicsShadowQuality = "0" }))
+    local parent, parent2 = newParent(), newParent()
+    graph.new(parent):draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis, { pickColor = "everyday" })
+    graph.new(parent2):draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis, { pickColor = "crowded" })
+    local picked, picked2 = marks(parent, "picked")[1], marks(parent2, "picked")[1]
+    local button = pointButtons(parent)[1]
+    button.scripts.OnEnter(button)
+    return picked ~= nil and sameColor(picked.box.fill._color, graph.COLORS.picked) and picked2 ~= nil
+        and sameColor(picked2.box.fill._color, graph.COLORS.pickedCrowd) and countExact(parent, "your pick") == 1
+        and countExact(parent, "recommended") == 1 and #marks(parent, "recommended") == 1
+        and GameTooltip.lines[2] == "about 333 fps if only this setting changes (your pick)", tostring(GameTooltip.lines[2])
+end)
+
+test("GR-14 each point's button is 20 pixels and a click calls onPick with that level; without onPick a click does nothing", function()
+    local _, graph, r = boot()
+    local m = modelOf(r)
+    local parent, parent2 = newParent(), newParent()
+    local got = {}
+    graph.new(parent):draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis, { onPick = function(value) got[#got + 1] = value end })
+    graph.new(parent2):draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis)
+    local buttons, buttons2 = pointButtons(parent), pointButtons(parent2)
+    local lay = graph.layout(graphOf(m, "graphicsShadowQuality"), m.axis, RECT)
+    buttons[1]:Click()
+    buttons[3]:Click()
+    local inert = pcall(function() buttons2[1]:Click() end)
+    return graph.HIT == 20 and buttons[1]._width == 20 and buttons[1]._height == 20 and near(buttons[1]._point[4], lay.points[1].x - 10)
+        and #got == 2 and got[1] == "0" and got[2] == "2" and inert and buttons2[1].scripts.OnClick == nil,
+        table.concat(got, ",") .. " " .. tostring(buttons[1]._width)
+end)
+
+test("GR-15 a redraw without onPick takes the click away from a button that had one", function()
+    local _, graph, r = boot()
+    local m = modelOf(r)
+    local parent = newParent()
+    local g = graph.new(parent)
+    local got = 0
+    g:draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis, { onPick = function() got = got + 1 end })
+    g:draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis)
+    pointButtons(parent)[1]:Click()
+    return got == 0 and pointButtons(parent)[1].scripts.OnClick == nil, tostring(got)
 end)
 
 return H.results()

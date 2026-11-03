@@ -1036,20 +1036,9 @@ end
   'graph-draw-lines-off': ['Graph.lua', `    local useLines = type(parent.CreateLine) == "function"`, `    local useLines = false`],
   'graph-draw-fallback-sparse': ['Graph.lua', `local DOT, DOT_STEP = 2, 6`, `local DOT, DOT_STEP = 2, 60`],
   'graph-draw-raising-lines-fatal': ['Graph.lua', `            local ok, line = pcall(take, segments)`, `            local ok, line = true, take(segments)`],
-  'graph-draw-point-size': ['Graph.lua', `local POINT, HIT, RING = 8, 14, 14`, `local POINT, HIT, RING = 10, 14, 14`],
-  'graph-draw-doubtful-filled': ['Graph.lua', `                if p.doubtful then
-                    outline(COLORS.hollow, item.x, item.y, POINT)`, `                if false then
-                    outline(COLORS.hollow, item.x, item.y, POINT)`],
-  'graph-draw-ring-missing': ['Graph.lua', `                    outline(COLORS.ring, item.x, item.y, RING)`, `                    local _ = RING`],
-  'graph-draw-recommended-uncoloured': ['Graph.lua', `box(p.recommended and COLORS.recommended or COLORS.point,`, `box(COLORS.point,`],
   'graph-draw-grid-missing': ['Graph.lua', `                box(COLORS.grid, plot.x, tick.y, plot.width, 1)`, `                local _ = plot`],
   'graph-draw-axis-line-missing': ['Graph.lua', `            box(COLORS.axis, plot.x, plot.y, 1, plot.height)`, `            local _ = plot`],
-  'graph-draw-tag-wrong-point': ['Graph.lua', `                if p.recommended then say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended) end`, `                if p.current then say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended) end`],
-  'graph-draw-tag-too-high': ['Graph.lua', `                if p.recommended then say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended) end`, `                if p.recommended then say("recommended", item.x - 35, item.y - 28, 70, COLORS.recommended) end`],
-  'graph-draw-now-tag-too-high': ['Graph.lua', `                    say("now", item.x - 20, item.y - TAG_RISE, 40)`, `                    say("now", item.x - 20, item.y - 28, 40)`],
   'graph-draw-margin-top-small': ['Graph.lua', `graph.MARGIN = { left = 44, right = 14, top = 22, bottom = 26 }`, `graph.MARGIN = { left = 44, right = 14, top = 10, bottom = 26 }`],
-  'graph-draw-label-all-levels': ['Graph.lua', `                if k == 1 or k == #points or p.current or p.recommended then`, `                if true then`],
-  'graph-draw-label-last-missing': ['Graph.lua', `                if k == 1 or k == #points or p.current or p.recommended then`, `                if k == 1 or p.current or p.recommended then`],
   'graph-draw-tooltip-unit': ['Graph.lua', `"about %.0f fps if only this setting changes"`, `"about %.0f ms if only this setting changes"`],
   'graph-draw-doubtful-mark-missing': ['Graph.lua', `    if p.doubtful then marks[#marks + 1] = "this reading looks off" end`, `    local _ = marks`],
   'graph-draw-leave-keeps-tooltip': ['Graph.lua', `                button:SetScript("OnLeave", function() GameTooltip:Hide() end)`, `                button:SetScript("OnLeave", function() end)`],
@@ -2005,6 +1994,40 @@ end
         measuredFps =`],
   'graph-recommended-on-current': ['Recommend.lua', `recommended = changing and level.value == recommendedLevel and not level.current, doubtful = false,`, `recommended = changing and level.value == recommendedLevel, doubtful = false,`],
   'graph-recommended-always': ['Recommend.lua', `recommended = changing and level.value == recommendedLevel and not level.current, doubtful = false,`, `recommended = level.value == recommendedLevel and not level.current, doubtful = false,`],
+  // The graph's new look and clickable points (spec 2026-11-03-tests-and-results-in-my-settings-design.md M4, M5); the first nine
+  // re-anchor the rows of the old square points
+  'graph-draw-point-size': ['Graph.lua', `local POINT, HIT, RING = 8, graph.HIT, 16`, `local POINT, HIT, RING = 10, graph.HIT, 16`],
+  'graph-draw-doubtful-filled': ['Graph.lua', `                elseif p.doubtful then
+                    mark(dots, "hollow", item.x, item.y, nil, COLORS.hollow)`, `                elseif false then
+                    mark(dots, "hollow", item.x, item.y, nil, COLORS.hollow)`],
+  'graph-draw-ring-missing': ['Graph.lua', `                    mark(rings, "ring", item.x, item.y, nil, COLORS.ring)`, `                    local _ = rings`],
+  'graph-draw-recommended-uncoloured': ['Graph.lua', `mark(dots, "recommended", item.x, item.y, COLORS.recommended)`, `mark(dots, "recommended", item.x, item.y, COLORS.point)`],
+  'graph-draw-tag-wrong-point': ['Graph.lua', `                elseif p.recommended then
+                    say("recommended"`, `                elseif p.current then
+                    say("recommended"`],
+  'graph-draw-tag-too-high': ['Graph.lua', `say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended)`, `say("recommended", item.x - 35, item.y - 28, 70, COLORS.recommended)`],
+  'graph-draw-now-tag-too-high': ['Graph.lua', `say("now", item.x - 20, item.y - TAG_RISE, 40, COLORS.ring)`, `say("now", item.x - 20, item.y - 28, 40, COLORS.ring)`],
+  'graph-draw-label-all-levels': ['Graph.lua', `if k == 1 or k == #points or p.current or p.recommended or p.picked then`, `if true then`],
+  'graph-draw-label-last-missing': ['Graph.lua', `if k == 1 or k == #points or p.current or p.recommended or p.picked then`, `if k == 1 or p.current or p.recommended or p.picked then`],
+  'gr-palette-line': ['Graph.lua', `line = paletteColor("accentDim")`, `line = paletteColor("accent")`],
+  'gr-palette-recommended': ['Graph.lua', `recommended = paletteColor("accent")`, `recommended = paletteColor("warning")`],
+  'gr-palette-picked': ['Graph.lua', `picked = paletteColor("profileEveryday")`, `picked = paletteColor("profileCrowded")`],
+  'gr-accent-dim-value': ['Skin.lua', `accentDim = "6f72c8"`, `accentDim = "6f72c9"`],
+  'gr-ring-size': ['Graph.lua', `local POINT, HIT, RING = 8, graph.HIT, 16`, `local POINT, HIT, RING = 8, graph.HIT, 14`],
+  'gr-ring-square': ['Graph.lua', `return newMark(parent, RING, ns.skin.RADIUS.window)`, `return newMark(parent, RING, ns.skin.RADIUS.control)`],
+  'gr-ring-filled': ['Graph.lua', `m.box.fill:SetColorTexture(f[1], f[2], f[3], fillColor and f[4] or 0)`, `m.box.fill:SetColorTexture(f[1], f[2], f[3], 1)`],
+  'gr-picked-not-drawn': ['Graph.lua', `                if p.picked then
+                    mark(dots, "picked"`, `                if false then
+                    mark(dots, "picked"`],
+  'gr-pick-colour-ignored': ['Graph.lua', `options.pickColor == "crowded" and COLORS.pickedCrowd or COLORS.picked`, `COLORS.picked`],
+  'gr-pick-tag-missing': ['Graph.lua', `say("your pick", item.x - 35, item.y - TAG_RISE, 70, pickedColor)`, `local _ = pickedColor`],
+  'gr-pick-tooltip': ['Graph.lua', `    if p.picked then marks[#marks + 1] = "your pick" end`, `    local _ = p`],
+  'gr-hit-small': ['Graph.lua', `graph.HIT = 20 `, `graph.HIT = 14 `],
+  'gr-click-missing': ['Graph.lua', `button:SetScript("OnClick", onPick and function() onPick(value) end or nil)`, `button:SetScript("OnClick", nil)`],
+  'gr-click-always': ['Graph.lua', `button:SetScript("OnClick", onPick and function() onPick(value) end or nil)`, `if onPick then button:SetScript("OnClick", function() onPick(value) end) end`],
+  'gr-click-wrong-level': ['Graph.lua', `local onPick, value = options.onPick, p.value`, `local onPick, value = options.onPick, points[1].point.value`],
+  'gr-marks-left-behind': ['Graph.lua', `        release(dots)
+        release(rings)`, `        local _ = dots`],
 };
 
 function main() {
