@@ -1198,6 +1198,9 @@ ed-skin-check-hover-disabled|test_skin|SK-11|killed
 skin-check-mark|test_skin|SK-4|killed
 skin-round-check-hover|test_skin|SK-9|killed
 live-held-none|test_settings|S3-2|killed
+ui-icon-gear|test_ui|B10-11b|killed
+ui-icon-size|test_ui|B10-11b|killed
+ui-icon-layer|test_ui|B10-11b|killed
 control-comment|test_bench||survive
 control-missing|test_bench||error
 control-syntax|test_bench||error'

@@ -1972,6 +1972,10 @@ end
   // The table run on the redesign: heldValues reads only the game now (its saved-values branch could no longer be reached)
   'live-held-none': ['Settings.lua', `        local value = GetCVar(entry.cvar)
         if value ~= nil then values[entry.cvar] = value end`, `        local _ = entry`],
+  // The minimap button's own gauge icon (owner request 2026-11-03)
+  'ui-icon-gear': ['UI.lua', `icon:SetTexture("Interface/AddOns/" .. addonName .. "/Media/icon.tga")`, `icon:SetTexture("Interface/Icons/INV_Misc_Gear_01")`],
+  'ui-icon-size': ['UI.lua', `    icon:SetSize(20, 20)`, `    icon:SetSize(24, 24)`],
+  'ui-icon-layer': ['UI.lua', `local icon = button:CreateTexture(nil, "ARTWORK")`, `local icon = button:CreateTexture(nil, "OVERLAY")`],
 };
 
 function main() {

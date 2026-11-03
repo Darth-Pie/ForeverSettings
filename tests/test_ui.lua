@@ -300,6 +300,21 @@ test("B10-11e the tooltip shows the state and how many settings are kept, in pla
         and idle:lower():find("forced", 1, true) == nil and two:lower():find("forced", 1, true) == nil, idle .. " // " .. two
 end)
 
+-- The button's picture is the addon's own gauge, as on the Wago thumbnail (owner request 2026-11-03), inside the stock round border.
+test("B10-11b the button shows the gauge icon from the addon's Media folder at 20 pixels, centred, under the round border", function()
+    local e, ui = newUi()
+    e.fire("PLAYER_LOGIN")
+    local btn = findFrame("ForeverSettingsMinimapButton")
+    local icon, ring
+    for _, tex in ipairs(btn and btn.textures or {}) do
+        if tex._texture == "Interface/AddOns/ForeverSettings/Media/icon.tga" then icon = tex end
+        if tex._texture == "Interface/Minimap/MiniMap-TrackingBorder" then ring = tex end
+    end
+    return icon ~= nil and icon.layer == "ARTWORK" and icon._width == 20 and icon._height == 20 and icon._point ~= nil
+        and icon._point[1] == "CENTER" and ring ~= nil and ring.layer == "OVERLAY",
+        tostring(icon and icon._texture) .. " " .. tostring(btn and btn.textures[1] and btn.textures[1]._texture)
+end)
+
 test("B10-12 /fset minimap hides and shows the button, and the choice survives a login", function()
     local e = newUi()
     e.fire("PLAYER_LOGIN")

@@ -45,5 +45,32 @@ for (const radius of [4, 8]) {
     }
   }
 }
+// The minimap button's gauge (UI.lua): a 64 by 64 32 bit TGA, round (clear corners, solid middle), in colour.
+(function () {
+  const name = 'icon.tga';
+  const size = 64;
+  let buf;
+  try {
+    buf = fs.readFileSync(path.join(dir, name));
+  } catch (e) {
+    problems.push(name + ' is missing');
+    return;
+  }
+  if (buf.length !== 18 + size * size * 4 || buf[2] !== 2 || buf[16] !== 32 || buf.readUInt16LE(12) !== size || buf.readUInt16LE(14) !== size) {
+    problems.push(name + ' is not an uncompressed 32 bit ' + size + 'x' + size + ' TGA');
+    return;
+  }
+  const at = (x, y) => 18 + ((size - 1 - y) * size + x) * 4;      // rows stored bottom to top; y counted from the top
+  for (const [x, y] of [[0, 0], [size - 1, 0], [0, size - 1], [size - 1, size - 1]]) {
+    if (buf[at(x, y) + 3] !== 0) problems.push(name + ': the corners should be clear (the icon is round)');
+  }
+  if (buf[at(size / 2, size / 2) + 3] < 250) problems.push(name + ': the middle should be solid');
+  let coloured = 0;
+  for (let i = 18; i < buf.length; i += 4) {
+    const [b, g, r] = [buf[i], buf[i + 1], buf[i + 2]];
+    if (buf[i + 3] > 200 && Math.max(r, g, b) - Math.min(r, g, b) > 80) coloured++;
+  }
+  if (coloured < 200) problems.push(name + ': the gauge colours are missing');
+})();
 for (const problem of problems) console.log('MEDIA FAIL: ' + problem);
 process.exit(problems.length === 0 ? 0 : 1);

@@ -1,7 +1,7 @@
 -- UI.lua: a minimap button with a dropdown menu, and a small report window (spec section 15).
 -- The menu is built from a pure model (ui.menuModel); every action calls the same function as its slash command,
 -- so the menu holds no logic of its own. The two adapters to the client's menu system are thin and carry no logic.
-local _, ns = ...
+local addonName, ns = ...
 
 local ui = {}
 ns.ui = ui
@@ -407,7 +407,7 @@ local function createButton()
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
     local icon = button:CreateTexture(nil, "ARTWORK")
-    icon:SetTexture("Interface/Icons/INV_Misc_Gear_01")
+    icon:SetTexture("Interface/AddOns/" .. addonName .. "/Media/icon.tga")     -- the gauge of the Wago thumbnail (build/make-icon.js)
     icon:SetSize(20, 20)
     icon:SetPoint("CENTER")
     local ring = button:CreateTexture(nil, "OVERLAY")
