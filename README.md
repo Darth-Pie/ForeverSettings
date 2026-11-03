@@ -21,7 +21,7 @@ An addon for **WoW Forever**.
 ## Try it in four steps
 
 1. Stand somewhere quiet and click the minimap button, then **Find my best settings**.
-2. Pick the frame rate you're aiming for (your monitor's refresh rate is a good choice) and press **Start**. It takes roughly 5 to 10 minutes and runs on its own. Don't move or open windows while it runs.
+2. Pick the frame rate you're aiming for (your monitor's refresh rate is a good choice) and press **Start**. It takes roughly 10 to 25 minutes (Quick is the shorter) and runs on its own. Don't move or open windows while it runs.
 3. See what each change does, then **Save**. Your own settings are put back after the test. Want a different level for one setting? Click its point on the graph: the estimate follows, and **Save** keeps the levels shown.
 4. Later, in a busy place (a city, a raid): **Find my crowded settings**.
 
@@ -31,7 +31,7 @@ An addon for **WoW Forever**.
 
 ## See the price of every level
 
-**My settings** (minimap menu, or `/fset settings`) has a page list on the left. The settings pages list every setting with what each level costs in frames per second against the level you have, how much it matters to the picture, a total for your choices, and what everything at the highest would give. The pages change the profile you are using, at once; the coloured pill next to the close button shows which one that is. Original and Maximum can't be changed, so their pages offer Everyday and Crowded instead. **Save as Everyday** and **Save as Crowded**, at the bottom of the page list, keep the settings you have in the game now.
+**My settings** (minimap menu, or `/fset settings`) has a page list on the left. The settings pages list every setting with what each level costs in frames per second against the level you have, how much it matters to the picture, a total for your choices, and what everything at the highest would give. The pages change the profile you are using, at once; the **Everyday | Crowded** switch in the title bar shows which one that is and switches with one click. Original and Maximum can't be changed, so their pages offer Everyday and Crowded instead. **Save as Everyday** and **Save as Crowded**, at the bottom of the page list, keep the settings you have in the game now.
 
 <p align="center">
   <img src=".previews/my-settings.png" alt="My settings, Light and shadows page: Shadow detail, Soft corner shadows and Extra effects detail, with the fps cost under each level" width="720">
@@ -45,6 +45,10 @@ The **Home** page switches profile and starts the tests. The test itself runs on
   <img src=".previews/picture-size.png" alt="My settings, Picture size page: the size buttons with their fps costs and the picture sharpness slider" width="355">
 </p>
 
+## Advanced settings
+
+Turn on **Advanced** in the title bar of My settings (you accept a warning the first time) for three more pages with 21 settings the game's own menu doesn't offer: how far grass and the world are drawn, sun rays, fog, glow, water reflections, shadow map size and more. They are finicky: some can make the game look wrong, run badly or crash, so change them only if you know what they do. **Return to Original** puts every setting back. The ones marked risky go back to a safe value when you log out and are put back after you enter the world; hold Shift while you enter the world to skip them for that session. The first Advanced page also has the raid option and the tools: Check this spot, Run benchmark, Show last report and Apply all now.
+
 ## Profiles
 
 | Profile | What it is |
@@ -54,7 +58,7 @@ The **Home** page switches profile and starts the tests. The test itself runs on
 | **Crowded** | The settings you saved for raids and busy cities. |
 | **Maximum** | Everything at the highest level the addon has learned. It needs plenty of graphics memory. |
 
-Switch from the minimap button, or type `/fset profile everyday` (also `crowded`, `maximum`, `original`).
+Switch from the minimap menu (hover a profile to see what it is for; **Return to Original** is at the bottom), from the switch in My settings' title bar, or type `/fset profile everyday` (also `crowded`, `maximum`, `original`).
 
 <p align="center">
   <img src=".previews/minimap-menu.png" alt="The minimap menu with the four profiles" width="300">
@@ -78,7 +82,9 @@ Switch from the minimap button, or type `/fset profile everyday` (also `crowded`
 - **Nothing changes in combat or during a test.** It waits until afterwards.
 - **If the game crashes, changes you made in My settings that session can be lost.** The game saves addon data only at a normal exit or `/reload`.
 - **Maximum** uses the sharpest textures, which need plenty of graphics memory.
-- **Not included:** raytracing and console-only settings. Some settings don't exist in every client and then aren't shown.
+- **Advanced settings are finicky** and never measured. Some can make the game look wrong, run badly or crash; Return to Original puts them back. They leave the game's raid and battleground graphics alone.
+- **The test measures every setting of the game's graphics menu,** so it takes longer than it used to. If a setting makes no difference anywhere, even with every setting at its lowest, the test says so and stops: then a frame-rate limit, another program or your processor sets the pace.
+- **Not included:** raytracing. Some settings don't exist in every client and then aren't shown.
 - **Another addon that sets the same graphics settings** can fight with this one, each undoing the other at every loading screen.
 
 ## Problems and ideas

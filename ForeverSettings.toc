@@ -2,7 +2,7 @@
 ## Title: ForeverSettings
 ## Notes: Finds good graphics settings for your PC and keeps them. An addon for WoW Forever.
 ## IconTexture: Interface/AddOns/ForeverSettings/Media/icon.tga
-## Version: 0.10.1
+## Version: 0.11.0
 ## X-Wago-ID: BKpEVPGE
 ## SavedVariables: ForeverSettingsDB
 
