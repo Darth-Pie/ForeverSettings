@@ -670,23 +670,6 @@ test("B6-1 check: baseline and spread printed, the control responds, everything 
         and CVARS.RenderScale == "1" and e.ns.suspended == false and b.active() == false and pendingOf(b) == nil, outText()
 end)
 
-test("B6-1b a picture sharpness boost ends when a test starts: it measures the normal size and the game ends there", function()
-    local e, b = newBench(checkCvars())
-    e.ns.profiles.boost(1.5, true)
-    local started = CVARS.RenderScale == "1.5" and e.ns.profiles.boosted() ~= nil
-    local results = runCheck(e, b)
-    local r = results[1]
-    return started and #results == 1 and r.ok and near(r.baselineMs, 8.0, 0.01) and CVARS.RenderScale == "1"
-        and e.ns.profiles.boosted() == nil and pendingOf(b) == nil, outText()
-end)
-
-test("B6-1c a boost that cannot be put back does not stop a test from starting", function()
-    local e, b = newBench(checkCvars())
-    e.ns.profiles.unboost = function() error("boom") end
-    local results = runCheck(e, b)
-    return #results == 1 and results[1].ok and CVARS.RenderScale == "1", outText()
-end)
-
 test("B6-2 a frame time that does not follow the control ends the check with 'did not respond'", function()
     local e, b = newBench(checkCvars())
     local results = runCheck(e, b, function() return 0.008 end)
@@ -825,14 +808,6 @@ local function rowsOf(entry, cvar)
 end
 local function reportText(b, entry) return table.concat(b.report(entry), "\n") end
 local function copyOf(t) local c = {} for k, v in pairs(t) do c[k] = v end return c end
-
-test("B7-0 a picture sharpness boost ends when a run starts: the baseline is the normal size and the game ends there", function()
-    local e, b = newRun()
-    e.ns.profiles.boost(1.5, true)                       -- 9 ms a frame on the fake renderer, against 7 ms at the normal size
-    local entry = doRun(e, b)[1]
-    return entry and entry.valid and near(entry.baselineMs, 7.0, 0.2) and CVARS.RenderScale == "1" and e.ns.profiles.boosted() == nil,
-        tostring(entry and entry.baselineMs)
-end)
 
 test("B7-1 every tier's delta matches the model, and the starting tier has delta 0", function()
     local e, b = newRun()
@@ -1986,6 +1961,32 @@ test("QT-7 dynamic render scale being on adds a plain warning that reaches the p
     local okOn, _, wOn = b.preflight()
     return onEntry and onEntry.valid == true and contains(on, DYNAMIC_WARNING) and contains(two, DYNAMIC_WARNING) and off == "" and absent == ""
         and okOn and wOn[1] == DYNAMIC_WARNING and not contains(on, "dynamicRenderScale"), on .. " / " .. off .. " / " .. absent
+end)
+
+local SIZE_WARNING_TEXT = "Picture sharpness is above 100%, so every setting is measured under a heavier load and the costs come out wrong. "
+    .. "Put it back to 100% on the Picture size page of My settings and run the test again."
+test("QT-8 a picture size above 100% adds a plain warning that reaches the player even in a silent run and does not refuse; 100% or less says nothing", function()
+    local function warned(change)
+        local cv = runCvars()
+        for k, v in pairs(change) do cv[k] = v end
+        local e, b = newRun(cv)
+        local entry = doRunWith(e, b, { levels = "quick", kind = "setup", silent = true })[1]
+        return entry, outText()
+    end
+    local onEntry, on = warned({ RenderScale = "1.5" })
+    local _, small = warned({ RenderScale = "0.8" })
+    local _, normal = warned({ RenderScale = "1" })
+    local cv = runCvars()
+    cv.RenderScale = "1.25"
+    local _, b = newBench(cv)
+    local okOn, _, wOn = b.preflight()
+    local cv2 = runCvars()
+    cv2.RenderScale = "1"
+    local _, b2 = newBench(cv2)
+    local _, _, wOff = b2.preflight()
+    return onEntry and onEntry.valid == true and contains(on, SIZE_WARNING_TEXT) and not contains(small, "Picture sharpness is above")
+        and not contains(normal, "Picture sharpness is above") and okOn and wOn[#wOn] == SIZE_WARNING_TEXT and #wOff == 0,
+        on .. " / " .. small .. " / " .. normal
 end)
 
 return H.results()

@@ -1310,193 +1310,44 @@ test("MX-13 no 'same settings' hint to or from Maximum, even when Everyday holds
     return to and from, outText()
 end)
 
--- SZ: the picture sharpness boost (spec 2026-11-02-picture-sharpness-slider-design.md): RenderScale changed in the live game
--- only, for this session, never written into a profile or the saved list.
-local function szCount(sub)
-    local n = 0
-    for _, l in ipairs(OUT) do
-        if l:find(sub, 1, true) then n = n + 1 end
-    end
-    return n
-end
-local function boostGame(over)
+-- SZ: a picture size above 100% is an ordinary kept level (spec 2026-11-02-one-saved-picture-size-design.md): stored in a profile,
+-- applied, enforced and saved like any other; only Maximum stays at the highest level the test measures.
+local function sizeGame(over)
     local cv = { RenderScale = "1", graphicsShadowQuality = "2", graphicsSSAO = "1" }
     for k, v in pairs(over or {}) do cv[k] = v end
     return boot(cv)
 end
 
-test("SZ-1 a boost sets the game's value now and remembers the one before it, and writes nothing into any profile or the saved list", function()
-    local e, p = boostGame()
+test("SZ-1 a picture size above 100% is stored, applied and enforced like any other level, on the profile in use and on one that is not", function()
+    local e, p = sizeGame()
     local db = p.state()
-    OUT, SETLOG = {}, {}
-    local ok, info = p.boost(1.5, true)
-    local first = p.boosted()
-    local ok2 = p.boost(2, true)
-    local second = p.boosted()
-    return ok and info.held == "1.5" and info.refused == false and CVARS.RenderScale == "2" and first.before == "1" and first.value == "1.5"
-        and ok2 and second.before == "1" and second.value == "2" and db.want.RenderScale == nil
-        and db.profiles.everyday.values.RenderScale == nil and db.profiles.crowded.values.RenderScale == nil
-        and db.original.values.RenderScale == "1" and #OUT == 0, outText()
-end)
-
-test("SZ-1b without silence the boost says the size, that it is for this session, and what it goes back to", function()
-    local e, p = boostGame()
-    OUT = {}
-    p.boost(1.5)
-    return szCount("picture sharpness is 150% for this session; it goes back to 100% when you log out") == 1, outText()
-end)
-
-test("SZ-2 a size outside 50% to 200%, or no number at all, is refused with a plain message and writes nothing", function()
-    local e, p = boostGame()
-    OUT, SETLOG = {}, {}
-    local results = {}
-    for _, v in ipairs({ 0.49, 2.01, 5, 0 }) do
-        local ok, why = p.boost(v)
-        results[#results + 1] = tostring(ok) .. ":" .. tostring(why)
-    end
-    local okText, whyText = p.boost("abc")
-    local okNil, whyNil = p.boost(nil)
-    local writes = #SETLOG
-    local refusedSays = szCount("50% to 200%")
-    local low = p.boost(0.5, true)
-    local high = p.boost(2, true)
-    return table.concat(results, ",") == "false:range,false:range,false:range,false:range" and okText == false and whyText == "range"
-        and okNil == false and whyNil == "range" and writes == 0 and refusedSays == 6 and low and high and CVARS.RenderScale == "2", outText()
-end)
-
-test("SZ-3 in combat, during a test, or in a client with no such setting, a boost is refused and writes nothing", function()
-    local e, p = boostGame()
-    OUT, SETLOG = {}, {}
-    COMBAT = true
-    local _, combat = p.boost(1.5)
-    COMBAT = false
-    e.ns.suspended = true
-    local _, busy = p.boost(1.5)
-    e.ns.suspended = false
-    local writes, kept = #SETLOG, CVARS.RenderScale
-    local sayCombat, sayBusy = szCount("in combat; try again afterwards"), szCount("benchmark running; try again afterwards")
-    local e2, p2 = boot({ graphicsShadowQuality = "2" })
-    local _, none = p2.boost(1.5)
-    return combat == "combat" and busy == "busy" and none == "unavailable" and writes == 0 and kept == "1" and sayCombat == 1 and sayBusy == 1
-        and #SETLOG == 0, outText()
-end)
-
-test("SZ-4 a value the game will not take, or takes changed, is said and the boost holds what the game holds", function()
-    local e, p = boostGame()
-    SETFAIL.RenderScale = "clamp"
-    OUT = {}
-    local ok, info = p.boost(1.5)
-    local refused = ok and info.refused == true and info.held == "1" and p.boosted() == nil and CVARS.RenderScale == "1"
-        and szCount("the game kept picture sharpness at 100% (wanted 150%)") == 1
-    SETFAIL.RenderScale = nil
-    DERIVED.RenderScale = function(_, cv) cv.RenderScale = "1.75" end
-    OUT = {}
-    local ok2, info2 = p.boost(2)
-    local changed = ok2 and info2.refused == true and info2.held == "1.75" and p.boosted().value == "1.75" and p.boosted().before == "1"
-        and szCount("the game kept picture sharpness at 175% (wanted 200%)") == 1
-    return refused and changed, outText()
-end)
-
-test("SZ-5 putting back returns the value from before; with nothing to put back it says so; a value changed elsewhere since is left alone", function()
-    local e, p = boostGame()
-    p.boost(1.5, true)
-    OUT, SETLOG = {}, {}
-    local ok = p.unboost(true)
-    local back = CVARS.RenderScale == "1" and p.boosted() == nil and #OUT == 0
-    local okNone, why = p.unboost(true)
-    p.boost(1.5, true)
-    OUT = {}
-    p.unboost()
-    local said = szCount("picture sharpness is back to 100%") == 1
-    p.boost(1.5, true)
-    CVARS.RenderScale = "0.8"                           -- changed elsewhere, say in the game's own menu
-    SETLOG = {}
-    local okStale, whyStale = p.unboost(true)           -- asked before anything has looked at the boost
-    local stale = p.boosted() == nil
-    return ok and back and okNone == false and why == "none" and said and stale and okStale == false and whyStale == "none"
-        and #SETLOG == 0 and CVARS.RenderScale == "0.8", outText()
-end)
-
-test("SZ-5b a game that will not take the old value back keeps the boost and says so", function()
-    local e, p = boostGame()
-    p.boost(1.5, true)
-    SETFAIL.RenderScale = "clamp"
-    OUT = {}
-    local ok, why = p.unboost()
-    local kept = ok == false and why == "failed" and p.boosted() ~= nil and CVARS.RenderScale == "1.5"
-        and szCount("the game would not put picture sharpness back to 100%") == 1
-    SETFAIL.RenderScale = nil
-    local again = p.unboost(true) and CVARS.RenderScale == "1" and p.boosted() == nil
-    return kept and again, outText()
-end)
-
-test("SZ-6 a level chosen for the same setting, or any profile switch (which writes every managed setting), takes over from a boost", function()
-    local e, p = boostGame()
-    local db = p.state()
-    db.profiles.everyday.values = { graphicsShadowQuality = "2" }
-    db.profiles.crowded.values = { RenderScale = "0.7" }
     p.switch("everyday", true)
-    p.boost(1.5, true)
-    p.setValue("RenderScale", "0.8", true)
-    local level = CVARS.RenderScale == "0.8" and p.boosted() == nil
-    local e2, p2 = boostGame()
-    local db2 = p2.state()
-    db2.profiles.everyday.values = { graphicsShadowQuality = "2" }
-    db2.profiles.crowded.values = { RenderScale = "0.7" }
-    p2.switch("everyday", true)
-    p2.boost(1.5, true)
-    p2.switch("crowded", true)
-    local profile = CVARS.RenderScale == "0.7" and p2.boosted() == nil
-    local e3, p3 = boostGame()
-    local db3 = p3.state()
-    db3.profiles.everyday.values = { graphicsShadowQuality = "2" }
-    db3.profiles.crowded.values = { graphicsSSAO = "2" }
-    p3.switch("everyday", true)
-    p3.boost(1.5, true)
-    p3.switch("crowded", true)                 -- holds no RenderScale: Original's value is written for it, as for any setting not held
-    local original = CVARS.RenderScale == "1" and p3.boosted() == nil
-    -- the profile or the level asks for exactly the size the boost holds: the profile owns it from then on, so the boost is over
-    local e4, p4 = boostGame()
-    local db4 = p4.state()
-    db4.profiles.everyday.values = { graphicsShadowQuality = "2" }
-    db4.profiles.crowded.values = { RenderScale = "1.5" }
-    p4.switch("everyday", true)
-    p4.boost(1.5, true)
-    p4.switch("crowded", true)
-    local sameProfile = CVARS.RenderScale == "1.5" and p4.boosted() == nil
-    local e5, p5 = boostGame()
-    p5.state().profiles.everyday.values = { graphicsShadowQuality = "2" }
-    p5.switch("everyday", true)
-    p5.boost(1.5, true)
-    p5.setValue("RenderScale", "1.5", true)
-    local sameLevel = CVARS.RenderScale == "1.5" and p5.boosted() == nil
-    return level and profile and original and sameProfile and sameLevel,
-        tostring(level) .. tostring(profile) .. tostring(original) .. tostring(sameProfile) .. tostring(sameLevel) .. outText()
+    local ok = p.setValue("RenderScale", "1.5", true)
+    local stored = ok and db.profiles.everyday.values.RenderScale == "1.5" and db.want.RenderScale == "1.5" and CVARS.RenderScale == "1.5"
+    p.setProfileValue("crowded", "RenderScale", "2", true)
+    local other = db.profiles.crowded.values.RenderScale == "2" and CVARS.RenderScale == "1.5" and db.want.RenderScale == "1.5"
+    p.switch("crowded", true)
+    local switched = CVARS.RenderScale == "2" and db.want.RenderScale == "2"
+    p.switch("everyday", true)
+    local back = CVARS.RenderScale == "1.5" and db.want.RenderScale == "1.5"
+    return stored and other and switched and back, tostring(stored) .. tostring(other) .. tostring(switched) .. tostring(back)
 end)
 
-test("SZ-8 a boost is never saved: while it holds the setting, the value the player has is the one from before, for a save and for a capture of live values", function()
-    local e, p = boostGame()
+test("SZ-2 saving the game's current settings keeps a size above 100% as it is, and so does capturing the live values", function()
+    local e, p = sizeGame()
     local db = p.state()
-    db.profiles.everyday.values = {}
-    p.boost(1.5, true)
-    local during = p.liveValue("RenderScale") == "1" and p.liveValue("graphicsSSAO") == "1" and p.live({ "RenderScale", "graphicsSSAO" }).RenderScale == "1"
+    CVARS.RenderScale = "1.75"
     local count = p.save("everyday", true)
-    local saved = count ~= nil and db.profiles.everyday.values.RenderScale == "1" and db.profiles.everyday.values.graphicsSSAO == "1"
-        and CVARS.RenderScale == "1.5" and p.boosted() ~= nil and db.want.RenderScale ~= "1.5"
-    CVARS.RenderScale = "0.8"                           -- the game changes it itself: that is the player's value
-    local stale = p.liveValue("RenderScale") == "0.8" and p.live({ "RenderScale" }).RenderScale == "0.8"
-    local e2, p2 = boostGame()
-    local plain = p2.liveValue("RenderScale") == "1" and p2.liveValue("noSuchSetting") == nil
-    return during and saved and stale and plain, tostring(during) .. tostring(saved) .. tostring(stale) .. tostring(plain)
+    local saved = count ~= nil and db.profiles.everyday.values.RenderScale == "1.75"
+    local live = p.live({ "RenderScale", "graphicsSSAO" })
+    return saved and live.RenderScale == "1.75" and live.graphicsSSAO == "1", tostring(saved) .. tostring(live.RenderScale)
 end)
 
-test("SZ-7 asking for the size the game had before ends the boost", function()
-    local e, p = boostGame()
-    p.boost(1.5, true)
-    p.boost(1, true)
-    local ended = CVARS.RenderScale == "1" and p.boosted() == nil
-    local again = p.boost(1, true) and p.boosted() == nil and CVARS.RenderScale == "1"
-    return ended and again, outText()
+test("SZ-3 Maximum never goes above 100%: it takes the highest level the test measures, whatever size the player has", function()
+    local e, p = sizeGame({ RenderScale = "1.5" })
+    local db = p.state()
+    local ok = p.switch("maximum", true)
+    return ok and CVARS.RenderScale == "1" and db.want.RenderScale == "1", tostring(ok) .. tostring(CVARS.RenderScale) .. tostring(db.want.RenderScale)
 end)
 
 return H.results()

@@ -10,7 +10,7 @@
 --   /fset dump <text>          list CVars whose name contains <text>, with current and default values
 --   /fset probe [names]        ask the client which of these CVars exist (the beyond-Ultra macros' when none are given);
 --                              changes nothing
---   /fset size [percent | off] the picture sharpness (Render scale), 50 to 200, for this session only
+--   /fset size [percent | off] the picture sharpness (Render scale), 50 to 200, kept in the profile in use
 
 local _, ns = ...
 
@@ -31,6 +31,9 @@ local db
 local pending = false
 local recovered = false
 local warned = {}
+local safeStart = false            -- Shift was held when the session's first loading screen came: no saved size above 100% this session
+local safeSaid = false
+local pendingManual = false        -- what waited for combat was asked for by the player (a command, a click), so Shift does not skip it
 
 local function say(msg)
     print(PREFIX .. msg)
@@ -150,9 +153,32 @@ local function orderedKeys(t)
     return keys
 end
 
+-- The picture size the profile in use keeps (the setting may be stored in any case), as a number, or nil.
+local function keptSize()
+    for name, value in pairs(db.want) do
+        if name:lower() == "renderscale" then return tonumber(value) end
+    end
+    return nil
+end
+
+-- A setting named in any case, as the game and the My settings window spell it: the managed settings, then the known names.
+-- (GetCVar answers in any case; without this `/fset set renderscale 1.5` would be stored, enforced and shown under another name
+-- than the window and the logout revert look for.)
+local function ownSpelling(name)
+    local lower = name:lower()
+    for _, known in ipairs(ns.profiles and ns.profiles.MANAGED or {}) do
+        if known:lower() == lower then return known end
+    end
+    for _, known in ipairs((ns.cvarNames())) do
+        if known:lower() == lower then return known end
+    end
+    return name
+end
+
 -- manual: the user asked for it, so say something even when nothing changed. silent: say nothing at all (the My settings
--- window shows the result in its rows).
-local function applyAll(manual, silent)
+-- window shows the result in its rows). explicit: not a manual call, but what it applies was asked for by the player (a size that
+-- waited for combat), so a Shift session does not skip it.
+local function applyAll(manual, silent, explicit)
     local say = silent and function() end or say
     if ns.suspended then
         if manual then say("benchmark running; try again afterwards") end
@@ -160,18 +186,24 @@ local function applyAll(manual, silent)
     end
     if InCombatLockdown() then
         pending = true
-        if manual then say("in combat; will apply when combat ends") end
+        if manual then
+            pendingManual = true
+            say("in combat; will apply when combat ends")
+        end
         return
     end
     pending = false
+    pendingManual = false
     local changed = 0
-    -- A picture sharpness boost holds its setting for the session: a loading screen must not undo it.
-    local boost = ns.profiles and ns.profiles.boosted and ns.profiles.boosted()
     for _, name in ipairs(orderedKeys(db.want)) do
         local value = db.want[name]
         local current = GetCVar(name)
-        if boost and name:lower() == boost.cvar:lower() then
-            -- left as the boost has it
+        if safeStart and not (manual or explicit) and name:lower() == "renderscale" and (tonumber(value) or 0) > 1 then
+            -- Shift was held at login (spec 2026-11-02-one-saved-picture-size-design.md S9): a saved size above 100% waits
+            if not safeSaid then
+                safeSaid = true
+                say("Shift is held: picture sharpness above 100% is not applied this session.")
+            end
         elseif current == nil then
             if not warned[name] then
                 warned[name] = true
@@ -304,29 +336,33 @@ local function percentOf(value)
     return string.format("%.0f%%", tonumber(value) * 100)
 end
 
--- /fset size [percent | off]: the picture sharpness for this session only (Profiles.lua holds the boost and puts the old
--- value back at logout).
+-- /fset size [percent | off]: the picture sharpness, kept in the profile in use like the slider in My settings does (it is
+-- /fset set RenderScale <fraction>); off, normal and back mean 100%.
 local function size(rest)
-    if not (ns.profiles and ns.profiles.boost) then say("profiles module not loaded") return end
+    if not (ns.profiles and ns.profiles.setValue) then say("profiles module not loaded") return end
+    local live = GetCVar("RenderScale")
+    if live == nil then say("this client has no picture sharpness setting") return end
     local word = (rest:lower():gsub("%s+", ""))
-    if word == "" then
-        local live = GetCVar("RenderScale")
-        local active = ns.profiles.boosted()
-        if live == nil then
-            say("this client has no picture sharpness setting")
-        elseif active then
-            say("picture sharpness is " .. percentOf(live) .. " for this session; it goes back to " .. percentOf(active.before) .. " when you log out")
-        else
-            say("picture sharpness is " .. percentOf(live))
-        end
-    elseif word == "off" or word == "normal" or word == "back" then
-        local ok, why = ns.profiles.unboost()
-        if not ok and why == "none" then say("picture sharpness is not changed this session") end
-    else
-        local number = tonumber((word:gsub("%%$", "")))
+    local number
+    if word == "off" or word == "normal" or word == "back" then
+        number = 100
+    elseif word ~= "" then
+        number = tonumber((word:gsub("%%$", "")))
         if number == nil then say("usage: /fset size 50 to 200, or /fset size off") return end
-        ns.profiles.boost(number / 100)
+        if number < 50 or number > 200 then say("picture sharpness goes from 50% to 200%") return end
     end
+    if number == nil then
+        local kept = keptSize()
+        local tail = " (not kept by the profile in use)"
+        if kept ~= nil and same(live, kept) then
+            tail = " (kept: the addon puts it back at every loading screen)"
+        elseif kept ~= nil then
+            tail = " (kept at " .. percentOf(kept) .. ", but the game has " .. percentOf(live) .. " now)"
+        end
+        say("picture sharpness is " .. percentOf(live) .. tail)
+        return
+    end
+    ns.profiles.setValue("RenderScale", string.format("%.4g", number / 100))
 end
 
 local function handleSlash(msg)
@@ -338,12 +374,15 @@ local function handleSlash(msg)
         local name, value = rest:match("^(%S+)%s+(.+)$")
         if not name then say("usage: /fset set <cvar> <value>") return end
         if GetCVar(name) == nil then say("unknown CVar '" .. name .. "'") return end
+        name = ownSpelling(name)
         warned[name] = nil
         if not ns.profiles then say("profiles module not loaded") return end
         ns.profiles.setValue(name, trim(value))
     elseif cmd == "unset" then
         if not ns.profiles then say("profiles module not loaded") return end
-        ns.profiles.unsetValue(rest)
+        local target = trim(rest)
+        if db.want[target] == nil then target = ownSpelling(target) end      -- a name saved as typed is found as typed first
+        ns.profiles.unsetValue(target)
     elseif cmd == "apply" then
         applyAll(true)
     elseif cmd == "reset" then
@@ -424,9 +463,19 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_ENTERING_WORLD" then
         if not recovered then
             recovered = true
+            safeStart = IsShiftKeyDown() and true or false
             if ns.bench and ns.bench.recover then
                 local ok, err = pcall(ns.bench.recover)
                 if not ok then say("benchmark recovery failed: " .. tostring(err)) end
+            end
+            -- Shift asks for a session at 100%: whatever put a size above 100% in the game before now (an unfinished test's
+            -- put-back, the game's own saved settings) goes back to 100% (spec 2026-11-02-one-saved-picture-size-design.md S9).
+            if safeStart then
+                local size = tonumber(GetCVar("RenderScale"))
+                if size and size > 1 then
+                    pcall(SetCVar, "RenderScale", "1")
+                    say("Shift is held: picture sharpness was above 100%, so it is back at 100% for this session.")
+                end
             end
         end
         if ns.profiles and ns.profiles.refresh then
@@ -435,10 +484,14 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         end
         applyAll(false)
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if pending then applyAll(false) end
+        if pending then applyAll(false, false, pendingManual) end
     elseif event == "PLAYER_LOGOUT" then
-        -- A picture sharpness boost is for this session: the game writes its settings on this exit, so the old value goes back first.
-        if ns.profiles and ns.profiles.unboost then pcall(ns.profiles.unboost, true) end
+        -- The game writes its own settings on this exit and loads them at its next start, before any addon runs. A picture size
+        -- above 100% that the addon keeps goes back to 100% first, so the game always starts at a safe size; the addon applies the
+        -- kept size again after the player has entered the world (spec 2026-11-02-one-saved-picture-size-design.md S8).
+        local kept = keptSize()
+        local live = tonumber(GetCVar("RenderScale"))
+        if kept and kept > 1 and live and live > 1 then pcall(SetCVar, "RenderScale", "1") end
     end
 end)
 

@@ -1,5 +1,9 @@
 # Picture sharpness slider (this session only): design
 
+> Superseded on 2026-11-02 (the same day, in 0.10.1) by `2026-11-02-one-saved-picture-size-design.md`: the slider and the level buttons
+> became one saved setting, so R1, R4, R5, R6 and R8 below no longer hold. Kept for the reasoning about the crash hazard, which the new
+> design still honours.
+
 Date: 2026-11-02. Status: approved by the owner in chat (the plan of 2026-11-02, then "go ahead", then "once that's done install it").
 Builds on `2026-10-30-words-and-menu-design.md` (the My settings window) and `2026-10-29-profiles-design.md` (profiles and
 enforcement).

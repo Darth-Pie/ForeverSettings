@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.1
+
+- **Picture size** is one saved setting now. The slider and the size buttons do the same thing: letting go of the slider keeps the size in the profile you are editing, as a button does, and the slider and the highlighted button always show the same size. The buttons go up to 200% (125, 150, 175 and 200% are new; the test never measures them, so their cost shows "?"). "Back to normal" is now "Back to 100%", and `/fset size 50` to `/fset size 200` keeps the size too.
+- Safe start for big sizes. The game saves its own settings when you quit and loads them before any addon runs, so a size above 100% that crashed your graphics card could lock you out. The addon now puts a kept size above 100% back to 100% in the game's own settings when you log out, and applies it again after you enter the world. If a saved size crashes the game when you enter, hold Shift while you enter: the addon skips it for that session.
+- A test warns when the picture size is above 100%, because it spoils the numbers.
+- `/fset set` stores a setting under the name the game and the window use, whatever case you typed.
+- The README now has a **Known issues and things to know** section. The ones that matter for this release: sizes above 100% can crash some graphics cards; hold Shift while you enter the world to skip a saved size above 100% for that session; and if the game won't start, set `SET RenderScale "1"` in `WTF\Config.wtf`.
+
 ## 0.10.0
 
 - **My settings** is a new flat window with rounded corners and a page list on the left: Home, Light and shadows, World detail, Picture size, Tests and results and About. Nothing scrolls. Home switches profile and starts or shows the tests, and the Everyday and Crowded switch sits above the settings pages.

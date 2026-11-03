@@ -249,10 +249,16 @@ function H.boot(cvars, opts)
         if SETFAIL[n] == "error" then error("boom") end
         if LOCKED[n] and COMBAT then error("locked in combat") end
         if SETFAIL[n] == "clamp" then return true end
-        if CVARS[n] == nil then error("Unknown CVar") end
-        CVARS[n] = tostring(v)
-        local derive = DERIVED[n]
-        if derive then derive(CVARS[n], CVARS) end
+        local key = n                                           -- the client answers CVar names without regard to case
+        if CVARS[key] == nil and type(n) == "string" then
+            for name in pairs(CVARS) do
+                if name:lower() == n:lower() then key = name break end
+            end
+        end
+        if CVARS[key] == nil then error("Unknown CVar") end
+        CVARS[key] = tostring(v)
+        local derive = DERIVED[key]
+        if derive then derive(CVARS[key], CVARS) end
         return true
     end
     _G.GetCVarDefault = function(n)
@@ -260,6 +266,8 @@ function H.boot(cvars, opts)
         return "D" .. n
     end
     _G.InCombatLockdown = function() return COMBAT end
+    _G.SHIFT = false        -- a test sets this to hold the Shift key down
+    _G.IsShiftKeyDown = function() return SHIFT == true end
     _G.print = function(s) OUT[#OUT + 1] = s end
     _G.SlashCmdList = {}
     _G.C_CVar = nil

@@ -437,8 +437,9 @@ OUT = {}
 local okNd = pcall(e_nd.slash, "probe farclip")
 check("TP-6 no default to give: the value is listed with a question mark", okNd and count("farclip = 1600 / ?") == 1, out())
 
--- TS: the picture sharpness boost in the addon's own wiring (spec 2026-11-02-picture-sharpness-slider-design.md): a loading
--- screen leaves a boosted setting alone, logout puts the old value back, and /fset size does it from chat.
+-- TS: a saved picture size above 100% in the addon's own wiring (spec 2026-11-02-one-saved-picture-size-design.md): it is applied
+-- like any saved level; the game's own saved settings always start at a safe size (logout puts a kept size above 100% back to
+-- 100%); holding Shift when entering the world skips a saved size above 100% for that session; /fset size saves like the slider.
 local function tsGame(extra)
     local cv = { RenderScale = "1", graphicsSSAO = "3", accountName = "x" }
     for k, v in pairs(extra or {}) do cv[k] = v end
@@ -447,79 +448,304 @@ end
 
 local et = tsGame()
 et.slash("profile everyday")
-et.slash("set RenderScale 0.8")
+et.slash("set RenderScale 1.5")
 et.slash("set graphicsSSAO 2")
-et.ns.profiles.boost(1.5, true)
-CVARS.graphicsSSAO = "3"                                  -- something else drifts away
+CVARS.RenderScale, CVARS.graphicsSSAO = "1", "3"
 et.fire("PLAYER_ENTERING_WORLD")
-check("TS-1 a loading screen leaves a boosted setting alone and still puts the others back", CVARS.RenderScale == "1.5" and CVARS.graphicsSSAO == "2",
+check("TS-1 a saved size above 100% is applied at a loading screen like any saved level", CVARS.RenderScale == "1.5" and CVARS.graphicsSSAO == "2",
     tostring(CVARS.RenderScale) .. " / " .. tostring(CVARS.graphicsSSAO))
-CVARS.RenderScale = "0.9"                                 -- changed elsewhere: the boost is over and the profile's level is enforced again
-et.fire("PLAYER_ENTERING_WORLD")
-check("TS-1 once the game holds another value the profile's level is enforced again", CVARS.RenderScale == "0.8", CVARS.RenderScale)
+
+local ew = tsGame()
+ew.slash("profile everyday")
+ew.slash("set RenderScale 1.5")
+ew.slash("set graphicsSSAO 2")
+CVARS.RenderScale, CVARS.graphicsSSAO = "1", "3"
+SHIFT = true
+OUT = {}
+ew.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+check("TS-2 Shift held at the first loading screen skips a saved size above 100% and still puts the others back",
+    CVARS.RenderScale == "1" and CVARS.graphicsSSAO == "2", tostring(CVARS.RenderScale) .. " / " .. tostring(CVARS.graphicsSSAO))
+check("TS-2 it says so, once, in plain words", count("Shift is held: picture sharpness above 100% is not applied this session.") == 1, out())
+OUT = {}
+ew.fire("PLAYER_ENTERING_WORLD")
+check("TS-2 the skip lasts for the whole session, quietly, though Shift is up", CVARS.RenderScale == "1" and #OUT == 0, tostring(CVARS.RenderScale) .. " " .. out())
+ew.slash("set RenderScale 1.75")
+check("TS-2 a size the player sets with a command still applies", CVARS.RenderScale == "1.75" and ForeverSettingsDB.want.RenderScale == "1.75", tostring(CVARS.RenderScale))
+local ev = tsGame()
+ev.slash("profile everyday")
+ev.slash("set RenderScale 0.8")
+CVARS.RenderScale = "1"
+SHIFT = true
+ev.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+check("TS-2 Shift does not stop a saved size of 100% or less", CVARS.RenderScale == "0.8", tostring(CVARS.RenderScale))
+local el2 = tsGame()
+el2.slash("profile everyday")
+el2.slash("set RenderScale 1.5")
+CVARS.RenderScale = "1"
+el2.fire("PLAYER_ENTERING_WORLD")
+CVARS.RenderScale = "1"
+SHIFT = true
+el2.fire("PLAYER_ENTERING_WORLD")                          -- Shift is read at the first loading screen only
+SHIFT = false
+check("TS-2 Shift is read at the first loading screen of the session only", CVARS.RenderScale == "1.5", tostring(CVARS.RenderScale))
+local ex = tsGame()
+ex.slash("profile everyday")
+ex.slash("set RenderScale 1")
+CVARS.RenderScale = "0.8"
+SHIFT = true
+ex.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+check("TS-2 a saved size of exactly 100% is still applied under Shift", CVARS.RenderScale == "1", tostring(CVARS.RenderScale))
 
 local el = tsGame()
-el.ns.profiles.boost(1.5, true)
+el.slash("profile everyday")
+el.slash("set RenderScale 1.5")
 OUT, SETLOG = {}, {}
 el.fire("PLAYER_LOGOUT")
-check("TS-2 logout puts the value from before back, silently", CVARS.RenderScale == "1" and el.ns.profiles.boosted() == nil and #OUT == 0
-    and next(ForeverSettingsDB.want) == nil, tostring(CVARS.RenderScale) .. " " .. out())
+check("TS-3 logout puts a kept size above 100% back to 100% in the game, silently", CVARS.RenderScale == "1" and #OUT == 0 and #SETLOG == 1
+    and SETLOG[1] == "RenderScale", tostring(CVARS.RenderScale) .. " " .. out() .. " " .. #SETLOG)
+check("TS-3 and the profile and the enforced list still keep it", ForeverSettingsDB.want.RenderScale == "1.5"
+    and ForeverSettingsDB.profiles.everyday.values.RenderScale == "1.5", tostring(ForeverSettingsDB.want.RenderScale))
+el.fire("PLAYER_ENTERING_WORLD")
+check("TS-3 the next loading screen applies the kept size again", CVARS.RenderScale == "1.5", tostring(CVARS.RenderScale))
+el.slash("set RenderScale 0.8")
 SETLOG = {}
 el.fire("PLAYER_LOGOUT")
-check("TS-2 logout with no boost writes nothing", #SETLOG == 0, #SETLOG)
-el.ns.profiles.boost(1.5, true)
-CVARS.RenderScale = "0.7"                                 -- the player set another value since
+check("TS-3 a kept size of 100% or less is left alone at logout", #SETLOG == 0 and CVARS.RenderScale == "0.8", #SETLOG)
+el.slash("set RenderScale 2")
+CVARS.RenderScale = "0.9"
 SETLOG = {}
 el.fire("PLAYER_LOGOUT")
-check("TS-2 logout leaves a value the player set since alone", #SETLOG == 0 and CVARS.RenderScale == "0.7", #SETLOG)
-el.ns.profiles.unboost = function() error("boom") end
+check("TS-3 so is a game that already holds 100% or less", #SETLOG == 0 and CVARS.RenderScale == "0.9", #SETLOG)
+el.slash("set RenderScale 1")
+CVARS.RenderScale = "1.5"                                  -- the game's own menu moved it after the addon applied 100%
+SETLOG = {}
+el.fire("PLAYER_LOGOUT")
+check("TS-3 a kept size of exactly 100% is left alone at logout too", #SETLOG == 0 and CVARS.RenderScale == "1.5", #SETLOG)
+local eu = tsGame()
+eu.slash("profile everyday")
+CVARS.RenderScale = "1.5"                                  -- set in the game's own menu, kept by nothing
+SETLOG = {}
+eu.fire("PLAYER_LOGOUT")
+check("TS-3 a size above 100% that nothing keeps is the player's own and is left alone", #SETLOG == 0 and CVARS.RenderScale == "1.5", #SETLOG)
+el.slash("set RenderScale 1.5")
+SETFAIL.RenderScale = "error"
 local okLogout = pcall(el.fire, "PLAYER_LOGOUT")
-check("TS-2 a failing put-back does not escape the logout", okLogout, "error escaped")
+SETFAIL.RenderScale = nil
+check("TS-3 a game that raises when the size is put back does not break the logout", okLogout, "error escaped")
 
 local es = tsGame()
+es.slash("profile everyday")
 OUT = {}
 es.slash("size")
-check("TS-3 /fset size says the current size", count("picture sharpness is 100%") == 1 and count("for this session") == 0, out())
+check("TS-4 /fset size says the current size and that the profile in use keeps none",
+    count("picture sharpness is 100% (not kept by the profile in use)") == 1, out())
 OUT = {}
 es.slash("size 150")
-check("TS-3 /fset size 150 boosts to 150% and says what it goes back to", CVARS.RenderScale == "1.5"
-    and count("picture sharpness is 150% for this session; it goes back to 100% when you log out") == 1, tostring(CVARS.RenderScale) .. " " .. out())
+check("TS-4 /fset size 150 keeps 150% in the profile in use and applies it", CVARS.RenderScale == "1.5"
+    and ForeverSettingsDB.profiles.everyday.values.RenderScale == "1.5" and ForeverSettingsDB.want.RenderScale == "1.5",
+    tostring(CVARS.RenderScale) .. " " .. out())
 OUT = {}
 es.slash("size")
-check("TS-3 /fset size says a boost is for this session", count("picture sharpness is 150% for this session; it goes back to 100% when you log out") == 1, out())
-OUT = {}
+check("TS-4 /fset size says it is kept", count("picture sharpness is 150% (kept: the addon puts it back at every loading screen)") == 1, out())
 es.slash("size 175%")
-check("TS-3 a percent sign is accepted", CVARS.RenderScale == "1.75", CVARS.RenderScale)
+check("TS-4 a percent sign is accepted", CVARS.RenderScale == "1.75", CVARS.RenderScale)
+es.slash("size 55")
+check("TS-4 any step of the slider can be asked for", CVARS.RenderScale == "0.55" and ForeverSettingsDB.profiles.everyday.values.RenderScale == "0.55",
+    CVARS.RenderScale)
 OUT = {}
 es.slash("size 201")
-check("TS-3 a size out of range is refused and nothing changes", count("50% to 200%") == 1 and CVARS.RenderScale == "1.75", tostring(CVARS.RenderScale) .. " " .. out())
+check("TS-4 a size out of range is refused and nothing changes", count("50% to 200%") == 1 and CVARS.RenderScale == "0.55", tostring(CVARS.RenderScale) .. " " .. out())
+es.slash("size 49")
+check("TS-4 below 50% is refused too", CVARS.RenderScale == "0.55", CVARS.RenderScale)
 OUT = {}
 es.slash("size abc")
-check("TS-3 something that is not a number shows the usage", count("usage: /fset size") == 1 and CVARS.RenderScale == "1.75", out())
-OUT = {}
+check("TS-4 something that is not a number shows the usage", count("usage: /fset size") == 1 and CVARS.RenderScale == "0.55", out())
 es.slash("size off")
-check("TS-3 /fset size off puts the value from before back", CVARS.RenderScale == "1" and count("picture sharpness is back to 100%") == 1, tostring(CVARS.RenderScale) .. " " .. out())
-OUT = {}
-es.slash("size off")
-check("TS-3 /fset size off with nothing to put back says so", count("picture sharpness is not changed this session") == 1, out())
+local viaOff = CVARS.RenderScale == "1" and ForeverSettingsDB.profiles.everyday.values.RenderScale == "1"
 es.slash("size 150")
 es.slash("size normal")
 local viaNormal = CVARS.RenderScale == "1"
 es.slash("size 150")
 es.slash("size back")
-check("TS-3 normal and back mean the same as off", viaNormal and CVARS.RenderScale == "1", tostring(CVARS.RenderScale))
+check("TS-4 off, normal and back all set 100%", viaOff and viaNormal and CVARS.RenderScale == "1", tostring(CVARS.RenderScale))
 OUT = {}
 es.slash("")
-check("TS-3 the command list names size", count("size [percent]") == 1, out())
+check("TS-4 the command list names size", count("size [percent]") == 1, out())
+local eo = tsGame()
+OUT = {}
+eo.slash("size 150")
+check("TS-4 on Original (hands off) it is refused like every edit and nothing changes", CVARS.RenderScale == "1" and count("Original is read-only") == 1,
+    tostring(CVARS.RenderScale) .. " " .. out())
 
 local en = boot({ graphicsSSAO = "3", accountName = "x" }, { fresh = true, defaults = false })
 OUT = {}
-en.slash("size")
-en.slash("size 150")
-check("TS-3 a client without the setting says so", count("this client has no picture sharpness setting") == 2, out())
+local okN1 = pcall(en.slash, "size")
+local okN2 = pcall(en.slash, "size 150")
+check("TS-4 a client without the setting says so and keeps nothing", okN1 and okN2 and count("this client has no picture sharpness setting") == 2
+    and ForeverSettingsDB.want.RenderScale == nil, out())
 local ep = boot({ RenderScale = "1", accountName = "x" }, { fresh = true, defaults = false, profiles = false })
 OUT = {}
-ep.slash("size 150")
-check("TS-3 without the profiles module /fset size says so", count("profiles module not loaded") == 1 and CVARS.RenderScale == "1", out())
+local okP = pcall(ep.slash, "size 150")
+check("TS-4 without the profiles module /fset size says so", okP and count("profiles module not loaded") == 1 and CVARS.RenderScale == "1", out())
+
+-- TS-5 to TS-8: the fix pass after the fresh review of the saved picture size.
+-- TS-5: the game answers a CVar name in any case, so a size typed as renderscale must be the one the window, the status and the
+-- logout revert see.
+local eL = tsGame()
+eL.slash("profile everyday")
+eL.slash("set renderscale 1.5")
+check("TS-5 /fset set stores a setting under the game's own spelling, whatever case was typed", ForeverSettingsDB.want.RenderScale == "1.5"
+    and ForeverSettingsDB.want.renderscale == nil and ForeverSettingsDB.profiles.everyday.values.RenderScale == "1.5" and CVARS.RenderScale == "1.5",
+    tostring(ForeverSettingsDB.want.RenderScale) .. " " .. tostring(ForeverSettingsDB.want.renderscale))
+SETLOG = {}
+eL.fire("PLAYER_LOGOUT")
+check("TS-5 so logout puts it back to 100%", CVARS.RenderScale == "1" and #SETLOG == 1, tostring(CVARS.RenderScale) .. " " .. #SETLOG)
+eL.slash("set graphicsssao 2")
+check("TS-5 any managed setting is stored as the window spells it", ForeverSettingsDB.want.graphicsSSAO == "2" and ForeverSettingsDB.want.graphicsssao == nil,
+    tostring(ForeverSettingsDB.want.graphicsSSAO))
+local eK = tsGame()
+eK.slash("profile everyday")
+ForeverSettingsDB.profiles.everyday.values.renderscale = "1.5"          -- saved by an older version under the spelling that was typed
+ForeverSettingsDB.want.renderscale = "1.5"
+CVARS.RenderScale = "1.5"
+SETLOG = {}
+eK.fire("PLAYER_LOGOUT")
+check("TS-5 a size already saved under another spelling is put back at logout too", CVARS.RenderScale == "1" and #SETLOG == 1, tostring(CVARS.RenderScale))
+CVARS.RenderScale = "1.5"
+OUT = {}
+eK.slash("size")
+check("TS-5 and /fset size knows it is kept", count("picture sharpness is 150% (kept: the addon puts it back at every loading screen)") == 1, out())
+eK.slash("unset renderscale")
+check("TS-5 /fset unset finds the setting in any case", ForeverSettingsDB.want.renderscale == nil and ForeverSettingsDB.want.RenderScale == nil,
+    tostring(ForeverSettingsDB.want.renderscale))
+local eU = tsGame()
+eU.slash("profile everyday")
+eU.slash("set RenderScale 1.5")
+eU.slash("unset renderscale")
+check("TS-5 and a size stored under the game's spelling too", ForeverSettingsDB.want.RenderScale == nil and ForeverSettingsDB.profiles.everyday.values.RenderScale == nil,
+    tostring(ForeverSettingsDB.want.RenderScale))
+
+-- TS-6: a Shift session asked for 100%: whatever put a size above 100% in the game before the first loading screen (a test the last
+-- session left unfinished, the game's own saved settings) goes back to 100%, with a plain line; a size of 100% or less is not touched.
+local function pendingGame(extra)
+    local g = tsGame(extra)
+    g.slash("profile everyday")
+    g.slash("set RenderScale 1.5")
+    g.ns.bench.state().pending = { time = 1, originals = { RenderScale = "1.5" } }
+    CVARS.RenderScale = "1"
+    return g
+end
+local er = pendingGame()
+SHIFT = true
+OUT = {}
+er.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+check("TS-6 an unfinished test's put-back does not return a saved size above 100% under Shift", CVARS.RenderScale == "1", tostring(CVARS.RenderScale) .. " " .. out())
+check("TS-6 it says so in plain words", count("Shift is held: picture sharpness was above 100%, so it is back at 100% for this session.") == 1, out())
+local er2 = pendingGame()
+er2.fire("PLAYER_ENTERING_WORLD")
+check("TS-6 without Shift the put-back and the saved size stand", CVARS.RenderScale == "1.5", tostring(CVARS.RenderScale))
+local eS = tsGame()
+eS.slash("profile everyday")
+CVARS.RenderScale = "1.5"                                  -- the game's own saved settings held it
+SHIFT = true
+OUT = {}
+eS.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+check("TS-6 under Shift a size above 100% that nothing keeps goes back to 100% too", CVARS.RenderScale == "1" and count("back at 100% for this session") == 1,
+    tostring(CVARS.RenderScale) .. " " .. out())
+local eW = tsGame()
+eW.slash("profile everyday")
+CVARS.RenderScale = "1.5"                                  -- the player's own size from the game's menu, nothing kept, no Shift
+OUT = {}
+eW.fire("PLAYER_ENTERING_WORLD")
+check("TS-6 without Shift a size above 100% that nothing keeps is left alone and nothing is said", CVARS.RenderScale == "1.5" and count("back at 100%") == 0,
+    tostring(CVARS.RenderScale) .. " " .. out())
+local eE = tsGame()
+eE.slash("profile everyday")
+CVARS.RenderScale = "1.5"
+SETFAIL.RenderScale = "error"
+SHIFT = true
+local okShift = pcall(eE.fire, "PLAYER_ENTERING_WORLD")
+SHIFT = false
+SETFAIL.RenderScale = nil
+check("TS-6 a game that raises when the size is put back does not break the first loading screen", okShift, "error escaped")
+local eN = tsGame()
+eN.slash("profile everyday")
+CVARS.RenderScale = "0.8"
+SETLOG = {}
+SHIFT = true
+OUT = {}
+eN.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+check("TS-6 under Shift a size of 100% or less is left alone and nothing is said", CVARS.RenderScale == "0.8" and count("back at 100%") == 0, tostring(CVARS.RenderScale) .. " " .. out())
+local e100 = tsGame()
+e100.slash("profile everyday")
+CVARS.RenderScale = "1"
+SETLOG = {}
+SHIFT = true
+e100.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+local wrote = false
+for _, n in ipairs(SETLOG) do if n == "RenderScale" then wrote = true end end
+check("TS-6 and exactly 100% is not written again", not wrote, #SETLOG)
+
+-- TS-7: a size asked for in combat in a Shift session waits and is applied when combat ends (a command still applies); a saved
+-- size that waited for combat is still skipped.
+local ec = tsGame()
+ec.slash("profile everyday")
+SHIFT = true
+ec.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+COMBAT = true
+OUT = {}
+ec.slash("size 175")
+check("TS-7 asking for a size in combat says it will apply afterwards", count("in combat; will apply when combat ends") == 1 and CVARS.RenderScale == "1",
+    tostring(CVARS.RenderScale) .. " " .. out())
+COMBAT = false
+ec.fire("PLAYER_REGEN_ENABLED")
+check("TS-7 and it is applied when combat ends, though Shift skips saved sizes", CVARS.RenderScale == "1.75", tostring(CVARS.RenderScale))
+local ed = tsGame()
+ed.slash("profile everyday")
+ed.slash("set RenderScale 1.5")
+CVARS.RenderScale = "1"
+SHIFT = true
+COMBAT = true
+ed.fire("PLAYER_ENTERING_WORLD")                           -- the loading screen came in combat: it waits
+COMBAT = false
+SHIFT = false
+ed.fire("PLAYER_REGEN_ENABLED")
+check("TS-7 a saved size that waited for combat is still skipped under Shift", CVARS.RenderScale == "1", tostring(CVARS.RenderScale))
+local ee = tsGame()
+ee.slash("profile everyday")
+SHIFT = true
+ee.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+COMBAT = true
+ee.slash("size 175")
+COMBAT = false
+ee.fire("PLAYER_REGEN_ENABLED")
+local applied = CVARS.RenderScale == "1.75"
+CVARS.RenderScale = "1"
+ee.fire("PLAYER_REGEN_ENABLED")
+local quiet = CVARS.RenderScale == "1"
+COMBAT = true
+ee.fire("PLAYER_ENTERING_WORLD")                           -- a later loading screen in combat waits too, and is not the player's ask
+COMBAT = false
+ee.fire("PLAYER_REGEN_ENABLED")
+check("TS-7 what waited for combat is applied once; a later loading screen that waited is still skipped under Shift",
+    applied and quiet and CVARS.RenderScale == "1", tostring(applied) .. tostring(quiet) .. tostring(CVARS.RenderScale))
+
+-- TS-8: /fset size says the truth when the profile keeps a size the game does not hold (a Shift session, a refused size).
+local ex2 = tsGame()
+ex2.slash("profile everyday")
+ex2.slash("set RenderScale 1.5")
+CVARS.RenderScale = "1"
+OUT = {}
+ex2.slash("size")
+check("TS-8 /fset size names the kept size when the game holds another", count("picture sharpness is 100% (kept at 150%, but the game has 100% now)") == 1, out())
 
 return H.results()

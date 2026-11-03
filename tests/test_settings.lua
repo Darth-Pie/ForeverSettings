@@ -128,7 +128,7 @@ test("S1-3 one row per setting the client has, in the table's order, with the pl
         and r[1].line == "How sharp and detailed shadows look. Higher looks better and costs a lot of speed."
         and levelTexts(r[1]) == "0 (lowest)|1|2|3|4 (highest)" and r[2].name == "Soft corner shadows"
         and r[3].name == "Grass and plants (exact amount)" and levelTexts(r[3]) == "48 (lowest)|64|128 (highest)"
-        and r[4].name == "Picture sharpness" and levelTexts(r[4]) == "50%|60%|70%|80%|90%|100%", order[3] .. " " .. levelTexts(r[4])
+        and r[4].name == "Picture sharpness" and levelTexts(r[4]) == "50%|60%|70%|80%|90%|100%|125%|150%|175%|200%", order[3] .. " " .. levelTexts(r[4])
 end)
 
 test("S1-4 the tab in use highlights the game's live value, the other tab its saved value, and ticks follow what is saved", function()
@@ -290,7 +290,7 @@ test("S1-12 the window's pages: a tick and level buttons per setting on each pag
     f.close:Click()
     return titled and keptNow and liveSelected and switched and not f:IsShown() and listed == 1 and not raw
         and lightKeeps == 2 and lightLevels == 5 + 13 and ssaoLines == 3 and worldKeeps == 1 and worldLevels == 3
-        and sizeKeeps == 1 and sizeLevels == 6,
+        and sizeKeeps == 1 and sizeLevels == 10,
         tostring(lightKeeps) .. " " .. tostring(lightLevels) .. " " .. tostring(ssaoLines) .. " " .. tostring(worldKeeps) .. " "
             .. tostring(worldLevels) .. " " .. tostring(sizeKeeps) .. " " .. tostring(sizeLevels) .. " " .. tostring(listed) .. " " .. tostring(raw)
 end)
@@ -425,7 +425,7 @@ test("S2-1 each level's cost is its frame rate minus the held level's, in whole 
     local none = "-|-|-|-|-"
     return costTexts(rowOf(mine, "graphicsShadowQuality")) == "+83 fps|+28 fps|now|?|?"
         and costTexts(rowOf(mine, "graphicsSSAO")) == "+24 fps|now|-20 fps|?|?"
-        and costTexts(rowOf(mine, "groundEffectDensity")) == "-|-|-" and costTexts(rowOf(mine, "RenderScale")) == "-|-|-|-|-|-"
+        and costTexts(rowOf(mine, "groundEffectDensity")) == "-|-|-" and costTexts(rowOf(mine, "RenderScale")) == "-|-|-|-|-|-|-|-|-|-"
         and costTexts(rowOf(other, "graphicsShadowQuality")) == "+56 fps|now|-28 fps|?|?"
         and costTexts(rowOf(other, "graphicsSSAO")) == none
         and costTexts(rowOf(unmeasured, "graphicsShadowQuality")) == none
@@ -893,59 +893,160 @@ test("S3-5 an estimate that cannot be made leaves the window drawn, without the 
         and #OUT == 0, tostring(yourText(f)) .. outText()
 end)
 
--- The picture sharpness block (spec 2026-11-02-picture-sharpness-slider-design.md): a slider for this session only.
-local SIZE_NOTE = "Not saved: the game goes back to your normal setting when you log out."
+-- The picture size block (spec 2026-11-02-one-saved-picture-size-design.md): the slider and the level buttons are two controls
+-- for one saved setting, the picture sharpness of the tab shown.
 local SIZE_WARNING = "Above 100% the game draws more pixels than your screen has. That can cost a lot of frame rate and graphics memory, "
     .. "and some graphics cards crash at high values."
+local SIZE_SAFE = "If a size above 100% crashes the game when you enter the world, hold Shift while you enter: the addon then skips it for that session."
+local NOTE_NONE = "Not kept in Everyday yet: drag the slider or click a size to keep it."
+local NOTE_KEPT = "Kept in Everyday: the addon puts it back at every loading screen."
+local SIZE_LEVELS = { "0.5", "0.6", "0.7", "0.8", "0.9", "1", "1.25", "1.5", "1.75", "2" }
 local function drag(f, value)                       -- plays a drag to `value` and the release of the mouse button
     local slider = byKey(f, "size")
     slider._value = value
     slider.scripts.OnValueChanged(slider, value, true)
     slider.scripts.OnMouseUp(slider)
 end
-
-test("S4-1 the picture sharpness block: label, range, note, the warning above 100%, Back to normal only while changed, greyed when locked, absent without the setting", function()
-    local e, s = boot()
-    local function size(over, locked)
-        return s.model({ tab = "everyday" }, ctxOf(e, { size = over, locked = locked })).size
+local function lit(f)                               -- the one size button highlighted, nil for none, "many" for more than one
+    local found
+    for _, value in ipairs(SIZE_LEVELS) do
+        local button = byKey(f, "level:RenderScale:" .. value)
+        if button and button.skinState.selected then
+            if found then return "many" end
+            found = value
+        end
     end
-    local normal = size({ percent = 100, boosted = false })
-    local up = size({ percent = 150, boosted = true, before = 100 })
-    local down = size({ percent = 80, boosted = true, before = 100 })
-    local near105 = size({ percent = 105, boosted = true, before = 100 })
-    local locked = size({ percent = 150, boosted = true, before = 100 }, "combat")
-    local low, high = size({ percent = 30, boosted = false }), size({ percent = 250, boosted = false })
-    return normal ~= nil and normal.label == "Picture sharpness right now: 100%" and normal.min == 50 and normal.max == 200
-        and normal.step == 5 and normal.value == 100 and normal.note == SIZE_NOTE and normal.warning == nil
-        and normal.canPutBack == false and normal.enabled == true
-        and up.label == "Picture sharpness right now: 150% (normal: 100%)" and up.warning == SIZE_WARNING and up.canPutBack == true
-        and down.label == "Picture sharpness right now: 80% (normal: 100%)" and down.warning == nil
-        and near105.warning == SIZE_WARNING and locked.enabled == false and locked.canPutBack == false
-        and low.value == 50 and low.label == "Picture sharpness right now: 30%" and high.value == 200
-        and s.model({ tab = "everyday" }, ctxOf(e, {})).size == nil, tostring(up and up.label)
+    return found
+end
+
+test("S4-1 the picture size block shows the tab's own size: label, range, whether it is kept, the warning and the Shift line above 100%, Back to 100% only off 100%, greyed when locked, absent without the setting", function()
+    local e, s = boot()
+    local function size(st, over)
+        return s.model(st, ctxOf(e, over)).size
+    end
+    CVARS.RenderScale = "1"
+    local none = size({ tab = "everyday" }, { size = { live = 100 } })
+    CVARS.RenderScale = "1.5"
+    local usedKept = size({ tab = "everyday" }, { size = { live = 150 }, saved = { everyday = { RenderScale = "1.5" }, crowded = {} } })
+    local locked = size({ tab = "everyday" }, { size = { live = 150 }, saved = { everyday = { RenderScale = "1.5" }, crowded = {} }, locked = "combat" })
+    CVARS.RenderScale = "1"
+    local otherKept = size({ tab = "crowded" }, { size = { live = 100 }, saved = { everyday = {}, crowded = { RenderScale = "0.8" } } })
+    local otherHigh = size({ tab = "crowded" }, { size = { live = 100 }, saved = { everyday = {}, crowded = { RenderScale = "2" } } })
+    local otherNone = size({ tab = "crowded" }, { size = { live = 100 }, saved = { everyday = {}, crowded = {} } })
+    CVARS.RenderScale = "1.5"
+    local inUseDrift = size({ tab = "everyday" }, { size = { live = 150 }, saved = { everyday = { RenderScale = "0.8" }, crowded = {} } })
+    CVARS.RenderScale = "1"
+    local skipped = size({ tab = "everyday" }, { size = { live = 100 }, saved = { everyday = { RenderScale = "1.5" }, crowded = {} } })
+    local settled = size({ tab = "everyday" }, { size = { live = 100 }, saved = { everyday = { RenderScale = "1" }, crowded = {} } })
+    CVARS.RenderScale = "1.15"
+    local rounded = size({ tab = "everyday" }, { size = { live = 115 } })
+    CVARS.RenderScale = "1.3"
+    local otherNoneLive = size({ tab = "crowded" }, { size = { live = 130 }, saved = { everyday = {}, crowded = {} } })
+    CVARS.RenderScale = "0.3"
+    local low = size({ tab = "everyday" }, { size = { live = 30 } })
+    CVARS.RenderScale = "2.5"
+    local high = size({ tab = "everyday" }, { size = { live = 250 } })
+    CVARS.RenderScale = "1.05"
+    local near105 = size({ tab = "everyday" }, { size = { live = 105 } })
+    return none ~= nil and none.percent == 100 and none.label == "Picture sharpness right now: 100%" and none.min == 50 and none.max == 200
+        and none.step == 5 and none.value == 100 and none.note == NOTE_NONE and none.warning == nil and none.safe == nil
+        and none.canPutBack == false and none.enabled == true
+        and usedKept.label == "Picture sharpness right now: 150%" and usedKept.note == NOTE_KEPT and usedKept.warning == SIZE_WARNING
+        and usedKept.safe == SIZE_SAFE and usedKept.canPutBack == true and usedKept.value == 150
+        and locked.enabled == false and locked.canPutBack == false
+        and otherKept.label == "Crowded keeps picture sharpness at 80%" and otherKept.note == "Kept in Crowded: used when you switch to Crowded."
+        and otherKept.value == 80 and otherKept.canPutBack == true and otherKept.warning == nil
+        and otherHigh.warning == SIZE_WARNING and otherHigh.safe == SIZE_SAFE and otherHigh.value == 200
+        and otherNone.label == "Crowded keeps no picture sharpness yet (the game has 100% now)" and otherNone.value == 100
+        and otherNone.note == "Not kept in Crowded yet: drag the slider or click a size to keep it." and otherNone.canPutBack == false
+        and inUseDrift.label == "Picture sharpness right now: 150%" and inUseDrift.value == 150
+        and inUseDrift.note == "Kept in Everyday at 80%: the game has 150% now." and inUseDrift.canPutBack == true
+        and skipped.label == "Picture sharpness right now: 100%" and skipped.value == 100
+        and skipped.note == "Kept in Everyday at 150%: the game has 100% now." and skipped.warning == SIZE_WARNING and skipped.safe == SIZE_SAFE
+        and skipped.canPutBack == true
+        and settled.note == NOTE_KEPT and settled.canPutBack == false and settled.warning == nil and settled.safe == nil
+        and rounded.label == "Picture sharpness right now: 115%" and rounded.value == 115
+        and otherNoneLive.label == "Crowded keeps no picture sharpness yet (the game has 130% now)" and otherNoneLive.value == 130
+        and otherNoneLive.canPutBack == true
+        and low.value == 50 and low.label == "Picture sharpness right now: 30%" and high.value == 200 and high.warning == SIZE_WARNING
+        and near105.warning == SIZE_WARNING
+        and s.model({ tab = "everyday" }, ctxOf(e, {})).size == nil, tostring(usedKept and usedKept.label) .. tostring(otherNone and otherNone.label)
 end)
 
-test("S4-2 the window draws the block; letting go of the slider applies the size, Back to normal puts it back, and nothing prints", function()
-    local e, s = bootWith(fullEntry())
+test("S4-2 the window draws the block; letting go of the slider keeps and applies the size like a button does, Back to 100% sets 100%, and nothing prints", function()
+    local e, s, db = bootWith(fullEntry())
     s.open("size")
     local f = window()
     local slider = byKey(f, "size")
     local back = byKey(f, "sizeback")
     local first = slider ~= nil and slider.kind == "Slider" and slider._min == 50 and slider._max == 200 and slider._step == 5
-        and slider._value == 100 and hasText(f, "Picture sharpness right now: 100%") and hasText(f, SIZE_NOTE)
-        and not hasText(f, SIZE_WARNING) and back ~= nil and back.enabled == false and back._text == "Back to normal"
+        and slider._value == 100 and hasText(f, "Picture sharpness right now: 100%") and hasText(f, NOTE_NONE)
+        and not hasText(f, SIZE_WARNING) and not hasText(f, SIZE_SAFE) and back ~= nil and back.enabled == false and back._text == "Back to 100%"
+        and byKey(f, "keep:RenderScale"):GetChecked() == false
     SETLOG = {}
     drag(f, 150)
-    local up = CVARS.RenderScale == "1.5" and hasText(f, "Picture sharpness right now: 150% (normal: 100%)") and hasText(f, SIZE_WARNING)
+    local up = CVARS.RenderScale == "1.5" and db.profiles.everyday.values.RenderScale == "1.5" and db.want.RenderScale == "1.5"
+        and hasText(f, "Picture sharpness right now: 150%") and hasText(f, SIZE_WARNING) and hasText(f, SIZE_SAFE) and hasText(f, NOTE_KEPT)
         and byKey(f, "sizeback").enabled == true and byKey(f, "size")._value == 150 and #SETLOG == 1 and SETLOG[1] == "RenderScale"
+        and byKey(f, "keep:RenderScale"):GetChecked() == true and lit(f) == "1.5"
     byKey(f, "sizeback"):Click()
-    local down = CVARS.RenderScale == "1" and hasText(f, "Picture sharpness right now: 100%") and not hasText(f, "(normal:")
-        and not hasText(f, SIZE_WARNING) and byKey(f, "sizeback").enabled == false and byKey(f, "size")._value == 100
+    local down = CVARS.RenderScale == "1" and db.profiles.everyday.values.RenderScale == "1" and hasText(f, "Picture sharpness right now: 100%")
+        and not hasText(f, SIZE_WARNING) and not hasText(f, SIZE_SAFE) and byKey(f, "sizeback").enabled == false
+        and byKey(f, "size")._value == 100 and lit(f) == "1"
     return first and up and down and #OUT == 0, tostring(first) .. tostring(up) .. tostring(down) .. outText()
 end)
 
-test("S4-3 dragging only moves the label; nothing is written until the mouse button is released", function()
+test("S4-3 the buttons and the slider always show the same size: a button moves the slider, the slider lights the button with its value, and no button is lit between two", function()
+    local e, s, db = bootWith(fullEntry())
+    s.open("size")
+    local f = window()
+    byKey(f, "level:RenderScale:0.8"):Click()
+    local a = byKey(f, "size")._value == 80 and hasText(f, "Picture sharpness right now: 80%") and lit(f) == "0.8" and CVARS.RenderScale == "0.8"
+    byKey(f, "level:RenderScale:1.75"):Click()
+    local b = byKey(f, "size")._value == 175 and lit(f) == "1.75" and CVARS.RenderScale == "1.75" and hasText(f, SIZE_WARNING)
+    drag(f, 90)
+    local c = lit(f) == "0.9" and CVARS.RenderScale == "0.9" and byKey(f, "size")._value == 90
+    drag(f, 165)
+    local d = lit(f) == nil and CVARS.RenderScale == "1.65" and byKey(f, "keep:RenderScale"):GetChecked() == true
+        and db.profiles.everyday.values.RenderScale == "1.65"
+    drag(f, 125)
+    local g = lit(f) == "1.25" and CVARS.RenderScale == "1.25"
+    drag(f, 200)
+    local h = lit(f) == "2" and CVARS.RenderScale == "2" and byKey(f, "size")._value == 200
+    return a and b and c and d and g and h, tostring(a) .. tostring(b) .. tostring(c) .. tostring(d) .. tostring(g) .. tostring(h)
+end)
+
+test("S4-4 on a tab that is not in use the same two controls keep the size for that profile only, and show it", function()
+    local e, s, db = bootWith(fullEntry())
+    s.open("size")
+    s.click("tab:crowded")
+    local f = window()
+    local first = byKey(f, "size")._value == 100 and hasText(f, "Crowded keeps no picture sharpness yet (the game has 100% now)") and lit(f) == nil
+        and byKey(f, "keep:RenderScale"):GetChecked() == false
+    drag(f, 130)
+    local dragged = db.profiles.crowded.values.RenderScale == "1.3" and CVARS.RenderScale == "1" and db.profiles.everyday.values.RenderScale == nil
+        and db.want.RenderScale == nil and byKey(f, "size")._value == 130 and hasText(f, "Crowded keeps picture sharpness at 130%")
+        and lit(f) == nil and byKey(f, "keep:RenderScale"):GetChecked() == true and hasText(f, SIZE_WARNING)
+        and not hasText(f, "The game kept")
+    byKey(f, "level:RenderScale:1.5"):Click()
+    local clicked = db.profiles.crowded.values.RenderScale == "1.5" and byKey(f, "size")._value == 150 and lit(f) == "1.5" and CVARS.RenderScale == "1"
+    byKey(f, "sizeback"):Click()
+    local back = db.profiles.crowded.values.RenderScale == "1" and lit(f) == "1" and CVARS.RenderScale == "1"
+    return first and dragged and clicked and back and #OUT == 0, tostring(first) .. tostring(dragged) .. tostring(clicked) .. tostring(back)
+end)
+
+test("S4-4b a tab that keeps no size shows the game's own size, rounded to a whole percent", function()
     local e, s = bootWith(fullEntry())
+    CVARS.RenderScale = "1.15"
+    s.open("size")
+    s.click("tab:crowded")
+    local f = window()
+    return hasText(f, "Crowded keeps no picture sharpness yet (the game has 115% now)") and byKey(f, "size")._value == 115,
+        tostring(byKey(f, "size")._value)
+end)
+
+test("S4-5 dragging only moves the label; nothing is written until the mouse button is released", function()
+    local e, s, db = bootWith(fullEntry())
     s.open("size")
     local f = window()
     local slider = byKey(f, "size")
@@ -953,12 +1054,14 @@ test("S4-3 dragging only moves the label; nothing is written until the mouse but
     slider._value = 175
     slider.scripts.OnValueChanged(slider, 175, true)
     local dragging = hasText(f, "Picture sharpness right now: 175%") and #SETLOG == 0 and CVARS.RenderScale == "1"
+        and db.profiles.everyday.values.RenderScale == nil
     slider.scripts.OnMouseUp(slider)
-    return dragging and CVARS.RenderScale == "1.75" and #SETLOG == 1, tostring(dragging) .. tostring(CVARS.RenderScale)
+    return dragging and CVARS.RenderScale == "1.75" and #SETLOG == 1 and db.profiles.everyday.values.RenderScale == "1.75",
+        tostring(dragging) .. tostring(CVARS.RenderScale)
 end)
 
-test("S4-4 drawing the window never writes: a size between steps, or out of the slider's range, only moves the slider", function()
-    local e, s = bootWith(fullEntry())
+test("S4-6 drawing the window never writes: a size between steps, or out of the slider's range, only moves the slider", function()
+    local e, s, db = bootWith(fullEntry())
     CVARS.RenderScale = "1.3"
     SETLOG = {}
     s.open("size")
@@ -967,23 +1070,29 @@ test("S4-4 drawing the window never writes: a size between steps, or out of the 
     CVARS.RenderScale = "0.3"
     s.open("size")
     local under = byKey(f, "size")._value == 50 and hasText(f, "Picture sharpness right now: 30%")
-    return mid and under and #SETLOG == 0 and #OUT == 0, tostring(mid) .. tostring(under) .. #SETLOG
+    CVARS.RenderScale = "1.15"
+    s.open("size")
+    local odd = byKey(f, "size")._value == 115 and hasText(f, "Picture sharpness right now: 115%")
+    return mid and under and odd and #SETLOG == 0 and #OUT == 0 and db.profiles.everyday.values.RenderScale == nil,
+        tostring(mid) .. tostring(under) .. tostring(odd) .. #SETLOG
 end)
 
-test("S4-5 the release rounds to the nearest step of 5", function()
-    local e, s = bootWith(fullEntry())
+test("S4-7 the release rounds to the nearest step of 5 and keeps that", function()
+    local e, s, db = bootWith(fullEntry())
     s.open("size")
     local f = window()
     drag(f, 152)
-    local a = CVARS.RenderScale == "1.5"
+    local a = CVARS.RenderScale == "1.5" and db.profiles.everyday.values.RenderScale == "1.5"
     drag(f, 153)
-    local b = CVARS.RenderScale == "1.55"
-    return a and b, tostring(CVARS.RenderScale)
+    local b = CVARS.RenderScale == "1.55" and db.profiles.everyday.values.RenderScale == "1.55"
+    s.click("size:46")
+    s.click("size:205")
+    local stray = CVARS.RenderScale == "1.55"
+    return a and b and stray, tostring(CVARS.RenderScale)
 end)
 
-test("S4-6 in combat or during a test the slider and Back to normal are greyed, and a stray click writes nothing", function()
-    local e, s = bootWith(fullEntry())
-    CVARS.RenderScale = "1"
+test("S4-8 in combat or during a test the slider and Back to 100% are greyed, and a stray click writes nothing", function()
+    local e, s, db = bootWith(fullEntry())
     s.open("size")
     local f = window()
     drag(f, 150)
@@ -993,22 +1102,22 @@ test("S4-6 in combat or during a test the slider and Back to normal are greyed, 
     SETLOG = {}
     s.click("size:200")
     s.click("sizeback")
-    local still = #SETLOG == 0 and CVARS.RenderScale == "1.5"
+    local still = #SETLOG == 0 and CVARS.RenderScale == "1.5" and db.profiles.everyday.values.RenderScale == "1.5"
     COMBAT = false
     return greyed and still, tostring(greyed) .. tostring(still) .. tostring(CVARS.RenderScale)
 end)
 
-test("S4-7 a client with no picture sharpness setting has no block", function()
+test("S4-9 a client with no picture sharpness setting has no block", function()
     local e5 = H.boot({ graphicsShadowQuality = "2", graphicsSSAO = "1", vsync = "0" }, { fresh = true })
     e5.ns.bench.now = function() return NOW end
     e5.ns.bench.state().history[1] = quietEntry()
     e5.ns.settings.open("size")
     local f = window()
     return f ~= nil and byKey(f, "size") == nil and byKey(f, "sizeback") == nil and not hasText(f, "Picture sharpness right now")
-        and not hasText(f, SIZE_NOTE)
+        and not hasText(f, NOTE_NONE)
 end)
 
-test("S4-8 a size the game will not take is said in the window, in plain words, and the slider shows what the game holds", function()
+test("S4-10 a size the game will not take is said in the window, in plain words, and the slider shows what the game holds", function()
     local e, s = bootWith(fullEntry())
     s.open("size")
     local f = window()
@@ -1018,19 +1127,61 @@ test("S4-8 a size the game will not take is said in the window, in plain words, 
         and byKey(f, "size")._value == 100 and #OUT == 0, outText()
 end)
 
-test("S4-10 ticking keep on Picture sharpness, or Use what I have in the game now, while a boost is on never saves the boosted size", function()
+test("S4-11 the keep tick and Use what I have in the game now keep the size the game has, above 100% too", function()
     local e, s, db = bootWith(fullEntry())
     s.open("size")
     drag(window(), 150)
-    s.click("keep:RenderScale")                           -- the size from before is what is kept; it takes over from the boost
-    local kept = db.profiles.everyday.values.RenderScale == "1" and db.want.RenderScale == "1" and CVARS.RenderScale == "1"
-    drag(window(), 175)
+    s.click("keep:RenderScale")                           -- untick: no longer kept, the size stays in the game
+    local off = db.profiles.everyday.values.RenderScale == nil and db.want.RenderScale == nil and CVARS.RenderScale == "1.5"
+        and hasText(window(), NOTE_NONE)
+    s.click("keep:RenderScale")                           -- tick: the size the game has now is kept
+    local on = db.profiles.everyday.values.RenderScale == "1.5" and db.want.RenderScale == "1.5" and CVARS.RenderScale == "1.5"
+    CVARS.RenderScale = "1.75"
     s.click("use")
-    local used = db.profiles.everyday.values.RenderScale == "1" and db.want.RenderScale == "1" and CVARS.RenderScale == "1.75"
-    return kept and used, tostring(kept) .. tostring(used) .. tostring(db.profiles.everyday.values.RenderScale)
+    local used = db.profiles.everyday.values.RenderScale == "1.75" and db.want.RenderScale == "1.75"
+    return off and on and used, tostring(off) .. tostring(on) .. tostring(used)
 end)
 
-test("S4-9 on the Picture size page the block stands under the card: the label over the slider over the warning over the note, Back to normal beside the slider, all above the summary", function()
+test("S4-12 the size card has the six levels the test measures and four above 100% it never measured; only the test's levels are measured, and the test's own list is untouched", function()
+    local e, s = boot()
+    local view = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, fullEntry()) }))
+    local row = rowOf(view, "RenderScale")
+    local values, shorts, costs = {}, {}, {}
+    for _, level in ipairs(row.levels) do
+        values[#values + 1] = level.value
+        shorts[#shorts + 1] = level.short
+        costs[#costs + 1] = level.cost or "-"
+    end
+    local tiers
+    for _, entry in ipairs(e.ns.bench.resolve()) do
+        if entry.cvar == "RenderScale" then tiers = entry.tiers end
+    end
+    return table.concat(values, ",") == "0.5,0.6,0.7,0.8,0.9,1,1.25,1.5,1.75,2"
+        and table.concat(shorts, ",") == "50%,60%,70%,80%,90%,100%,125%,150%,175%,200%"
+        and row.levels[1].text == "50%" and row.levels[6].text == "100%" and row.levels[7].text == "125%"
+        and costs[7] == "?" and costs[10] == "?" and costs[6] == "now"
+        and tiers ~= nil and #tiers == 6 and tiers[6] == "1", table.concat(values, ",") .. " " .. table.concat(costs, ",")
+end)
+
+test("S4-13 the Picture size page is one full-width card: all ten size buttons share one line", function()
+    local e, s = bootWith(fullEntry())
+    s.open("size")
+    local f = window()
+    local ys, xs = {}, {}
+    for _, value in ipairs(SIZE_LEVELS) do
+        local button = byKey(f, "level:RenderScale:" .. value)
+        if button then
+            xs[#xs + 1] = button._point[4]
+            ys[button._point[5]] = true
+        end
+    end
+    local one = next(ys, next(ys)) == nil
+    local last = byKey(f, "level:RenderScale:2")
+    return #xs == 10 and one and xs[1] == 0 and last ~= nil and last._point[4] + last._width <= 675 and s.columnsFor(1) == 2,
+        tostring(#xs) .. tostring(one) .. tostring(last and last._point[4])
+end)
+
+test("S4-14 on the Picture size page the block stands under the card: the label over the slider over the warning over the Shift line over the note, Back to 100% beside the slider, all above the summary", function()
     local e, s = bootWith(fullEntry())
     s.open("size")
     drag(window(), 150)
@@ -1050,17 +1201,18 @@ test("S4-9 on the Picture size page the block stands under the card: the label o
         end)
         return found
     end
-    local label, warn, note = fontStringWith(f, "Picture sharpness right now: 150% (normal: 100%)"), fontStringWith(f, SIZE_WARNING), fontStringWith(f, SIZE_NOTE)
+    local label, warn, safe, note = fontStringWith(f, "Picture sharpness right now: 150%"), fontStringWith(f, SIZE_WARNING),
+        fontStringWith(f, SIZE_SAFE), fontStringWith(f, NOTE_KEPT)
     local slider, back, card = byKey(f, "size"), byKey(f, "sizeback"), byKey(f, "level:RenderScale:1")
     local your = textHas("Your Everyday settings")
     local function top(item) return -item._point[5] end
-    local ok = label ~= nil and warn ~= nil and note ~= nil and slider ~= nil and back ~= nil and card ~= nil and your ~= nil
+    local ok = label ~= nil and warn ~= nil and safe ~= nil and note ~= nil and slider ~= nil and back ~= nil and card ~= nil
         and top(label) >= top(card) + 22 + 16 and top(slider) >= top(label) + STRINGHEIGHT(label)
-        and top(warn) >= top(slider) + 16 and top(note) >= top(warn) + STRINGHEIGHT(warn)
+        and top(warn) >= top(slider) + 16 and top(safe) >= top(warn) + STRINGHEIGHT(warn) and top(note) >= top(safe) + STRINGHEIGHT(safe)
         and back._point[4] >= slider._point[4] + slider._width and back._point[4] + back._width <= 675
-        and 8 + top(note) + STRINGHEIGHT(note) <= 522 - (your._point[5] + STRINGHEIGHT(your))
+    local fits = your == nil or 8 + top(note) + STRINGHEIGHT(note) <= 522 - (your._point[5] + STRINGHEIGHT(your))
     STRINGHEIGHT = nil
-    return ok, tostring(ok)
+    return ok and fits, tostring(ok) .. tostring(fits)
 end)
 
 test("S6-12 a card's name that wraps pushes its help line and levels down: the help never sits on the name", function()
@@ -1159,7 +1311,7 @@ test("S10-1 the page list ends with a caption and two buttons, Save as Everyday 
     return #bad == 0 and above, table.concat(bad, ",") .. tostring(above)
 end)
 
-test("S10-2 a save button keeps the game's current settings in that profile and says so beside the buttons, silently; a boosted sharpness is saved as it was", function()
+test("S10-2 a save button keeps the game's current settings in that profile and says so beside the buttons, silently; a size above 100% is saved as it is", function()
     local e, s, db = bootWith(fullEntry())
     local n = managedPresent(e)
     s.open("home")
@@ -1175,7 +1327,7 @@ test("S10-2 a save button keeps the game's current settings in that profile and 
     s.open("size")
     drag(window(), 150)
     byKey(window(), "save:crowded"):Click()
-    local boosted = db.profiles.crowded.values.RenderScale == "1" and CVARS.RenderScale == "1.5"
+    local boosted = db.profiles.crowded.values.RenderScale == "1.5" and CVARS.RenderScale == "1.5"
     s.click("page:light")
     local gone = not hasText(window(), "Saved " .. n) and hasText(window(), SAVE_CAPTION)
     return everyday and crowded and boosted and gone, tostring(everyday) .. tostring(crowded) .. tostring(boosted) .. tostring(gone)

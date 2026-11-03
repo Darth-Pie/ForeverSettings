@@ -37,7 +37,7 @@ An addon for **WoW Forever**.
   <img src=".previews/my-settings.png" alt="My settings, Light and shadows page: Shadow detail, Soft corner shadows and Extra effects detail, with the fps cost under each level" width="720">
 </p>
 
-The **Home** page switches profile and starts the tests. The **Picture size** page has a slider for picture sharpness, up to 200% for this session only, with a warning that high values can crash some graphics cards.
+The **Home** page switches profile and starts the tests. The **Picture size** page has a slider and size buttons for picture sharpness, up to 200%. Both keep the size in the profile you are editing. A warning says that high values can crash some graphics cards, and holding Shift while you enter the world skips a saved size above 100% for that session.
 
 <p align="center">
   <img src=".previews/home.png" alt="My settings, Home page: the four profiles and the two test buttons" width="355">
@@ -65,8 +65,21 @@ Switch from the minimap button, or type `/fset profile everyday` (also `crowded`
 - Nothing is forced on a first install.
 - It never changes a setting during combat or while a test is running.
 - It doesn't collect or send anything.
-- `/fset reset` puts back everything the addon changed. `/fset settings` opens My settings, `/fset size 50` to `/fset size 200` sets the picture sharpness for this session, and `/fset minimap` hides or shows the button.
-- Built for and tried on WoW Forever. Retail is untested.
+- `/fset reset` puts back everything the addon changed. `/fset settings` opens My settings, `/fset size 50` to `/fset size 200` sets and keeps the picture sharpness, and `/fset minimap` hides or shows the button.
+- Built for WoW Forever. So far it has been tested mostly on the live game with the same code; it hasn't had a full run on Forever itself yet, so reports from Forever are welcome.
+
+## Known issues and things to know
+
+- **Picture sharpness above 100% can crash some graphics cards.** The slider and the size buttons go up to 200%. Above 100% the game draws more pixels than your screen has, which costs a lot of frame rate and graphics memory. Some cards can crash (AMD drivers have been reported to). Try 125% first.
+- **If the game crashes when you enter the world at a saved size above 100%,** hold Shift while you enter. The addon then skips that size for the session. Afterwards lower it on the Picture size page of My settings.
+- **If the game won't even start,** close it, open `WTF\Config.wtf` in Notepad, change the line `SET RenderScale "..."` to `SET RenderScale "1"`, save, and start again. The addon puts a kept size above 100% back to 100% at a normal logout, but a crash or a forced close can leave the big value in the game's own settings.
+- **Test it properly.** Stand still in a quiet spot with vsync off, no frame-rate limit and dynamic render scale off. Costs are measured one setting at a time, so "about N fps" for your combined choices is an estimate. Run the test again after a driver or hardware change. Sizes above 100% are never measured and show "?".
+- **Your kept settings are put back at every loading screen.** If you change one in the game's own graphics menu, the addon changes it back. Use My settings to change it, or switch to Original.
+- **Nothing changes in combat or during a test.** It waits until afterwards.
+- **If the game crashes, changes you made in My settings that session can be lost.** The game saves addon data only at a normal exit or `/reload`.
+- **Maximum** uses the sharpest textures, which need plenty of graphics memory.
+- **Not included:** raytracing and console-only settings. Some settings don't exist in every client and then aren't shown.
+- **Another addon that sets the same graphics settings** can fight with this one, each undoing the other at every loading screen.
 
 ## Problems and ideas
 

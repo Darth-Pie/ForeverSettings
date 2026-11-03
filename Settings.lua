@@ -21,9 +21,10 @@ local MATTERS_NOTE = [["Matters to the picture" is the addon's own judgement, no
 local NOTHING_TEXT = "Maximum has nothing to set yet: run Find my best settings once so the addon learns what each setting can do."
 local USE_TEXT = "Use what I have in the game now"
 local MAXIMUM_TEXT = "Switch to Maximum"
-local SIZE_MIN, SIZE_MAX, SIZE_STEP = 50, 200, 5          -- percent: the picture sharpness slider (this session only)
-local SIZE_SLIDER_WIDTH, SIZE_BACK_WIDTH = 360, 140      -- pixels: the slider and its Back to normal button
-local SIZE_NOTE = "Not saved: the game goes back to your normal setting when you log out."
+local SIZE_MIN, SIZE_MAX, SIZE_STEP = 50, 200, 5          -- percent: the picture sharpness slider
+local SIZE_SLIDER_WIDTH, SIZE_BACK_WIDTH = 360, 140      -- pixels: the slider and its Back to 100% button
+local SIZE_EXTRA = { "1.25", "1.5", "1.75", "2" }          -- the sizes above 100% the size card offers, which the test never measures
+local SIZE_SAFE = "If a size above 100% crashes the game when you enter the world, hold Shift while you enter: the addon then skips it for that session."
 local SIZE_WARNING = "Above 100% the game draws more pixels than your screen has. That can cost a lot of frame rate and graphics memory, "
     .. "and some graphics cards crash at high values."
 local DYNAMIC_OFF = "Dynamic render scale is off."
@@ -46,7 +47,7 @@ local ABOUT_LINES = {
     "Chat commands",
     "/fset settings: open this window",
     "/fset profile everyday, crowded, maximum or original: switch profile",
-    "/fset size 50 to 200, or off: the picture sharpness for this session",
+    "/fset size 50 to 200, or off: set the picture sharpness and keep it",
     "/fset probe: ask the game which settings it has",
     "/fset reset: put back everything the addon changed",
     "",
@@ -140,7 +141,8 @@ local function refusedNames(mismatched)
     return list
 end
 
--- Columns of cards on a settings page: two, three above six cards (spec H7).
+-- Columns of cards on a settings page: two, three above six cards (spec H7). The Picture size page is one column: its card has ten size
+-- buttons.
 function settings.columnsFor(count)
     return count > 6 and 3 or 2
 end
@@ -214,7 +216,14 @@ function settings.model(st, ctx)
         -- test did not measure, shows none.
         local list = costs and costs.fps.byCvar[cvar]
         local heldFps = list and chosen ~= nil and fpsOf(list, chosen) or nil
-        for i, value in ipairs(entry.tiers) do
+        -- Picture sharpness also offers sizes above 100%: levels the test never measured (a copy: the test's own list stays as it is).
+        local tiers = entry.tiers
+        if cvar:lower() == "renderscale" then
+            tiers = {}
+            for _, value in ipairs(entry.tiers) do tiers[#tiers + 1] = value end
+            for _, value in ipairs(SIZE_EXTRA) do tiers[#tiers + 1] = value end
+        end
+        for i, value in ipairs(tiers) do
             local position
             if i == 1 then position = "lowest" elseif i == #entry.tiers then position = "highest" end
             local level = { value = value, text = names.level(cvar, value, position), short = names.level(cvar, value),
@@ -248,15 +257,40 @@ function settings.model(st, ctx)
             view.yourLine = view.yourLine .. " " .. plural(est.notCounted, "setting") .. " not counted: " .. NOT_COUNTED
         end
     end
-    -- The picture sharpness block (spec 2026-11-02-picture-sharpness-slider-design.md); ctx.size = {percent, boosted, before}.
+    -- The picture size block (spec 2026-11-02-one-saved-picture-size-design.md S1, S2): the slider shows the same size as the level
+    -- buttons, the tab's (the game's own when the tab is in use, else the one the tab keeps); ctx.size = {live = the game's percent}.
     local size = ctx.size
     if size then
-        local label = settings.sizeLabel(size.percent)
-        if size.boosted and size.before then label = label .. " (normal: " .. size.before .. "%)" end
-        view.size = { percent = size.percent, value = math.max(SIZE_MIN, math.min(SIZE_MAX, size.percent)), min = SIZE_MIN,
-            max = SIZE_MAX, step = SIZE_STEP, label = label, note = SIZE_NOTE,
-            warning = size.percent > 100 and SIZE_WARNING or nil, enabled = locked == nil,
-            canPutBack = (size.boosted and locked == nil) and true or false }
+        local keptSize = saved.RenderScale
+        local fraction = tonumber(onTabInUse and ctx.live("RenderScale") or keptSize)
+        local percent = fraction and math.floor(fraction * 100 + 0.5) or size.live
+        local tab = TAB_TEXT[st.tab] or ""
+        local label, note
+        if onTabInUse then
+            label = settings.sizeLabel(percent)
+        elseif keptSize ~= nil then
+            label = tab .. " keeps picture sharpness at " .. percent .. "%"
+        else
+            label = tab .. " keeps no picture sharpness yet (the game has " .. percent .. "% now)"
+        end
+        -- What the tab keeps can differ from what the game holds (a Shift session skips a saved size above 100%, the game may
+        -- refuse a size): the note then says both, and the warning and Back to 100% follow the larger of the two.
+        local keptPercent = keptSize ~= nil and tonumber(keptSize) and math.floor(tonumber(keptSize) * 100 + 0.5) or nil
+        local differs = onTabInUse and keptPercent ~= nil and keptPercent ~= percent
+        if keptSize == nil then
+            note = "Not kept in " .. tab .. " yet: drag the slider or click a size to keep it."
+        elseif differs then
+            note = "Kept in " .. tab .. " at " .. keptPercent .. "%: the game has " .. percent .. "% now."
+        elseif onTabInUse then
+            note = "Kept in " .. tab .. ": the addon puts it back at every loading screen."
+        else
+            note = "Kept in " .. tab .. ": used when you switch to " .. tab .. "."
+        end
+        local risky = percent > 100 or (keptPercent ~= nil and keptPercent > 100)
+        view.size = { percent = percent, value = math.max(SIZE_MIN, math.min(SIZE_MAX, percent)), min = SIZE_MIN, max = SIZE_MAX,
+            step = SIZE_STEP, label = label, note = note, warning = risky and SIZE_WARNING or nil,
+            safe = risky and SIZE_SAFE or nil, enabled = locked == nil,
+            canPutBack = (percent ~= 100 or differs) and locked == nil }
     end
     -- Whether the game's dynamic render scale is on (it resizes the picture by itself and spoils a test); nil when the client lacks it.
     if ctx.dynamicScale then view.dynamicLine = ctx.dynamicScale.on and DYNAMIC_ON or DYNAMIC_OFF end
@@ -372,14 +406,11 @@ local function costsAndMaximum(tab)
     return { kind = source.kind, measuredLine = source.measuredLine, fps = fps }, maximum, mine
 end
 
--- The picture sharpness now and whether a session-only change holds it, for the slider; nil when the client has no such setting.
+-- The game's picture sharpness now, in percent, for the slider; nil when the client has no such setting.
 local function sizeContext()
     local live = tonumber(GetCVar("RenderScale"))
     if live == nil then return nil end
-    local boost = ns.profiles and ns.profiles.boosted and ns.profiles.boosted()
-    local before = boost and tonumber(boost.before)
-    return { percent = math.floor(live * 100 + 0.5), boosted = boost ~= nil and boost ~= false,
-        before = before and math.floor(before * 100 + 0.5) or nil }
+    return { live = math.floor(live * 100 + 0.5) }
 end
 
 -- Whether the game's dynamic render scale (CVar dynamicRenderScale) is on, for the Picture size page; nil when the client lacks it.
@@ -483,6 +514,22 @@ function settings.open(which)
     end)
 end
 
+-- Keeps a picture size in the tab's profile exactly as a level button does, and applies it at once when that profile is in use;
+-- when the game keeps another size, the window says so.
+local function saveSize(percent)
+    if percent < SIZE_MIN or percent > SIZE_MAX then return end
+    local value = string.format("%.4g", percent / 100)
+    local ok = ns.profiles.setProfileValue(state.tab, "RenderScale", value, true)
+    if ok and ns.profiles.active() == state.tab then
+        local held = GetCVar("RenderScale")
+        if held ~= nil and not sameValue(held, value) then
+            state.notice = "The game kept picture sharpness at " .. string.format("%.0f%%", tonumber(held) * 100)
+                .. " (you asked for " .. percent .. "%)."
+        end
+    end
+    draw()
+end
+
 -- A button or tick of the window, by the keys of the model: tab:<tab>, keep:<cvar>, level:<cvar>:<value>, use, maximum,
 -- close. A refusal Maximum gives is shown in the window until the next click or redraw.
 function settings.click(key)
@@ -512,20 +559,14 @@ function settings.click(key)
         return
     end
     if not ns.profiles then return end
-    -- The picture sharpness slider (this session only): size:<percent> when the mouse button is let go, sizeback.
+    -- The picture size slider: size:<percent> when the mouse button is let go, and Back to 100%; both keep the size like a level button.
     local percent = key:match("^size:(%d+)$")
     if percent then
-        local ok, info = ns.profiles.boost(tonumber(percent) / 100, true)
-        if ok and info.refused then
-            state.notice = "The game kept picture sharpness at " .. string.format("%.0f%%", tonumber(info.held) * 100)
-                .. " (you asked for " .. percent .. "%)."
-        end
-        draw()
+        saveSize(tonumber(percent))
         return
     end
     if key == "sizeback" then
-        ns.profiles.unboost(true)
-        draw()
+        saveSize(100)
         return
     end
     if key == "maximum" then
@@ -575,7 +616,7 @@ function settings.click(key)
         if ctx.saved[profile][cvar] ~= nil then
             ns.profiles.unsetProfileValue(profile, cvar, true)
         else
-            local now = ns.profiles.liveValue(cvar)          -- not a picture sharpness boost: that is never saved
+            local now = GetCVar(cvar)
             if now ~= nil then ns.profiles.setProfileValue(profile, cvar, now, true) end
         end
         draw()
@@ -772,10 +813,11 @@ local function build()
     -- The picture sharpness block of the Picture size page.
     p.sizeLabel = skin.text(area, "normal", "bright", AREA_W)
     p.sizeSlider = makeSlider(area, p)
-    p.sizeBack = skin.button(area, "Back to normal", SIZE_BACK_WIDTH, 24)
+    p.sizeBack = skin.button(area, "Back to 100%", SIZE_BACK_WIDTH, 24)
     p.sizeBack.key = "sizeback"
     p.sizeBack:SetScript("OnClick", clicked)
     p.sizeWarn = skin.text(area, "small", "warning", AREA_W)
+    p.sizeSafe = skin.text(area, "small", "dim", AREA_W)
     p.sizeNote = skin.text(area, "small", "dim", AREA_W)
     p.dynamicLine = skin.text(area, "small", "dim", AREA_W)
 
@@ -964,7 +1006,7 @@ function settings.render()
         placeText(p.note, NONE_TEXT)
     else
         hideText(p.note)
-        local columns = settings.columnsFor(#rows)
+        local columns = view.page == "size" and 1 or settings.columnsFor(#rows)
         local cardW = math.floor((AREA_W - (columns - 1) * CARD_GAP_X) / columns)
         local perRow = math.max(1, math.floor((cardW + LEVEL_GAP) / (LEVEL_W + LEVEL_GAP)))
         local i = 1
@@ -1080,12 +1122,14 @@ function settings.render()
         p.sizeBack:Show()
         y = y + 16 + 12
         if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end
+        if size.safe then placeText(p.sizeSafe, size.safe) else hideText(p.sizeSafe) end
         placeText(p.sizeNote, size.note)
     else
         p.sizeSlider:Hide()
         p.sizeBack:Hide()
         hideText(p.sizeLabel)
         hideText(p.sizeWarn)
+        hideText(p.sizeSafe)
         hideText(p.sizeNote)
     end
     if view.page == "size" and view.dynamicLine then
