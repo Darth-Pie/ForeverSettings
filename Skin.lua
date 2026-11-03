@@ -12,6 +12,8 @@ local HEX = {
     accent = "9a9cff", accentLight = "c9caff", text = "d8dbe3", bright = "eef0f6", dim = "8b90a0",
     warning = "ff9933", danger = "e06060",
     hover = "1b1e28", pressed = "2c3266", textDisabled = "5d6170",
+    -- The colour of each profile (spec 2026-11-02-edit-the-profile-in-use-design.md P5).
+    profileOriginal = "b4b2a9", profileEveryday = "5dcaa5", profileCrowded = "ef9f27", profileMaximum = "f0997b",
 }
 local ALPHA = { fill = 0.96 }
 
@@ -122,6 +124,16 @@ function skin.box(frame, radius, fillName, edgeName)
     return box
 end
 
+-- A coloured dot: an 8 pixel circle (the rounded box of radius 4 on an 8 pixel frame is four quarter discs), used for the profile
+-- colours. dot:SetColorName(name) repaints it.
+function skin.dot(parent, colorName)
+    local dot = CreateFrame("Frame", nil, parent)
+    dot:SetSize(8, 8)
+    dot.box = skin.box(dot, skin.RADIUS.control, colorName or "dim")
+    function dot:SetColorName(name) self.box.fill:SetColorTexture(skin.color(name)) end
+    return dot
+end
+
 -- A button: a flat fill and a one-pixel edge, its label centred both ways on one line. States are painted by colour:
 -- normal, hover, pressed, selected, disabled.
 local function paint(b)
@@ -129,6 +141,7 @@ local function paint(b)
     local fill, edge, text = "fill", "control", "text"
     if not b:IsEnabled() then
         text = "textDisabled"
+        if state.selected then fill, text = "selected", "dim" end      -- a read-only page still shows what the game has
     elseif state.pressed then
         fill, edge = "pressed", "accent"
     elseif state.selected then
@@ -226,18 +239,25 @@ function skin.navItem(parent, text, width, height)
     return row
 end
 
--- A check box: a 16 pixel rounded square with an accent mark when ticked.
+-- A check box: a 16 pixel rounded square with an accent mark when ticked, a dim mark when ticked but disabled, and no hover
+-- while disabled.
 function skin.check(parent)
     local box = CreateFrame("CheckButton", nil, parent)
     box:SetSize(16, 16)
     local shape = skin.box(box, skin.RADIUS.control, "fill", "control")
     local edges = { shape.edge }
-    local mark = box:CreateTexture(nil, "OVERLAY")
-    mark:SetColorTexture(skin.color("accent"))
-    mark:SetSize(8, 8)
-    mark:SetPoint("CENTER", box, "CENTER", 0, 0)
-    box:SetCheckedTexture(mark)
-    box:SetScript("OnEnter", function() for _, tex in ipairs(edges) do tex:SetColorTexture(skin.color("border")) end end)
+    local function newMark(colorName)
+        local mark = box:CreateTexture(nil, "OVERLAY")
+        mark:SetColorTexture(skin.color(colorName))
+        mark:SetSize(8, 8)
+        mark:SetPoint("CENTER", box, "CENTER", 0, 0)
+        return mark
+    end
+    box:SetCheckedTexture(newMark("accent"))
+    box:SetDisabledCheckedTexture(newMark("dim"))
+    box:SetScript("OnEnter", function(self)
+        if self:IsEnabled() then for _, tex in ipairs(edges) do tex:SetColorTexture(skin.color("border")) end end
+    end)
     box:SetScript("OnLeave", function() for _, tex in ipairs(edges) do tex:SetColorTexture(skin.color("control")) end end)
     return box
 end

@@ -786,30 +786,11 @@ end
   'friendly-raw': ['Profiles.lua', `    if ns.names then return ns.names.label(cvar, label) end`, `    if false then return ns.names.label(cvar, label) end`],
 
   // The My settings window (words and menu, Task 3)
-  'settings-default-tab-wrong': ['Settings.lua', `    return ns.profiles and ns.profiles.active() == "crowded" and "crowded" or "everyday"`, `    return "crowded"`],
-  'settings-original-note-missing': ['Settings.lua', `    if ctx.active == "original" then
-        view.notice = ORIGINAL_NOTE`, `    if false then
-        view.notice = ORIGINAL_NOTE`],
-  'settings-tab-in-use-mark-missing': ['Settings.lua', `text = TAB_TEXT[key] .. (inUse and " (in use)" or ""),`, `text = TAB_TEXT[key],`],
   'settings-order-reversed': ['Settings.lua', `        if ra ~= rb then return ra < rb end`, `        if ra ~= rb then return ra > rb end`],
   'settings-lowest-mark-missing': ['Settings.lua', `            if i == 1 then position = "lowest" elseif i == #entry.tiers then position = "highest" end`, `            if i == #entry.tiers then position = "highest" end`],
-  'settings-active-highlights-saved': ['Settings.lua', `        if onTabInUse then chosen = ctx.live(cvar) end`, `        if false then chosen = ctx.live(cvar) end`],
-  'settings-other-highlights-live': ['Settings.lua', `    local onTabInUse = st.tab == ctx.active`, `    local onTabInUse = true`],
   'settings-kept-ignores-saved': ['Settings.lua', `kept = saved[cvar] ~= nil,`, `kept = false,`],
   'settings-click-active-stores-only': ['Settings.lua', `        ns.profiles.setProfileValue(profile, pickedCvar, value, true)`, `        ns.profiles.state().profiles[profile].values[pickedCvar] = value`],
-  'settings-click-other-writes-cvar': ['Settings.lua', `        ns.profiles.setProfileValue(profile, pickedCvar, value, true)
-        draw()`, `        ns.profiles.setProfileValue(profile, pickedCvar, value, true)
-        pcall(SetCVar, pickedCvar, value)
-        draw()`],
-  'settings-untick-other-keeps': ['Settings.lua', `            ns.profiles.unsetProfileValue(profile, cvar, true)`, `            if profile == ns.profiles.active() then ns.profiles.unsetProfileValue(profile, cvar, true) end`],
   'settings-tick-wrong-value': ['Settings.lua', `ns.profiles.setProfileValue(profile, cvar, now, true)`, `ns.profiles.setProfileValue(profile, cvar, "0", true)`],
-  'settings-lock-not-checked': ['Settings.lua', `    if ctx.locked then
-        if key == "maximum" then draw() end          -- the draw says why (the window may not have caught up yet)
-        return
-    end
-    local tab = key:match("^tab:(.+)$")`, `    local tab = key:match("^tab:(.+)$")`],
-  'settings-lock-tabs-live': ['Settings.lua', `            note = names.PROFILE_NOTE[key], enabled = locked == nil,`, `            note = names.PROFILE_NOTE[key], enabled = true,`],
-  'settings-use-wrong-profile': ['Settings.lua', `        keepCurrent(profile)`, `        keepCurrent("everyday")`],
   'settings-refresh-missing': ['Settings.lua', `        if signature(context()) ~= lastSignature then draw() end`, `        if false then draw() end`],
   'settings-prints': ['Settings.lua', `        ns.profiles.setProfileValue(profile, pickedCvar, value, true)`, `        ns.profiles.setProfileValue(profile, pickedCvar, value)`],
   'settings-row-shows-raw-name': ['Settings.lua', `        name:SetText(row.name)`, `        name:SetText(row.cvar)`],
@@ -1404,19 +1385,12 @@ end`],
   'settings-max-total-nothing-to-set': ['Settings.lua', `    if next(values) ~= nil then`, `    if true then`],
   'settings-max-total-ignores-values': ['Settings.lua', `ns.recommend.estimateFps(source.entry, values)`, `ns.recommend.estimateFps(source.entry, {})`],
   'settings-max-total-truncates': ['Settings.lua', `string.format("Everything at the highest: about %.0f fps.", max.fps)`, `"Everything at the highest: about " .. math.floor(max.fps) .. " fps."`],
-  'settings-max-button-in-use': ['Settings.lua', `    if ctx.active ~= "maximum" then`, `    if true then`],
-  'settings-max-button-in-combat': ['Settings.lua', `{ key = "maximum", text = MAXIMUM_TEXT, enabled = locked == nil }`, `{ key = "maximum", text = MAXIMUM_TEXT, enabled = true }`],
   'settings-max-click-not-silent': ['Settings.lua', `local ok, info = ns.profiles.switch(name, true)`, `local ok, info = ns.profiles.switch(name)`],
-  'settings-max-click-locked-writes': ['Settings.lua', `    if ctx.locked then
-        if key == "maximum" then draw() end`, `    if ctx.locked and key ~= "maximum" then
-        if key == "maximum" then draw() end`],
   'settings-max-nothing-notice-missing': ['Settings.lua', `    if not ok and info == "nothing" then
         state.notice = NOTHING_TEXT`, `    if false then
         state.notice = NOTHING_TEXT`],
   'settings-max-refusal-not-shown': ['Settings.lua', `    if view.refusal then notices[#notices + 1] = view.refusal end`, `    if false then notices[#notices + 1] = view.refusal end`],
   'settings-max-notice-not-consumed': ['Settings.lua', `    state.notice = nil                       -- a refusal is shown once: until the next click or redraw`, `    local _ = state`],
-  'settings-max-level-click-wrong-call': ['Settings.lua', `ns.profiles.setProfileValue(profile, pickedCvar, value, true)`, `ns.profiles.setValue(pickedCvar, value, true)`],
-  'settings-max-note-in-use-missing': ['Settings.lua', `    elseif ctx.active == "maximum" then`, `    elseif false then`],
   'settings-max-leftout-missing': ['Settings.lua', `if max and (max.leftOut or 0) > 0 then view.notice`, `if false then view.notice`],
   'settings-max-leftout-plural': ['Settings.lua', `    if n == 1 then return "1 setting stays as it is: the addon has not learned its levels yet." end`, `    if n == 0 then return "1 setting stays as it is: the addon has not learned its levels yet." end`],
   'settings-max-second-line-missing': ['Settings.lua', `            if level.cost then
@@ -1431,35 +1405,25 @@ end`],
             settings.hide()`, `            ns.ui.openSaved(testKey)`],
   'ui-show-hub-stays': ['Settings.lua', `            ns.ui.openSaved(showKey)
             settings.hide()`, `            ns.ui.openSaved(showKey)`],
-  'ui-original-note-menu': ['Settings.lua', `Switch to Everyday or Crowded on the Home page to turn these on.`, `Switch to Everyday or Crowded in the menu to turn these on.`],
-  'ui-maximum-note-menu': ['Settings.lua', `Switch to Everyday or Crowded on the Home page to change these.`, `Switch to Everyday or Crowded in the menu to change these.`],
 
   // The live total in My settings ("Your Everyday settings: about N fps")
-  'live-no-test-needed': ['Settings.lua', `if costs and est and type(est.fps) == "number" and (est.counted or 0) > 0 then`, `if est and type(est.fps) == "number" and (est.counted or 0) > 0 then`],
   'live-counted-zero': ['Settings.lua', `type(est.fps) == "number" and (est.counted or 0) > 0 then`, `type(est.fps) == "number" then`],
   'live-note-dropped': ['Settings.lua', `        if (est.notCounted or 0) > 0 then`, `        if false then`],
   'live-note-plural': ['Settings.lua', `plural(est.notCounted, "setting")`, `(est.notCounted .. " settings")`],
-  'live-tab-name': ['Settings.lua', `TAB_TEXT[st.tab] or "", est.fps)`, `"Everyday", est.fps)`],
   'live-whole-number': ['Settings.lua', `"Your %s settings: about %.0f fps"`, `"Your %s settings: about %.1f fps"`],
   'live-tail-missing': ['Settings.lua', `est.fps) .. YOUR_TAIL`, `est.fps)`],
-  'live-held-live-always': ['Settings.lua', `        if live then value = GetCVar(entry.cvar) else value = db.profiles[tab].values[entry.cvar] end`, `        value = GetCVar(entry.cvar)`],
-  'live-held-saved-always': ['Settings.lua', `        if live then value = GetCVar(entry.cvar) else value = db.profiles[tab].values[entry.cvar] end`, `        value = db.profiles[tab].values[entry.cvar]`],
   'live-guard-removed': ['Settings.lua', `local okHeld, yours = pcall(ns.recommend.estimateFps, source.entry, held)`, `local okHeld, yours = true, ns.recommend.estimateFps(source.entry, held)`],
   'live-count-ignores-missing': ['Settings.lua', `counted = heldCount - #yours.missing`, `counted = heldCount`],
   'live-not-counted-zero': ['Settings.lua', `notCounted = #yours.missing }`, `notCounted = 0 }`],
-  'live-context-dropped': ['Settings.lua', `ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab)`, `ctx.costs, ctx.maximum = costsAndMaximum(state.tab)`],
   'live-line-not-stacked': ['Settings.lua', `    stack(p.your, view.yourLine)
 `, ``],
   'live-stack-order': ['Settings.lua', `    stack(p.total, view.totalLine)
     stack(p.your, view.yourLine)`, `    stack(p.your, view.yourLine)
     stack(p.total, view.totalLine)`],
-  'settings-max-total-over-buttons': ['Settings.lua', `    local bottom = FOOTER_H + SUMMARY_GAP`, `    local bottom = 20`],
   'settings-max-matters-over-total': ['Settings.lua', `        bottom = bottom + heightOf(fs, str) + 2`, `        bottom = bottom + 2`],
-  'settings-max-footer-overlap': ['Settings.lua', `local useRight = PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0)`, `local useRight = PAD + (hasMaximum and 0 or 0)`],
   'settings-max-matters-line-missing': ['Settings.lua', `            worth:SetText("matters: " .. row.mattersWords)`, `            worth:SetText("")`],
   'settings-max-cost-note-missing': ['Settings.lua', `    if onSettings or view.page == "home" then placeText(p.costNote, view.costNote) else hideText(p.costNote) end`, `    hideText(p.costNote)`],
   'settings-max-costs-not-released': ['Settings.lua', `    release(p.costs, true)`, `    local _ = p.costs`],
-  'settings-max-button-not-hidden': ['Settings.lua', `        if hasMaximum then p.maximum:Show() else p.maximum:Hide() end`, `        p.maximum:Show()`],
 
   // The step count of a guided test grows when a reading is repeated: the window says why
   'bench-repeats-not-counted': ['Bench.lua', `progressState.total = progressState.total + #tiers + 1
@@ -1534,7 +1498,6 @@ end`],
   'skin-escape-twice': ['Skin.lua', `    if not listed and name then tinsert(UISpecialFrames, name) end`, `    if name then tinsert(UISpecialFrames, name) end`],
   'skin-window-shown': ['Skin.lua', `    f:Hide()
     return f`, `    return f`],
-  'skin-check-mark': ['Skin.lua', `mark:SetColorTexture(skin.color("accent"))`, `mark:SetColorTexture(skin.color("text"))`],
   'skin-check-size': ['Skin.lua', `box:SetSize(16, 16)`, `box:SetSize(18, 18)`],
   'skin-slider-range': ['Skin.lua', `slider:SetMinMaxValues(min, max)`, `slider:SetMinMaxValues(min, max - 1)`],
   'skin-slider-step': ['Skin.lua', `slider:SetValueStep(step)`, `slider:SetValueStep(1)`],
@@ -1587,7 +1550,6 @@ end`],
   'skin-round-bar-top': ['Skin.lua', `row.bar:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -BAR_INSET)`, `row.bar:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)`],
   'skin-round-bar-bottom': ['Skin.lua', `row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, BAR_INSET)`, `row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)`],
   'skin-round-edges-unlinked': ['Skin.lua', `b.bg, b.edges = box.fill, { box.edge }`, `b.bg, b.edges = box.fill, {}`],
-  'skin-round-check-hover': ['Skin.lua', `tex:SetColorTexture(skin.color("border")) end end)`, `tex:SetColorTexture(skin.color("text")) end end)`],
   'skin-round-check-leave': ['Skin.lua', `tex:SetColorTexture(skin.color("control")) end end)`, `tex:SetColorTexture(skin.color("border")) end end)`],
   'skin-nav-select-unpainted': ['Skin.lua', `        self.skinState.selected = on and true or false
         paintRow(self)`, `        self.skinState.selected = on and true or false`],
@@ -1598,10 +1560,6 @@ end`],
   'hub-nav-gap': ['Settings.lua', `-(10 + (i - 1) * 30 + (i > 4 and 14 or 0))`, `-(10 + (i - 1) * 30)`],
   'hub-nav-selected-unmarked': ['Settings.lua', `p.nav[i]:SetSelected(entry.selected)`, `p.nav[i]:SetSelected(false)`],
   'hub-title-missing': ['Settings.lua', `    p.title:SetText(title)`, `    p.title:SetText("")`],
-  'hub-tabs-always': ['Settings.lua', `        if onSettings then button:Show() else button:Hide() end`, `        button:Show()`],
-  'hub-tab-unmarked': ['Settings.lua', `button:SetSelected(tab.selected)`, `button:SetSelected(false)`],
-  'hub-tab-never-greyed': ['Settings.lua', `button:SetEnabled(tab.enabled)`, `button:SetEnabled(true)`],
-  'hub-tab-width': ['Settings.lua', `local TAB_W = 120`, `local TAB_W = 100`],
   'hub-banner-missing': ['Settings.lua', `    if #notices > 0 then placeText(p.banner, table.concat(notices`, `    if false then placeText(p.banner, table.concat(notices`],
   'hub-card-tick-unchecked': ['Settings.lua', `box:SetChecked(row.kept)`, `box:SetChecked(false)`],
   'hub-card-tick-never-greyed': ['Settings.lua', `box:SetEnabled(row.enabled)`, `box:SetEnabled(true)`],
@@ -1639,9 +1597,6 @@ end`],
         p.saveNote:Show()`],
   'saveas-caption-y': ['Settings.lua', `p.saveCaption:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, captionY)`, `p.saveCaption:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, 12)`],
   'saveas-caption-covers': ['Settings.lua', `local captionY = 12 + #TABS * (SAVE_H + SAVE_GAP)`, `local captionY = 12 + (#TABS - 1) * (SAVE_H + SAVE_GAP)`],
-  'saveas-locked-saves': ['Settings.lua', `    if ctx.locked then
-        if key == "maximum" then draw() end`, `    if ctx.locked and not key:find("^save:") then
-        if key == "maximum" then draw() end`],
   'hub-level-key': ['Settings.lua', `button.key = "level:" .. row.cvar .. ":" .. level.value`, `button.key = "level:" .. row.cvar .. ":0"`],
   'hub-cost-now-colour': ['Settings.lua', `level.cost == "now" and "accentLight" or "dim"`, `"dim"`],
   'hub-two-columns-only': ['Settings.lua', `view.page == "size" and 1 or settings.columnsFor(#rows)`, `view.page == "size" and 1 or 2`],
@@ -1652,12 +1607,6 @@ end`],
   'hub-levels-not-released': ['Settings.lua', `    release(p.levels)`, `    local _ = p.levels`],
   'hub-ticks-not-released': ['Settings.lua', `    release(p.checks)`, `    local _ = p.checks`],
   'hub-summary-on-every-page': ['Settings.lua', `        if not (onSettings and str) then`, `        if not str then`],
-  'hub-footer-on-every-page': ['Settings.lua', `        p.use:Hide()
-`, ``],
-  'hub-use-never-greyed': ['Settings.lua', `p.use:SetEnabled(button.enabled)`, `p.use:SetEnabled(true)`],
-  'hub-maximum-never-greyed': ['Settings.lua', `p.maximum:SetEnabled(button.enabled)`, `p.maximum:SetEnabled(true)`],
-  'hub-footer-margin': ['Settings.lua', `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)`, `p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + 4), 9)`],
-  'hub-footer-use-width': ['Settings.lua', `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26`, `local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 180, 160, 26`],
 
   // The final review's fix pass: a wrapped name pushes the help down, a Home click says what was refused
   'fix-name-wrap-ignored': ['Settings.lua', `local helpTop = top + math.max(18, heightOf(name, row.name) + 2)`, `local helpTop = top + 18`],
@@ -1713,16 +1662,9 @@ end`],
         placeText(p.aboutVersion`],
 
   // The Home page
-  'home-inuse-label': ['Settings.lua', `labels[ctx.active] or tostring(ctx.active)`, `tostring(ctx.active)`],
   'home-card-split': ['Settings.lua', `full:match("^([^:]+):%s*(.+)$")`, `full:match("^(.+)$")`],
   'home-max-fps-missing': ['Settings.lua', `if key == "maximum" and type(home.maxFps) == "number" then`, `if false then`],
   'home-max-fps-wrong-card': ['Settings.lua', `if key == "maximum" and type(home.maxFps) == "number" then`, `if key == "crowded" and type(home.maxFps) == "number" then`],
-  'home-card-unmarked': ['Settings.lua', `selected = ctx.active == key,
-            enabled = locked == nil }`, `selected = false,
-            enabled = locked == nil }`],
-  'home-card-never-greyed': ['Settings.lua', `selected = ctx.active == key,
-            enabled = locked == nil }`, `selected = ctx.active == key,
-            enabled = true }`],
   'home-test-never-done': ['Settings.lua', `done = saved.best == true`, `done = false`],
   'home-test-crowded-done': ['Settings.lua', `done = saved.crowded == true`, `done = saved.best == true`],
   'home-test-never-greyed': ['Settings.lua', `{ key = "best", text = "Find my best settings", enabled = locked == nil,`, `{ key = "best", text = "Find my best settings", enabled = true,`],
@@ -1768,10 +1710,6 @@ end
   'page-of-wrong': ['Settings.lua', `graphicsssao = "light"`, `graphicsssao = "world"`],
   'page-of-size-wrong': ['Settings.lua', `renderscale = "size",`, `renderscale = "world",`],
   'page-unknown-not-world': ['Settings.lua', `settings.PAGE_OF[cvar:lower()] or "world"`, `settings.PAGE_OF[cvar:lower()] or "light"`],
-  'page-open-tab-page': ['Settings.lua', `        state.tab = which
-        state.page = "light"`, `        state.tab = which`],
-  'page-open-ignores-page': ['Settings.lua', `        if PAGE_KEYS[which] then state.page = which end`, `        local _ = which`],
-  'page-open-bogus': ['Settings.lua', `        if PAGE_KEYS[which] then state.page = which end`, `        if which then state.page = which end`],
   'page-click-ignored': ['Settings.lua', `        if PAGE_KEYS[pageKey] then
             state.page = pageKey`, `        if false then
             state.page = pageKey`],
@@ -1838,20 +1776,6 @@ end
   'sz-extra-all-settings': ['Settings.lua', `        if cvar:lower() == "renderscale" then
             tiers = {}`, `        if true then
             tiers = {}`],
-  'sz-percent-ignores-live': ['Settings.lua', `local fraction = tonumber(onTabInUse and ctx.live("RenderScale") or keptSize)`, `local fraction = tonumber(keptSize)`],
-  'sz-percent-other-uses-live': ['Settings.lua', `local fraction = tonumber(onTabInUse and ctx.live("RenderScale") or keptSize)`, `local fraction = tonumber(ctx.live("RenderScale") or keptSize)`],
-  'sz-percent-rounding': ['Settings.lua', `math.floor(fraction * 100 + 0.5)`, `math.floor(fraction * 100)`],
-  'sz-percent-fallback': ['Settings.lua', `or size.live`, `or 100`],
-  'sz-label-in-use': ['Settings.lua', `            label = settings.sizeLabel(percent)`, `            label = tab .. " keeps picture sharpness at " .. percent .. "%"`],
-  'sz-label-other-kept': ['Settings.lua', `label = tab .. " keeps picture sharpness at " .. percent .. "%"`, `label = settings.sizeLabel(percent)`],
-  'sz-label-other-none': ['Settings.lua', `label = tab .. " keeps no picture sharpness yet (the game has " .. percent .. "% now)"`, `label = tab .. " keeps no picture sharpness yet"`],
-  'sz-note-none': ['Settings.lua', `        if keptSize == nil then
-            note =`, `        if keptSize ~= nil then
-            note =`],
-  'sz-note-in-use': ['Settings.lua', `        elseif onTabInUse then
-            note = "Kept in "`, `        elseif not onTabInUse then
-            note = "Kept in "`],
-  'sz-note-other': ['Settings.lua', `note = "Kept in " .. tab .. ": used when you switch to " .. tab .. "."`, `note = "Kept in " .. tab .. "."`],
   'sz-value-unclamped': ['Settings.lua', `value = math.max(SIZE_MIN, math.min(SIZE_MAX, percent))`, `value = percent`],
   'sz-no-setting': ['Settings.lua', `    local live = tonumber(GetCVar("RenderScale"))
     if live == nil then return nil end`, `    local live = tonumber(GetCVar("RenderScale"))
@@ -1862,10 +1786,7 @@ end
   'sz-save-range-low': ['Settings.lua', `if percent < SIZE_MIN or percent > SIZE_MAX then return end`, `if percent < 0 or percent > SIZE_MAX then return end`],
   'sz-save-range-high': ['Settings.lua', `if percent < SIZE_MIN or percent > SIZE_MAX then return end`, `if percent < SIZE_MIN or percent > 300 then return end`],
   'sz-save-format': ['Settings.lua', `local value = string.format("%.4g", percent / 100)`, `local value = string.format("%.2g", percent / 100)`],
-  'sz-save-tab': ['Settings.lua', `ns.profiles.setProfileValue(state.tab, "RenderScale", value, true)`, `ns.profiles.setProfileValue("everyday", "RenderScale", value, true)`],
-  'sz-save-loud': ['Settings.lua', `ns.profiles.setProfileValue(state.tab, "RenderScale", value, true)`, `ns.profiles.setProfileValue(state.tab, "RenderScale", value)`],
   'sz-save-notice-missing': ['Settings.lua', `if held ~= nil and not sameValue(held, value) then`, `if false then`],
-  'sz-save-notice-any-tab': ['Settings.lua', `if ok and ns.profiles.active() == state.tab then`, `if ok then`],
   'sz-save-click-pattern': ['Settings.lua', `key:match("^size:(%d+)$")`, `key:match("^size:(%d%d)$")`],
   'sz-save-back-missing': ['Settings.lua', `    if key == "sizeback" then
         saveSize(100)`, `    if key == "sizeback-off" then
@@ -1875,9 +1796,6 @@ end
   'sz-frame-one-column': ['Settings.lua', `view.page == "size" and 1 or settings.columnsFor(#rows)`, `settings.columnsFor(#rows)`],
   'sz-frame-back-label': ['Settings.lua', `skin.button(area, "Back to 100%", SIZE_BACK_WIDTH, 24)`, `skin.button(area, "Back to normal", SIZE_BACK_WIDTH, 24)`],
   'sz-frame-safe-missing': ['Settings.lua', `        if size.safe then placeText(p.sizeSafe, size.safe) else hideText(p.sizeSafe) end`, `        hideText(p.sizeSafe)`],
-  'sz-frame-stack-order': ['Settings.lua', `        if size.safe then placeText(p.sizeSafe, size.safe) else hideText(p.sizeSafe) end
-        placeText(p.sizeNote, size.note)`, `        placeText(p.sizeNote, size.note)
-        if size.safe then placeText(p.sizeSafe, size.safe) else hideText(p.sizeSafe) end`],
   'sz-frame-label-missing': ['Settings.lua', `        placeText(p.sizeLabel, size.label)`, `        local _ = size.label`],
   'sz-frame-value-not-set': ['Settings.lua', `        p.sizeSlider:SetValue(size.value)`, `        local _ = size.value`],
   'sz-frame-back-enabled': ['Settings.lua', `p.sizeBack:SetEnabled(size.canPutBack)`, `p.sizeBack:SetEnabled(true)`],
@@ -1920,29 +1838,9 @@ end
   'sz-safe-never': ['Settings.lua', `safe = risky and SIZE_SAFE or nil`, `safe = nil`],
   'sz-safe-at-100': ['Settings.lua', `safe = risky and SIZE_SAFE or nil`, `safe = (risky or percent == 100) and SIZE_SAFE or nil`],
   'sz-kept-not-risky': ['Settings.lua', `(keptPercent ~= nil and keptPercent > 100)`, `false`],
-  'sz-note-differs': ['Settings.lua', `        elseif differs then
-            note =`, `        elseif false then
-            note =`],
-  'sz-putback-always': ['Settings.lua', `canPutBack = (percent ~= 100 or differs) and locked == nil`, `canPutBack = locked == nil`],
-  'sz-putback-differs-missing': ['Settings.lua', `canPutBack = (percent ~= 100 or differs) and locked == nil`, `canPutBack = percent ~= 100 and locked == nil`],
-  'sz-putback-ignores-lock': ['Settings.lua', `canPutBack = (percent ~= 100 or differs) and locked == nil`, `canPutBack = (percent ~= 100 or differs)`],
-  'sz-enabled-ignores-lock': ['Settings.lua', `safe = risky and SIZE_SAFE or nil, enabled = locked == nil,`, `safe = risky and SIZE_SAFE or nil, enabled = true,`],
   'sz-preflight-size-missing': ['Bench.lua', `    if size and size > 1 then`, `    if false then`],
   'sz-preflight-size-100': ['Bench.lua', `    if size and size > 1 then`, `    if size and size >= 1 then`],
   // Editing a tab that is not in use: the where line, Switch to <tab>, and what a save replaced (the owner's report of 2026-11-02)
-  'sw-model-switch-missing': ['Settings.lua', `    if st.tab ~= ctx.active and TAB_TEXT[st.tab] then`, `    if false then`],
-  'sw-model-switch-always': ['Settings.lua', `    if st.tab ~= ctx.active and TAB_TEXT[st.tab] then`, `    if TAB_TEXT[st.tab] then`],
-  'sw-model-switch-text': ['Settings.lua', `text = "Switch to " .. TAB_TEXT[st.tab], enabled = locked == nil }`, `text = "Switch", enabled = locked == nil }`],
-  'sw-model-switch-ignores-lock': ['Settings.lua', `text = "Switch to " .. TAB_TEXT[st.tab], enabled = locked == nil }`, `text = "Switch to " .. TAB_TEXT[st.tab], enabled = true }`],
-  'sw-where-in-use': ['Settings.lua', `        if not onTabInUse then
-            local usedLabel`, `        if onTabInUse then
-            local usedLabel`],
-  'sw-where-label': ['Settings.lua', `(ns.profiles and ns.profiles.LABEL or {})[ctx.active] or tostring(ctx.active)`, `(ns.profiles and ns.profiles.LABEL or {})[st.tab] or tostring(ctx.active)`],
-  'sw-where-text': ['Settings.lua', `" and take effect when you switch to " .. tab .. "."`, `" and take effect at once."`],
-  'sw-click-switch-missing': ['Settings.lua', `    if key == "switch" then                  -- Switch to`, `    if key == "switch-off" then                  -- Switch to`],
-  'sw-click-switch-active': ['Settings.lua', `if TAB_TEXT[profile] and profile ~= ctx.active then switchProfile(profile) end`, `if TAB_TEXT[profile] then switchProfile(profile) end`],
-  'sw-click-switch-tab': ['Settings.lua', `if TAB_TEXT[profile] and profile ~= ctx.active then switchProfile(profile) end`, `if TAB_TEXT[profile] and profile ~= ctx.active then switchProfile("crowded") end`],
-  'sw-keep-use-routed': ['Settings.lua', `        keepCurrent(profile)`, `        ns.profiles.save(profile, true) draw()`],
   'sw-keep-save-routed': ['Settings.lua', `        keepCurrent(saveKey)`, `        local _ = saveKey`],
   'sw-keep-text-dropped': ['Settings.lua', `if replaced ~= "" then text = text .. " " .. replaced end`, `local _ = replaced`],
   'sw-keep-swapped': ['Settings.lua', `replacedText(before, db.profiles[name].values)`, `replacedText(db.profiles[name].values, before)`],
@@ -1953,19 +1851,127 @@ end
   'sw-replaced-more': ['Settings.lua', `if #lines > 3 then text = text .. "; and " .. (#lines - 3) .. " more" end`, `if #lines > 4 then text = text .. "; and " .. (#lines - 3) .. " more" end`],
   'sw-replaced-more-count': ['Settings.lua', `"; and " .. (#lines - 3) .. " more"`, `"; and " .. #lines .. " more"`],
   'sw-replaced-words': ['Settings.lua', `" was " .. ns.names.level(cvar, was) .. ", now " .. ns.names.level(cvar, now)`, `" is " .. ns.names.level(cvar, now)`],
-  'sw-frame-switch-hidden': ['Settings.lua', `        if hasSwitch then p.switch:Show() else p.switch:Hide() end`, `        p.switch:Hide()`],
-  'sw-frame-switch-off-page': ['Settings.lua', `        p.switch:Hide()
-        p.footerRule:Hide()`, `        p.footerRule:Hide()`],
-  'sw-frame-switch-position': ['Settings.lua', `-(useRight + FOOTER_USE_W + 8)`, `-(useRight + FOOTER_USE_W)`],
-  'sw-frame-use-position': ['Settings.lua', `local useRight = PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0)`, `local useRight = PAD + (hasMaximum and FOOTER_MAX_W or 0)`],
-  'sw-frame-switch-label': ['Settings.lua', `            p.switch:SetLabel(button.text)`, `            local _ = button.text`],
-  'sw-frame-switch-enabled': ['Settings.lua', `            p.switch:SetEnabled(button.enabled)`, `            p.switch:SetEnabled(true)`],
-  'sw-frame-where-missing': ['Settings.lua', `        if size.where then placeText(p.sizeWhere, size.where) else hideText(p.sizeWhere) end`, `        hideText(p.sizeWhere)`],
-  'sw-frame-where-order': ['Settings.lua', `        if size.where then placeText(p.sizeWhere, size.where) else hideText(p.sizeWhere) end
-        if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end`, `        if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end
-        if size.where then placeText(p.sizeWhere, size.where) else hideText(p.sizeWhere) end`],
-  'sw-frame-where-sticky': ['Settings.lua', `        hideText(p.sizeLabel)
-        hideText(p.sizeWhere)`, `        hideText(p.sizeLabel)`],
+  // My settings edits the profile in use (spec 2026-11-02-edit-the-profile-in-use-design.md): rows re-anchored on the new code
+  'settings-lock-not-checked': ['Settings.lua', `    if ctx.locked then
+        -- a profile switch says why it was refused (the window may not have caught up with the lock yet)
+        if key:find("^profile:") or key:find("^edit:") then draw() end
+        return
+    end
+`, `    local _ = ctx.locked
+`],
+  'saveas-locked-saves': ['Settings.lua', `    if ctx.locked then
+        -- a profile switch says why`, `    if ctx.locked and not key:find("^save:") then
+        -- a profile switch says why`],
+  'home-card-unmarked': ['Settings.lua', `selected = ctx.active == key,`, `selected = false,`],
+  'home-card-never-greyed': ['Settings.lua', `enabled = locked == nil, color = PROFILE_COLOR[key] }`, `enabled = true, color = PROFILE_COLOR[key] }`],
+  'settings-use-wrong-profile': ['Settings.lua', `keepCurrent(saveKey)`, `keepCurrent("everyday")`],
+  'live-no-test-needed': ['Settings.lua', `if editing and next(saved) ~= nil and costs and est and`, `if editing and next(saved) ~= nil and est and`],
+  'live-tab-name': ['Settings.lua', `TAB_TEXT[editing], est.fps)`, `"Everyday", est.fps)`],
+  'live-context-dropped': ['Settings.lua', `ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(`, `ctx.costs, ctx.maximum = costsAndMaximum(`],
+  'home-inuse-label': ['Settings.lua', `view.home = { inUse = labels[ctx.active] or tostring(ctx.active)`, `view.home = { inUse = tostring(ctx.active)`],
+  'page-open-ignores-page': ['Settings.lua', `    elseif PAGE_KEYS[which] then
+        state.page = which
+    end`, `    end`],
+  'page-open-bogus': ['Settings.lua', `    elseif PAGE_KEYS[which] then`, `    elseif which then`],
+  'sz-percent-rounding': ['Settings.lua', `math.floor(tonumber(keptSize) * 100 + 0.5)`, `math.floor(tonumber(keptSize) * 100)`],
+  'sz-label-in-use': ['Settings.lua', `label = settings.sizeLabel(percent), note = note`, `label = settings.sizeLabel(keptPercent or percent), note = note`],
+  'sz-note-none': ['Settings.lua', `            if keptSize == nil then
+                note = "Not kept`, `            if keptSize ~= nil then
+                note = "Not kept`],
+  'sz-note-differs': ['Settings.lua', `            elseif differs then
+                note = "Kept in "`, `            elseif false then
+                note = "Kept in "`],
+  'sz-save-loud': ['Settings.lua', `ns.profiles.setProfileValue(profile, "RenderScale", value, true)`, `ns.profiles.setProfileValue(profile, "RenderScale", value)`],
+  'sz-putback-always': ['Settings.lua', `canPutBack = editing ~= nil and (percent ~= 100 or differs) and locked == nil`, `canPutBack = editing ~= nil and locked == nil`],
+  'sz-putback-differs-missing': ['Settings.lua', `canPutBack = editing ~= nil and (percent ~= 100 or differs) and locked == nil`, `canPutBack = editing ~= nil and percent ~= 100 and locked == nil`],
+  'sz-putback-ignores-lock': ['Settings.lua', `canPutBack = editing ~= nil and (percent ~= 100 or differs) and locked == nil`, `canPutBack = editing ~= nil and (percent ~= 100 or differs)`],
+  'sz-enabled-ignores-lock': ['Settings.lua', `safe = risky and SIZE_SAFE or nil, enabled = locked == nil and editing ~= nil,`, `safe = risky and SIZE_SAFE or nil, enabled = editing ~= nil,`],
+  'sz-frame-stack-order': ['Settings.lua', `        if size.safe then placeText(p.sizeSafe, size.safe) else hideText(p.sizeSafe) end
+        if size.note then placeText(p.sizeNote, size.note) else hideText(p.sizeNote) end`, `        if size.note then placeText(p.sizeNote, size.note) else hideText(p.sizeNote) end
+        if size.safe then placeText(p.sizeSafe, size.safe) else hideText(p.sizeSafe) end`],
+
+  // My settings edits the profile in use: the new code
+  'ed-costs-profile-in-use': ['Settings.lua', `costsAndMaximum(TAB_TEXT[ctx.active] and ctx.active or "everyday")`, `costsAndMaximum("everyday")`],
+  'ed-pill-label': ['Settings.lua', `text = labels[ctx.active] or tostring(ctx.active), color = PROFILE_COLOR`, `text = tostring(ctx.active), color = PROFILE_COLOR`],
+  'ed-pill-colour': ['Settings.lua', `color = PROFILE_COLOR[ctx.active] or "dim" }`, `color = "dim" }`],
+  'ed-open-profile-page': ['Settings.lua', `    if which == "everyday" or which == "crowded" then
+        state.page = "light"`, `    if which == "everyday" or which == "crowded" then
+        state.page = state.page`],
+  'ed-size-note-only-editing': ['Settings.lua', `        if editing then
+            local tab = TAB_TEXT[editing]`, `        if true then
+            local tab = TAB_TEXT[editing] or "Everyday"`],
+  'ed-size-save-read-only': ['Settings.lua', `    local profile = ns.profiles.active()
+    if not TAB_TEXT[profile] then return end`, `    local profile = ns.profiles.active()
+    if not TAB_TEXT[profile] then profile = "everyday" end`],
+  'ed-putback-read-only': ['Settings.lua', `canPutBack = editing ~= nil and (percent ~= 100 or differs) and locked == nil`, `canPutBack = (percent ~= 100 or differs) and locked == nil`],
+  'ed-size-enabled-read-only': ['Settings.lua', `safe = risky and SIZE_SAFE or nil, enabled = locked == nil and editing ~= nil,`, `safe = risky and SIZE_SAFE or nil, enabled = locked == nil,`],
+  'ed-rows-editable-read-only': ['Settings.lua', `enabled = locked == nil and editing ~= nil, page = settings.PAGE_OF`, `enabled = locked == nil, page = settings.PAGE_OF`],
+  'ed-saved-maximum-own': ['Settings.lua', `local saved = editing and ((ctx.saved or {})[editing] or {}) or (ctx.want or {})`, `local saved = editing and ((ctx.saved or {})[editing] or {}) or {}`],
+  'ed-saved-wrong-profile': ['Settings.lua', `local saved = editing and ((ctx.saved or {})[editing] or {}) or (ctx.want or {})`, `local saved = editing and ((ctx.saved or {}).everyday or {}) or (ctx.want or {})`],
+  'ed-chosen-saved': ['Settings.lua', `        local chosen = ctx.live(cvar)`, `        local chosen = saved[cvar] or ctx.live(cvar)`],
+  'ed-read-only-missing': ['Settings.lua', `    if not editing then
+        view.readOnly =`, `    if false then
+        view.readOnly =`],
+  'ed-read-only-text': ['Settings.lua', `view.readOnly = { text = view.profile.text .. READ_ONLY_TAIL, buttons = {} }`, `view.readOnly = { text = READ_ONLY_TAIL, buttons = {} }`],
+  'ed-read-only-tail': ['Settings.lua', `READ_ONLY_TAIL = " can't be changed. To change settings, edit:"`, `READ_ONLY_TAIL = " can't be changed."`],
+  'ed-read-only-buttons-unlocked': ['Settings.lua', `color = PROFILE_COLOR[key],
+                enabled = locked == nil }`, `color = PROFILE_COLOR[key],
+                enabled = true }`],
+  'ed-edit-key': ['Settings.lua', `key = "edit:" .. key, text = TAB_TEXT[key]`, `key = "profile:" .. key, text = TAB_TEXT[key]`],
+  'ed-home-card-colour': ['Settings.lua', `enabled = locked == nil, color = PROFILE_COLOR[key] }`, `enabled = locked == nil, color = "dim" }`],
+  'ed-notice-maximum': ['Settings.lua', `    if ctx.active == "maximum" then
+        view.notice = MAXIMUM_NOTE`, `    if false then
+        view.notice = MAXIMUM_NOTE`],
+  'ed-yourline-needs-saved': ['Settings.lua', `if editing and next(saved) ~= nil and costs`, `if editing and costs`],
+  'ed-yourline-read-only': ['Settings.lua', `if editing and next(saved) ~= nil and costs`, `if next(saved) ~= nil and costs`],
+  'ed-pill-click': ['Settings.lua', `if key == "pill" then pageKey = "home" end`, `if key == "pill" then pageKey = "light" end`],
+  'ed-pill-not-in-combat': ['Settings.lua', `if key == "pill" then pageKey = "home" end`, `if key == "pill" and not InCombatLockdown() then pageKey = "home" end`],
+  'ed-edit-switches': ['Settings.lua', `if TAB_TEXT[editKey] then switchProfile(editKey) end`, `if TAB_TEXT[editKey] then switchProfile("everyday") end`],
+  'ed-click-read-only-guard': ['Settings.lua', `    local profile = TAB_TEXT[ctx.active] and ctx.active or nil
+    if not profile then return end`, `    local profile = TAB_TEXT[ctx.active] and ctx.active or "everyday"
+    if not profile then return end`],
+  'ed-frame-pill-label': ['Settings.lua', `p.pill.label:SetText(view.profile.text)`, `p.pill.label:SetText("Everyday")`],
+  'ed-frame-pill-dot': ['Settings.lua', `p.pill.dot:SetColorName(view.profile.color)`, `p.pill.dot:SetColorName("profileEveryday")`],
+  'ed-frame-read-only-on-home': ['Settings.lua', `    if onSettings and view.readOnly then
+        placeText(p.readOnly`, `    if view.readOnly then
+        placeText(p.readOnly`],
+  'ed-frame-read-only-never': ['Settings.lua', `    if onSettings and view.readOnly then
+        placeText(p.readOnly`, `    if false and view.readOnly then
+        placeText(p.readOnly`],
+  'ed-frame-edit-spacing': ['Settings.lua', `(i - 1) * (EDIT_W + 8), -y)`, `(i - 1) * EDIT_W, -y)`],
+  'ed-frame-edit-gap-below': ['Settings.lua', `        y = y + EDIT_H + 8
+    else
+        hideText(p.readOnly)`, `        y = y + 8
+    else
+        hideText(p.readOnly)`],
+  'ed-frame-edit-enabled': ['Settings.lua', `            button:SetEnabled(spec.enabled)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1)`, `            button:SetEnabled(true)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1)`],
+  'ed-frame-edit-left-shown': ['Settings.lua', `for _, button in ipairs(p.editButtons) do button:Hide() end`, `local _ = p.editButtons`],
+  'ed-frame-pill-size': ['Settings.lua', `local PILL_W, PILL_H = 104, 22`, `local PILL_W, PILL_H = 100, 22`],
+  'ed-frame-edit-size': ['Settings.lua', `local EDIT_W, EDIT_H = 112, 24`, `local EDIT_W, EDIT_H = 120, 24`],
+  'ed-frame-pill-anchor': ['Settings.lua', `pill:SetPoint("RIGHT", f.close, "LEFT", -8, 0)`, `pill:SetPoint("RIGHT", f.close, "LEFT", -4, 0)`],
+  'ed-frame-pill-label-pos': ['Settings.lua', `pill.label:SetPoint("LEFT", pill, "LEFT", 24, 0)`, `pill.label:SetPoint("LEFT", pill, "LEFT", 20, 0)`],
+  'ed-frame-pill-key': ['Settings.lua', `pill.key = "pill"`, `pill.key = "pillx"`],
+  'ed-frame-card-dot': ['Settings.lua', `card.dot:SetColorName(profile.color)`, `card.dot:SetColorName("dim")`],
+  'ed-summary-bottom': ['Settings.lua', `local SUMMARY_BOTTOM = 12`, `local SUMMARY_BOTTOM = 20`],
+  'ed-skin-colour-everyday': ['Skin.lua', `profileEveryday = "5dcaa5"`, `profileEveryday = "5dcaa6"`],
+  'ed-skin-colour-crowded': ['Skin.lua', `profileCrowded = "ef9f27"`, `profileCrowded = "ef9f28"`],
+  'ed-skin-dot-size': ['Skin.lua', `dot:SetSize(8, 8)`, `dot:SetSize(10, 10)`],
+  'ed-skin-dot-recolour': ['Skin.lua', `function dot:SetColorName(name) self.box.fill:SetColorTexture(skin.color(name)) end`, `function dot:SetColorName(name) end`],
+  // The fix pass after the fresh review of the redesign: a read-only page still shows what the game has
+  'ed-skin-disabled-selected-lost': ['Skin.lua', `if state.selected then fill, text = "selected", "dim" end`, `if false then fill, text = "selected", "dim" end`],
+  'ed-skin-disabled-selected-bright': ['Skin.lua', `fill, text = "selected", "dim"`, `fill, text = "selected", "bright"`],
+  'ed-skin-check-dim-mark-missing': ['Skin.lua', `    box:SetDisabledCheckedTexture(newMark("dim"))`, `    local _ = newMark`],
+  'ed-skin-check-dim-mark-accent': ['Skin.lua', `newMark("dim")`, `newMark("accent")`],
+  'ed-skin-check-hover-disabled': ['Skin.lua', `        if self:IsEnabled() then for _, tex`, `        if true then for _, tex`],
+  'skin-check-mark': ['Skin.lua', `box:SetCheckedTexture(newMark("accent"))`, `box:SetCheckedTexture(newMark("text"))`],
+  'skin-round-check-hover': ['Skin.lua', `do tex:SetColorTexture(skin.color("border")) end end`, `do tex:SetColorTexture(skin.color("text")) end end`],
+  // The table run on the redesign: heldValues reads only the game now (its saved-values branch could no longer be reached)
+  'live-held-none': ['Settings.lua', `        local value = GetCVar(entry.cvar)
+        if value ~= nil then values[entry.cvar] = value end`, `        local _ = entry`],
 };
 
 function main() {

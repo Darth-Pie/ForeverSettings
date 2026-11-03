@@ -100,6 +100,9 @@ local function makeFrame(kind, name, parent, template)
     function f:UnlockHighlight() self.locked = false end
     function f:SetChecked(on) self.checked = on and true or false end
     function f:GetChecked() return self.checked end
+    -- The pictures a check button shows when ticked, and when ticked but disabled (the client draws the second one then).
+    function f:SetCheckedTexture(tex) self._checkedTexture = tex end
+    function f:SetDisabledCheckedTexture(tex) self._disabledCheckedTexture = tex end
     -- A slider keeps its range and value; changing the value in code runs OnValueChanged with userInput false, as the client's
     -- does (a test fires the script itself, with userInput true, to play a drag).
     function f:SetMinMaxValues(lo, hi) self._min, self._max = lo, hi end

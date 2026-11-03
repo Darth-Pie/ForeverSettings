@@ -13,14 +13,13 @@ local REFRESH = 0.5            -- seconds of frame time between looks at what ch
 local NONE_TEXT = "None of these settings are in this client."
 
 local INTRO = "Choose how the game looks. Settings you tick are kept: the addon puts them back at every loading screen."
-local ORIGINAL_NOTE = "You're using your Original settings (hands off). Switch to Everyday or Crowded on the Home page to turn these on."
 local MAXIMUM_NOTE = "You're using Maximum (everything at its highest). It includes the sharpest textures, which need plenty of "
-    .. "graphics memory. Switch to Everyday or Crowded on the Home page to change these."
+    .. "graphics memory."
+local READ_ONLY_TAIL = " can't be changed. To change settings, edit:"
+local PROFILE_COLOR = { original = "profileOriginal", everyday = "profileEveryday", crowded = "profileCrowded", maximum = "profileMaximum" }
 local COST_NONE = "Run Find my best settings to see what each level costs."
 local MATTERS_NOTE = [["Matters to the picture" is the addon's own judgement, not something it measured.]]
 local NOTHING_TEXT = "Maximum has nothing to set yet: run Find my best settings once so the addon learns what each setting can do."
-local USE_TEXT = "Use what I have in the game now"
-local MAXIMUM_TEXT = "Switch to Maximum"
 local SIZE_MIN, SIZE_MAX, SIZE_STEP = 50, 200, 5          -- percent: the picture sharpness slider
 local SIZE_SLIDER_WIDTH, SIZE_BACK_WIDTH = 360, 140      -- pixels: the slider and its Back to 100% button
 local SIZE_EXTRA = { "1.25", "1.5", "1.75", "2" }          -- the sizes above 100% the size card offers, which the test never measures
@@ -77,7 +76,7 @@ settings.PAGE_OF = {
     graphicstextureresolution = "world", renderscale = "size",
 }
 
-local state = { tab = "everyday", page = "home" }
+local state = { page = "home" }
 
 local function sameValue(a, b)
     if a == b then return true end
@@ -159,23 +158,26 @@ end
 function settings.model(st, ctx)
     local names = ns.names
     local locked = ctx.locked
-    local view = { title = "My settings", intro = INTRO, tabs = {}, rows = {}, buttons = {} }
+    local view = { title = "My settings", intro = INTRO, rows = {} }
     view.page = PAGE_KEYS[st.page] and st.page or "home"
     view.pages = {}
     for _, page in ipairs(settings.PAGES) do
         view.pages[#view.pages + 1] = { key = page.key, text = page.text, selected = page.key == view.page, enabled = true }
     end
-    for _, key in ipairs(TABS) do
-        local inUse = ctx.active == key
-        view.tabs[#view.tabs + 1] = {
-            key = key, text = TAB_TEXT[key] .. (inUse and " (in use)" or ""), inUse = inUse, selected = st.tab == key,
-            note = names.PROFILE_NOTE[key], enabled = locked == nil,
-        }
+    -- The settings pages edit the profile in use (spec 2026-11-02-edit-the-profile-in-use-design.md P1). Original and Maximum cannot
+    -- be edited: their pages are read-only and offer Everyday and Crowded (P2). The header pill names the profile in use (P4).
+    local editing = TAB_TEXT[ctx.active] and ctx.active or nil
+    local labels = ns.profiles and ns.profiles.LABEL or {}
+    view.profile = { key = ctx.active, text = labels[ctx.active] or tostring(ctx.active), color = PROFILE_COLOR[ctx.active] or "dim" }
+    if not editing then
+        view.readOnly = { text = view.profile.text .. READ_ONLY_TAIL, buttons = {} }
+        for _, key in ipairs(TABS) do
+            view.readOnly.buttons[#view.readOnly.buttons + 1] = { key = "edit:" .. key, text = TAB_TEXT[key], color = PROFILE_COLOR[key],
+                enabled = locked == nil }
+        end
     end
     local max = ctx.maximum
-    if ctx.active == "original" then
-        view.notice = ORIGINAL_NOTE
-    elseif ctx.active == "maximum" then
+    if ctx.active == "maximum" then
         view.notice = MAXIMUM_NOTE
         if max and (max.leftOut or 0) > 0 then view.notice = view.notice .. " " .. leftOutSentence(max.leftOut) end
         if max and (max.pending or 0) > 0 then view.notice = view.notice .. " " .. pendingSentence(max.pending) end
@@ -196,24 +198,23 @@ function settings.model(st, ctx)
     else
         view.costNote = COST_NONE
     end
-    local onTabInUse = st.tab == ctx.active
-    local saved = (ctx.saved or {})[st.tab] or {}
+    -- What the profile in use holds: its own values when it can be edited, else what the addon keeps for it (Maximum's levels; none
+    -- for Original).
+    local saved = editing and ((ctx.saved or {})[editing] or {}) or (ctx.want or {})
     local ranking = ns.recommend and ns.recommend.RANKING or {}
     for _, entry in ipairs(ordered(ctx.resolved)) do
         local cvar = entry.cvar
         local _, line = names.get(cvar)
         local row = { cvar = cvar, name = names.label(cvar, entry.label), line = line, kept = saved[cvar] ~= nil,
-            levels = {}, enabled = locked == nil, page = settings.PAGE_OF[cvar:lower()] or "world" }
+            levels = {}, enabled = locked == nil and editing ~= nil, page = settings.PAGE_OF[cvar:lower()] or "world" }
         local words = ranking[cvar] and names.matters(ranking[cvar].weight)
         if words then
             row.matters = "Matters to the picture: " .. words .. "."
             row.mattersWords = words
             view.mattersNote = MATTERS_NOTE
         end
-        local chosen = saved[cvar]
-        if onTabInUse then chosen = ctx.live(cvar) end
-        -- Costs are measured against the level this tab holds; a setting it holds no level for, or whose held level the
-        -- test did not measure, shows none.
+        local chosen = ctx.live(cvar)
+        -- Costs are measured against the level the game holds; a setting whose level the test did not measure shows none.
         local list = costs and costs.fps.byCvar[cvar]
         local heldFps = list and chosen ~= nil and fpsOf(list, chosen) or nil
         -- Picture sharpness also offers sizes above 100%: levels the test never measured (a copy: the test's own list stays as it is).
@@ -248,63 +249,47 @@ function settings.model(st, ctx)
                 .. ", so there is no total yet. Run Find my best settings and choose Thorough."
         end
     end
-    -- The estimate for the levels this tab holds (live total, 2026-11-02): none without a test to read, and none for a tab that
-    -- holds no level the test measured, where it would only repeat today's frame rate.
+    -- The estimate for the levels the profile in use holds (P8): none without a test to read, none for Original or Maximum, and none
+    -- for a profile that holds no level the test measured, where it would only repeat today's frame rate.
     local est = ctx.estimate
-    if costs and est and type(est.fps) == "number" and (est.counted or 0) > 0 then
-        view.yourLine = string.format("Your %s settings: about %.0f fps", TAB_TEXT[st.tab] or "", est.fps) .. YOUR_TAIL
+    if editing and next(saved) ~= nil and costs and est and type(est.fps) == "number" and (est.counted or 0) > 0 then
+        view.yourLine = string.format("Your %s settings: about %.0f fps", TAB_TEXT[editing], est.fps) .. YOUR_TAIL
         if (est.notCounted or 0) > 0 then
             view.yourLine = view.yourLine .. " " .. plural(est.notCounted, "setting") .. " not counted: " .. NOT_COUNTED
         end
     end
-    -- The picture size block (spec 2026-11-02-one-saved-picture-size-design.md S1, S2): the slider shows the same size as the level
-    -- buttons, the tab's (the game's own when the tab is in use, else the one the tab keeps); ctx.size = {live = the game's percent}.
+    -- The picture size block (spec 2026-11-02-one-saved-picture-size-design.md S1, S2 and the edit-the-profile-in-use spec P7): the
+    -- slider shows the game's size, the same one the level buttons light; ctx.size = {live = the game's percent}.
     local size = ctx.size
     if size then
         local keptSize = saved.RenderScale
-        local fraction = tonumber(onTabInUse and ctx.live("RenderScale") or keptSize)
-        local percent = fraction and math.floor(fraction * 100 + 0.5) or size.live
-        local tab = TAB_TEXT[st.tab] or ""
-        local label, note
-        if onTabInUse then
-            label = settings.sizeLabel(percent)
-        elseif keptSize ~= nil then
-            label = tab .. " keeps picture sharpness at " .. percent .. "%"
-        else
-            label = tab .. " keeps no picture sharpness yet (the game has " .. percent .. "% now)"
-        end
-        -- What the tab keeps can differ from what the game holds (a Shift session skips a saved size above 100%, the game may
+        local percent = size.live
+        -- What the profile keeps can differ from what the game holds (a Shift session skips a saved size above 100%, the game may
         -- refuse a size): the note then says both, and the warning and Back to 100% follow the larger of the two.
         local keptPercent = keptSize ~= nil and tonumber(keptSize) and math.floor(tonumber(keptSize) * 100 + 0.5) or nil
-        local differs = onTabInUse and keptPercent ~= nil and keptPercent ~= percent
-        if keptSize == nil then
-            note = "Not kept in " .. tab .. " yet: drag the slider or click a size to keep it."
-        elseif differs then
-            note = "Kept in " .. tab .. " at " .. keptPercent .. "%: the game has " .. percent .. "% now."
-        elseif onTabInUse then
-            note = "Kept in " .. tab .. ": the addon puts it back at every loading screen."
-        else
-            note = "Kept in " .. tab .. ": used when you switch to " .. tab .. "."
+        local differs = keptPercent ~= nil and keptPercent ~= percent
+        local note
+        if editing then
+            local tab = TAB_TEXT[editing]
+            if keptSize == nil then
+                note = "Not kept in " .. tab .. " yet: drag the slider or click a size to keep it."
+            elseif differs then
+                note = "Kept in " .. tab .. " at " .. keptPercent .. "%: the game has " .. percent .. "% now."
+            else
+                note = "Kept in " .. tab .. ": the addon puts it back at every loading screen."
+            end
         end
         local risky = percent > 100 or (keptPercent ~= nil and keptPercent > 100)
-        -- A tab that is not the profile in use only stores what is chosen on it: the game does not change until that profile is
-        -- switched on (the owner's report: with Maximum in use a stored size looked like it did nothing, then Save as undid it).
-        local where
-        if not onTabInUse then
-            local usedLabel = (ns.profiles and ns.profiles.LABEL or {})[ctx.active] or tostring(ctx.active)
-            where = "The game is using " .. usedLabel .. ". Changes here are stored in " .. tab .. " and take effect when you switch to " .. tab .. "."
-        end
         view.size = { percent = percent, value = math.max(SIZE_MIN, math.min(SIZE_MAX, percent)), min = SIZE_MIN, max = SIZE_MAX,
-            step = SIZE_STEP, label = label, note = note, where = where, warning = risky and SIZE_WARNING or nil,
-            safe = risky and SIZE_SAFE or nil, enabled = locked == nil,
-            canPutBack = (percent ~= 100 or differs) and locked == nil }
+            step = SIZE_STEP, label = settings.sizeLabel(percent), note = note, warning = risky and SIZE_WARNING or nil,
+            safe = risky and SIZE_SAFE or nil, enabled = locked == nil and editing ~= nil,
+            canPutBack = editing ~= nil and (percent ~= 100 or differs) and locked == nil }
     end
     -- Whether the game's dynamic render scale is on (it resizes the picture by itself and spoils a test); nil when the client lacks it.
     if ctx.dynamicScale then view.dynamicLine = ctx.dynamicScale.on and DYNAMIC_ON or DYNAMIC_OFF end
     -- The Home page: the profile in use, the four profile cards, the two test buttons. ctx.home = the minimap menu's facts
     -- ({saved = {best, crowded}, maxFps}); missing when the interface module is not there.
     local home = ctx.home or {}
-    local labels = ns.profiles and ns.profiles.LABEL or {}
     view.home = { inUse = labels[ctx.active] or tostring(ctx.active), profiles = {}, tests = {} }
     for _, key in ipairs(PROFILE_KEYS) do
         local full = (names.PROFILE and names.PROFILE[key]) or key
@@ -312,7 +297,7 @@ function settings.model(st, ctx)
         title, note = title or full, note or ""
         if key == "maximum" and type(home.maxFps) == "number" then note = note .. string.format(" (about %.0f fps)", home.maxFps) end
         view.home.profiles[#view.home.profiles + 1] = { key = key, title = title, note = note, selected = ctx.active == key,
-            enabled = locked == nil }
+            enabled = locked == nil, color = PROFILE_COLOR[key] }
     end
     -- The Tests and results page: a line for each saved result with a Show results button, and the progress of a running test.
     local tests = ctx.tests or {}
@@ -329,14 +314,6 @@ function settings.model(st, ctx)
         { key = "best", text = "Find my best settings", enabled = locked == nil, done = saved.best == true },
         { key = "crowded", text = "Find my crowded settings", enabled = locked == nil, done = saved.crowded == true },
     }
-    view.buttons[#view.buttons + 1] = { key = "use", text = USE_TEXT, enabled = locked == nil }
-    if st.tab ~= ctx.active and TAB_TEXT[st.tab] then
-        view.buttons[#view.buttons + 1] = { key = "switch", text = "Switch to " .. TAB_TEXT[st.tab], enabled = locked == nil }
-    end
-    if ctx.active ~= "maximum" then
-        view.buttons[#view.buttons + 1] = { key = "maximum", text = MAXIMUM_TEXT, enabled = locked == nil }
-    end
-    view.buttons[#view.buttons + 1] = { key = "close", text = "Close", enabled = true }
     return view
 end
 
@@ -372,23 +349,20 @@ local function costSource(tab)
     return { kind = "quiet", entry = quiet, measuredLine = line }
 end
 
--- The levels a tab holds, for the live total: the game's own values on the tab in use, the saved ones on the other.
-local function heldValues(tab)
+-- The levels the game holds now, for the live total of the profile in use (the pages edit only that one: spec
+-- 2026-11-02-edit-the-profile-in-use-design.md P8).
+local function heldValues()
     local values = {}
-    local db = ns.profiles and ns.profiles.state()
-    if not db then return values end
-    local live = db.active == tab
     for _, entry in ipairs(ns.bench and ns.bench.resolve() or {}) do
-        local value
-        if live then value = GetCVar(entry.cvar) else value = db.profiles[tab].values[entry.cvar] end
+        local value = GetCVar(entry.cvar)
         if value ~= nil then values[entry.cvar] = value end
     end
     return values
 end
 
--- ctx.costs, ctx.maximum and ctx.estimate for a tab: what each level costs against the test, what everything at the highest
+-- ctx.costs, ctx.maximum and ctx.estimate for a profile: what each level costs against the test, what everything at the highest
 -- would give ({fps, skipped, leftOut}: fps only when the test measured the highest level of every setting Maximum would set),
--- and what the levels the tab holds would give ({fps, counted, notCounted}). A test the recommender cannot read is no test:
+-- and what the levels the profile holds would give ({fps, counted, notCounted}). A test the recommender cannot read is no test:
 -- the window must still draw, with or without the last.
 local function costsAndMaximum(tab)
     local values, leftOut = {}, {}
@@ -408,7 +382,7 @@ local function costsAndMaximum(tab)
             if #estimate.missing > 0 then maximum.skipped = #estimate.missing else maximum.fps = estimate.fps end
         end
     end
-    local held, heldCount = heldValues(tab), 0
+    local held, heldCount = heldValues(), 0
     for _ in pairs(held) do heldCount = heldCount + 1 end
     local okHeld, yours = pcall(ns.recommend.estimateFps, source.entry, held)
     local mine
@@ -464,20 +438,17 @@ local function context(withCosts)
         for _, key in ipairs(TABS) do saved[key] = db.profiles[key].values end
     end
     local ctx = {
-        active = db and db.active or "original", saved = saved, live = function(cvar) return GetCVar(cvar) end,
+        active = db and db.active or "original", saved = saved, want = db and db.want or {}, live = function(cvar) return GetCVar(cvar) end,
         resolved = ns.bench and ns.bench.resolve() or {}, locked = lockReason(), size = sizeContext(),
         dynamicScale = dynamicContext(),
     }
     if withCosts then
-        ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(state.tab)
+        -- The costs of the profile in use (Crowded prefers the crowd test); Original and Maximum read the quiet-spot test.
+        ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(TAB_TEXT[ctx.active] and ctx.active or "everyday")
         ctx.home = homeContext()
         ctx.tests = testsContext(ctx.home)
     end
     return ctx
-end
-
-local function defaultTab()
-    return ns.profiles and ns.profiles.active() == "crowded" and "crowded" or "everyday"
 end
 
 local function draw()
@@ -508,15 +479,13 @@ local function switchProfile(name)
     draw()
 end
 
--- Shows the window on a page (the page last shown when none is given, Home the first time). `everyday` or `crowded` picks that
--- tab and the first settings page; anything else shows the tab of the profile in use.
+-- Shows the window on a page (the page last shown when none is given, Home the first time); `everyday` or `crowded` opens the first
+-- settings page, which edits the profile in use.
 function settings.open(which)
     if which == "everyday" or which == "crowded" then
-        state.tab = which
         state.page = "light"
-    else
-        state.tab = defaultTab()
-        if PAGE_KEYS[which] then state.page = which end
+    elseif PAGE_KEYS[which] then
+        state.page = which
     end
     guarded(function()
         settings.render()
@@ -524,13 +493,15 @@ function settings.open(which)
     end)
 end
 
--- Keeps a picture size in the tab's profile exactly as a level button does, and applies it at once when that profile is in use;
--- when the game keeps another size, the window says so.
+-- Keeps a picture size in the profile in use exactly as a level button does, and applies it at once; Original and Maximum cannot be
+-- edited. When the game keeps another size, the window says so.
 local function saveSize(percent)
     if percent < SIZE_MIN or percent > SIZE_MAX then return end
+    local profile = ns.profiles.active()
+    if not TAB_TEXT[profile] then return end
     local value = string.format("%.4g", percent / 100)
-    local ok = ns.profiles.setProfileValue(state.tab, "RenderScale", value, true)
-    if ok and ns.profiles.active() == state.tab then
+    local ok = ns.profiles.setProfileValue(profile, "RenderScale", value, true)
+    if ok then
         local held = GetCVar("RenderScale")
         if held ~= nil and not sameValue(held, value) then
             state.notice = "The game kept picture sharpness at " .. string.format("%.0f%%", tonumber(held) * 100)
@@ -558,8 +529,8 @@ local function replacedText(before, after)
     return text .. "."
 end
 
--- Save as Everyday / Save as Crowded and Use what I have in the game now: keeps the game's current settings in a profile, and says
--- what that replaced (a profile edited while another was in use held values the game does not have).
+-- Save as Everyday / Save as Crowded: keeps the game's current settings in a profile, and says what that replaced (a profile not
+-- in use can hold values the game does not have).
 local function keepCurrent(name)
     local db = ns.profiles.state()
     local before = {}
@@ -574,14 +545,16 @@ local function keepCurrent(name)
     draw()
 end
 
--- A button or tick of the window, by the keys of the model: tab:<tab>, keep:<cvar>, level:<cvar>:<value>, use, switch, maximum,
--- close. A refusal Maximum gives is shown in the window until the next click or redraw.
+-- A button or tick of the window, by the keys of the model: page:<page>, pill, profile:<name>, edit:<name>, keep:<cvar>,
+-- level:<cvar>:<value>, size:<percent>, sizeback, save:<name>, test:<kind>, show:<kind>, close. A refusal is shown in the window
+-- until the next click or redraw.
 function settings.click(key)
     if key == "close" then
         settings.hide()
         return
     end
     local pageKey = key:match("^page:(.+)$")
+    if key == "pill" then pageKey = "home" end      -- the profile pill opens Home, where the profile is switched
     if pageKey then                          -- turning a page is not a change: it works in combat and during a test
         if PAGE_KEYS[pageKey] then
             state.page = pageKey
@@ -591,15 +564,8 @@ function settings.click(key)
     end
     local ctx = context()
     if ctx.locked then
-        if key == "maximum" then draw() end          -- the draw says why (the window may not have caught up yet)
-        return
-    end
-    local tab = key:match("^tab:(.+)$")
-    if tab then
-        if tab == "everyday" or tab == "crowded" then
-            state.tab = tab
-            draw()
-        end
+        -- a profile switch says why it was refused (the window may not have caught up with the lock yet)
+        if key:find("^profile:") or key:find("^edit:") then draw() end
         return
     end
     if not ns.profiles then return end
@@ -613,14 +579,16 @@ function settings.click(key)
         saveSize(100)
         return
     end
-    if key == "maximum" then
-        switchProfile("maximum")
-        return
-    end
     -- The Home page: a profile card switches profile (as the minimap menu does), a test button opens the guided test or its saved result.
     local profileKey = key:match("^profile:(.+)$")
     if profileKey then
         switchProfile(profileKey)
+        return
+    end
+    -- The read-only pages of Original and Maximum: Everyday or Crowded switches to that profile so it can be edited.
+    local editKey = key:match("^edit:(.+)$")
+    if editKey then
+        if TAB_TEXT[editKey] then switchProfile(editKey) end
         return
     end
     -- The guided test and the results window are their own windows: this one steps aside so they do not sit on top of it.
@@ -641,21 +609,15 @@ function settings.click(key)
         end
         return
     end
-    -- Save as Everyday / Save as Crowded: keeps the game's current settings in that profile, whatever page or tab is showing.
+    -- Save as Everyday / Save as Crowded: keeps the game's current settings in that profile, whatever page is showing.
     local saveKey = key:match("^save:(.+)$")
     if saveKey then                          -- Original, Maximum and a name that is no profile are refused by save, quietly
         keepCurrent(saveKey)
         return
     end
-    local profile = state.tab
-    if key == "use" then
-        keepCurrent(profile)
-        return
-    end
-    if key == "switch" then                  -- Switch to <the tab shown>: it becomes the profile in use
-        if TAB_TEXT[profile] and profile ~= ctx.active then switchProfile(profile) end
-        return
-    end
+    -- Ticks and levels edit the profile in use; Original and Maximum cannot be edited.
+    local profile = TAB_TEXT[ctx.active] and ctx.active or nil
+    if not profile then return end
     local cvar = key:match("^keep:(.+)$")
     if cvar then
         if ctx.saved[profile][cvar] ~= nil then
@@ -676,24 +638,24 @@ end
 
 -- The window (frame adapter) ----------------------------------------------------------------------------------------
 -- Drawn from the flat widgets of Skin.lua (spec 2026-11-02-flat-hub-window-design.md): a header, the page list at the left, the
--- page area, and a footer strip. Nothing scrolls.
+-- page area. Nothing scrolls.
 
 local skin = ns.skin
 local frame, parts
 local sinceRefresh = 0
 local lastSignature
 
-local NAV_WIDTH, PAD, TOP, TITLE_H, FOOTER_H = 150, 16, 8, 26, 44
+local NAV_WIDTH, PAD, TOP, TITLE_H = 150, 16, 8, 26
+local SUMMARY_BOTTOM = 12                          -- the summary block stands this far above the bottom of the page (no footer)
 local AREA_X = NAV_WIDTH + 1 + PAD                 -- where the page area starts inside the page frame
 local AREA_W = WIDTH - 2 - AREA_X - PAD
 local PAGE_H = HEIGHT - 38                         -- the page frame: under the 36 pixel header, inside the 1 pixel border
 local CARD_GAP_X, CARD_GAP_Y = 18, 6
 local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 50, 22, 3, 14
 local COST_W = LEVEL_W + 8                         -- the cost under a level button is a little wider than the button: "+136 fps"
-local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26
-local FOOTER_SWITCH_W = 170                           -- Switch to Everyday / Switch to Crowded
-local SUMMARY_GAP = 6
-local TAB_W = 120
+local TEST_BTN_W, TEST_BTN_H = 230, 26             -- Find my best settings / Find my crowded settings (Home, Tests and results)
+local PILL_W, PILL_H = 104, 22                     -- the profile pill in the header
+local EDIT_W, EDIT_H = 112, 24                     -- Everyday and Crowded on a read-only page
 local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6       -- the save buttons at the bottom of the page list
 local HOME_CARD_W, HOME_CARD_H = math.floor((AREA_W - CARD_GAP_X) / 2), 56
 local HOME_TESTS_NOTE = "A highlighted button has a saved result."
@@ -763,7 +725,7 @@ end
 
 -- A signature of everything the window shows that can change outside it.
 local function signature(ctx)
-    local list = { tostring(ctx.active), tostring(ctx.locked), state.tab }
+    local list = { tostring(ctx.active), tostring(ctx.locked) }
     for _, entry in ipairs(ctx.resolved) do
         local cvar = entry.cvar
         list[#list + 1] = cvar .. "=" .. tostring(ctx.live(cvar)) .. "/" .. tostring(ctx.saved.everyday[cvar]) .. "/"
@@ -810,20 +772,35 @@ local function build()
     rule:SetPoint("TOPLEFT", page, "TOPLEFT", NAV_WIDTH, 0)
     rule:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", NAV_WIDTH, 0)
 
-    -- The page area: the title, the Everyday/Crowded switch, the banner, the cards.
+    -- The profile pill in the header, left of the close button: the dot and name of the profile in use; it opens Home.
+    local pill = CreateFrame("Button", nil, f.header)
+    pill:SetSize(PILL_W, PILL_H)
+    pill:SetPoint("RIGHT", f.close, "LEFT", -8, 0)
+    pill.box = skin.box(pill, skin.RADIUS.control, "fill", "control")
+    pill.dot = skin.dot(pill, "dim")
+    pill.dot:SetPoint("LEFT", pill, "LEFT", 10, 0)
+    pill.label = skin.text(pill, "small", "bright", PILL_W - 28)
+    pill.label:SetPoint("LEFT", pill, "LEFT", 24, 0)
+    pill.key = "pill"
+    pill:SetScript("OnClick", clicked)
+    p.pill = pill
+
+    -- The page area: the title, the banner, the read-only line of Original and Maximum, the cards.
     local area = CreateFrame("Frame", nil, page)
     area:SetPoint("TOPLEFT", page, "TOPLEFT", AREA_X, -TOP)
-    area:SetSize(AREA_W, PAGE_H - TOP - FOOTER_H)
+    area:SetSize(AREA_W, PAGE_H - TOP - SUMMARY_BOTTOM)
     p.area = area
-    p.title = skin.text(area, "large", "accent", AREA_W - 2 * TAB_W - 8)
+    p.title = skin.text(area, "large", "accent", AREA_W)
     p.title:SetPoint("TOPLEFT", area, "TOPLEFT", 0, -2)
-    p.tabs = {}
+    p.readOnly = skin.text(area, "normal", "accentLight", AREA_W)
+    p.editButtons = {}
     for i, key in ipairs(TABS) do
-        local button = skin.button(area, TAB_TEXT[key], TAB_W, 24)
-        button.key = "tab:" .. key
+        local button = skin.button(area, TAB_TEXT[key], EDIT_W, EDIT_H)
+        button.key = "edit:" .. key
         button:SetScript("OnClick", clicked)
-        button:SetPoint("TOPRIGHT", area, "TOPRIGHT", -(#TABS - i) * (TAB_W + 4), 0)
-        p.tabs[i] = button
+        button.dot = skin.dot(button, PROFILE_COLOR[key])
+        button.dot:SetPoint("LEFT", button, "LEFT", 12, 0)
+        p.editButtons[i] = button
     end
     p.costNote = skin.text(area, "small", "dim", AREA_W)
     p.banner = skin.text(area, "small", "warning", AREA_W)
@@ -863,7 +840,6 @@ local function build()
     p.sizeBack.key = "sizeback"
     p.sizeBack:SetScript("OnClick", clicked)
     p.sizeWarn = skin.text(area, "small", "warning", AREA_W)
-    p.sizeWhere = skin.text(area, "small", "accentLight", AREA_W)
     p.sizeSafe = skin.text(area, "small", "dim", AREA_W)
     p.sizeNote = skin.text(area, "small", "dim", AREA_W)
     p.dynamicLine = skin.text(area, "small", "dim", AREA_W)
@@ -879,11 +855,13 @@ local function build()
         card.note = skin.text(card, "small", "dim", HOME_CARD_W - 16)
         card.note:SetJustifyH("CENTER")
         card.note:SetPoint("CENTER", card, "CENTER", 0, -10)
+        card.dot = skin.dot(card, "dim")                  -- the profile's colour, as on the header pill
+        card.dot:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -10)
         p.profileCards[i] = card
     end
     p.testButtons = {}
     for i, key in ipairs({ "best", "crowded" }) do
-        local button = skin.button(area, "", FOOTER_USE_W, FOOTER_BTN_H)
+        local button = skin.button(area, "", TEST_BTN_W, TEST_BTN_H)
         button.key = "test:" .. key
         button:SetScript("OnClick", clicked)
         p.testButtons[i] = button
@@ -903,22 +881,10 @@ local function build()
     p.aboutVersion = skin.text(area, "normal", "bright", AREA_W)
     p.aboutText = skin.text(area, "normal", "text", AREA_W)
 
-    -- The summary block above the footer, and the footer strip.
+    -- The summary block at the bottom of the page.
     p.your = skin.text(page, "small", "text", AREA_W)
     p.total = skin.text(page, "small", "text", AREA_W)
     p.mattersNote = skin.text(page, "small", "dim", AREA_W)
-    p.footerRule = skin.divider(page)
-    p.footerRule:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", NAV_WIDTH + 1, FOOTER_H)
-    p.footerRule:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, FOOTER_H)
-    p.use = skin.button(page, USE_TEXT, FOOTER_USE_W, FOOTER_BTN_H)
-    p.use.key = "use"
-    p.use:SetScript("OnClick", clicked)
-    p.maximum = skin.button(page, MAXIMUM_TEXT, FOOTER_MAX_W, FOOTER_BTN_H)
-    p.maximum.key = "maximum"
-    p.maximum:SetScript("OnClick", clicked)
-    p.switch = skin.button(page, "Switch to Everyday", FOOTER_SWITCH_W, FOOTER_BTN_H)
-    p.switch.key = "switch"
-    p.switch:SetScript("OnClick", clicked)
 
     f:SetScript("OnUpdate", function(self, elapsed)
         if not self:IsShown() then return end
@@ -935,8 +901,8 @@ local function ensure()
     return frame or build()
 end
 
--- Draws the model: the page list, the page's title and switch, the banner, then the page: cards for a settings page, the size
--- block on the Picture size page, the summary block and the footer.
+-- Draws the model: the page list, the profile pill, the page's title, the banner and the read-only line, then the page: cards for
+-- a settings page, the size block on the Picture size page, and the summary block.
 function settings.render()
     local f = ensure()
     local p = parts
@@ -964,13 +930,8 @@ function settings.render()
         p.saveCaption:Show()
         p.saveNote:Hide()
     end
-    for i, tab in ipairs(view.tabs) do
-        local button = p.tabs[i]
-        button:SetLabel(tab.text)
-        button:SetSelected(tab.selected)
-        button:SetEnabled(tab.enabled)
-        if onSettings then button:Show() else button:Hide() end
-    end
+    p.pill.label:SetText(view.profile.text)
+    p.pill.dot:SetColorName(view.profile.color)
 
     local y = TITLE_H
     local function placeText(fs, str, x)
@@ -991,6 +952,21 @@ function settings.render()
     if view.locked then notices[#notices + 1] = view.locked end
     if view.refusal then notices[#notices + 1] = view.refusal end
     if #notices > 0 then placeText(p.banner, table.concat(notices, "\n")) else hideText(p.banner) end
+    -- Original or Maximum in use: the settings pages are read-only and offer Everyday and Crowded.
+    if onSettings and view.readOnly then
+        placeText(p.readOnly, view.readOnly.text)
+        for i, spec in ipairs(view.readOnly.buttons) do
+            local button = p.editButtons[i]
+            button:SetEnabled(spec.enabled)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (EDIT_W + 8), -y)
+            button:Show()
+        end
+        y = y + EDIT_H + 8
+    else
+        hideText(p.readOnly)
+        for _, button in ipairs(p.editButtons) do button:Hide() end
+    end
 
     -- One card per setting of the page: the tick, the name, how much it matters, the help, the small level buttons with their costs.
     local function placeCard(row, x, top, cardW, perRow)
@@ -1088,10 +1064,10 @@ function settings.render()
             button:SetSelected(test.done)
             button:SetEnabled(test.enabled)
             button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (FOOTER_USE_W + 12), -y)
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (TEST_BTN_W + 12), -y)
             button:Show()
         end
-        y = y + FOOTER_BTN_H + 8
+        y = y + TEST_BTN_H + 8
     end
 
     -- The Home page.
@@ -1103,6 +1079,7 @@ function settings.render()
             card.key = "profile:" .. profile.key
             card:SetLabel(profile.title)
             card.note:SetText(profile.note)
+            card.dot:SetColorName(profile.color)
             card:SetSelected(profile.selected)
             card:SetEnabled(profile.enabled)
             card:ClearAllPoints()
@@ -1171,15 +1148,13 @@ function settings.render()
         p.sizeBack:SetEnabled(size.canPutBack)
         p.sizeBack:Show()
         y = y + 16 + 12
-        if size.where then placeText(p.sizeWhere, size.where) else hideText(p.sizeWhere) end
         if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end
         if size.safe then placeText(p.sizeSafe, size.safe) else hideText(p.sizeSafe) end
-        placeText(p.sizeNote, size.note)
+        if size.note then placeText(p.sizeNote, size.note) else hideText(p.sizeNote) end
     else
         p.sizeSlider:Hide()
         p.sizeBack:Hide()
         hideText(p.sizeLabel)
-        hideText(p.sizeWhere)
         hideText(p.sizeWarn)
         hideText(p.sizeSafe)
         hideText(p.sizeNote)
@@ -1191,8 +1166,8 @@ function settings.render()
         hideText(p.dynamicLine)
     end
 
-    -- The summary block, stacked up from the footer: the matters note, the total, then the line on this tab's levels.
-    local bottom = FOOTER_H + SUMMARY_GAP
+    -- The summary block, stacked up from the bottom of the page: the matters note, the total, then the line on the profile's levels.
+    local bottom = SUMMARY_BOTTOM
     local function stack(fs, str)
         if not (onSettings and str) then
             hideText(fs)
@@ -1207,42 +1182,6 @@ function settings.render()
     stack(p.mattersNote, view.mattersNote)
     stack(p.total, view.totalLine)
     stack(p.your, view.yourLine)
-
-    -- The footer, right-aligned: Switch to <the tab shown> (only when that tab is not the profile in use), Use what I have in the
-    -- game now, and Switch to Maximum (only when Maximum is not in use).
-    local hasMaximum, hasSwitch = false, false
-    for _, button in ipairs(view.buttons) do
-        if button.key == "use" then
-            p.use:SetLabel(button.text)
-            p.use:SetEnabled(button.enabled)
-        elseif button.key == "maximum" then
-            hasMaximum = true
-            p.maximum:SetLabel(button.text)
-            p.maximum:SetEnabled(button.enabled)
-        elseif button.key == "switch" then
-            hasSwitch = true
-            p.switch:SetLabel(button.text)
-            p.switch:SetEnabled(button.enabled)
-        end
-    end
-    if onSettings then
-        local useRight = PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0)
-        p.use:ClearAllPoints()
-        p.maximum:ClearAllPoints()
-        p.switch:ClearAllPoints()
-        p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)
-        p.use:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -useRight, 9)
-        p.switch:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(useRight + FOOTER_USE_W + 8), 9)
-        p.use:Show()
-        if hasMaximum then p.maximum:Show() else p.maximum:Hide() end
-        if hasSwitch then p.switch:Show() else p.switch:Hide() end
-        p.footerRule:Show()
-    else
-        p.use:Hide()
-        p.maximum:Hide()
-        p.switch:Hide()
-        p.footerRule:Hide()
-    end
 end
 
 function settings.show()

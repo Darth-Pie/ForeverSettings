@@ -31,13 +31,13 @@ An addon for **WoW Forever**.
 
 ## See the price of every level
 
-**My settings** (minimap menu, or `/fset settings`) has a page list on the left. The settings pages list every setting with what each level costs in frames per second against the level you have, how much it matters to the picture, a total for your choices, and what everything at the highest would give. **Save as Everyday** and **Save as Crowded**, at the bottom of the page list, keep the settings you have in the game now.
+**My settings** (minimap menu, or `/fset settings`) has a page list on the left. The settings pages list every setting with what each level costs in frames per second against the level you have, how much it matters to the picture, a total for your choices, and what everything at the highest would give. The pages change the profile you are using, at once; the coloured pill next to the close button shows which one that is. Original and Maximum can't be changed, so their pages offer Everyday and Crowded instead. **Save as Everyday** and **Save as Crowded**, at the bottom of the page list, keep the settings you have in the game now.
 
 <p align="center">
   <img src=".previews/my-settings.png" alt="My settings, Light and shadows page: Shadow detail, Soft corner shadows and Extra effects detail, with the fps cost under each level" width="720">
 </p>
 
-The **Home** page switches profile and starts the tests. The **Picture size** page has a slider and size buttons for picture sharpness, up to 200%. Both keep the size in the profile you are editing. A warning says that high values can crash some graphics cards, and holding Shift while you enter the world skips a saved size above 100% for that session.
+The **Home** page switches profile and starts the tests. The **Picture size** page has a slider and size buttons for picture sharpness, up to 200%. Both keep the size in the profile in use. A warning says that high values can crash some graphics cards, and holding Shift while you enter the world skips a saved size above 100% for that session.
 
 <p align="center">
   <img src=".previews/home.png" alt="My settings, Home page: the four profiles and the two test buttons" width="355">

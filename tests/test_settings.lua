@@ -80,46 +80,33 @@ local function selectedOf(row)
 end
 
 local INTRO = "Choose how the game looks. Settings you tick are kept: the addon puts them back at every loading screen."
-local ORIGINAL_NOTE = "You're using your Original settings (hands off). Switch to Everyday or Crowded on the Home page to turn these on."
 local COMBAT_TEXT = "You are in combat; try again afterwards."
 local BUSY_TEXT = "A test is running; try again afterwards."
 local RAW = { "graphicsShadowQuality", "graphicsSSAO", "groundEffectDensity", "RenderScale", "graphicsComputeEffects" }
 
-test("S1-1 the tabs, their notes and marks, the title and the intro; the window opens on the profile in use", function()
-    local e, s, db = boot()
-    local view = s.model({ tab = "everyday" }, ctxOf(e))
-    s.open()
-    local onEveryday = s.state().tab
-    db.active = "crowded"
-    s.open()
-    local onCrowded = s.state().tab
-    db.active = "original"
-    s.open()
-    local onOriginal = s.state().tab
-    return view.title == "My settings" and view.intro == INTRO and #view.tabs == 2
-        and view.tabs[1].key == "everyday" and view.tabs[1].text == "Everyday (in use)" and view.tabs[1].inUse and view.tabs[1].selected
-        and view.tabs[1].note == "Settings for normal play." and view.tabs[2].key == "crowded" and view.tabs[2].text == "Crowded"
-        and not view.tabs[2].inUse and not view.tabs[2].selected and view.tabs[2].note == "Settings for raids and busy cities."
-        and view.notice == nil and onEveryday == "everyday" and onCrowded == "crowded" and onOriginal == "everyday",
-        view.tabs[1].text .. " " .. onEveryday .. onCrowded .. onOriginal
+test("S1-1 the title and the intro; no tabs and no footer buttons; the notice is quiet on Everyday", function()
+    local e, s = boot()
+    local view = s.model({ page = "light" }, ctxOf(e))
+    return view.title == "My settings" and view.intro == INTRO and view.tabs == nil and view.buttons == nil and view.notice == nil,
+        tostring(view.tabs)
 end)
 
-test("S1-2 with Original in use the note shows, the tabs and rows stay editable, and an edit is only stored", function()
+test("S1-2 with Original in use the rows are read-only, the line offers Everyday and Crowded, and a stray click writes nothing", function()
     local e, s, db = boot({ active = "original" })
-    local view = s.model({ tab = "everyday" }, ctxOf(e, { active = "original" }))
-    s.open("crowded")
+    local view = s.model({ page = "light" }, ctxOf(e, { active = "original" }))
+    s.open("light")
     local before = copyOf(db.profiles.everyday.values)
-    s.click("tab:everyday")
     s.click("level:graphicsShadowQuality:3")
-    local stored = db.profiles.everyday.values.graphicsShadowQuality == "3" and db.active == "original" and #SETLOG == 0
+    s.click("keep:graphicsSSAO")
+    local stored = sameTable(db.profiles.everyday.values, before) and db.active == "original" and #SETLOG == 0
         and CVARS.graphicsShadowQuality == "2" and next(db.want) == nil and #OUT == 0
-    return view.notice == ORIGINAL_NOTE and view.tabs[1].enabled and view.tabs[2].enabled and view.rows[1].enabled
-        and not view.tabs[1].inUse and not view.tabs[2].inUse and stored and before.graphicsShadowQuality == "2", outText()
+    return view.readOnly ~= nil and view.readOnly.text == "Original can't be changed. To change settings, edit:" and view.rows[1].enabled == false
+        and stored, outText()
 end)
 
 test("S1-3 one row per setting the client has, in the table's order, with the plain name, line and level words", function()
     local e, s = boot()
-    local view = s.model({ tab = "everyday" }, ctxOf(e))
+    local view = s.model({ page = "light" }, ctxOf(e))
     local order = {}
     for _, row in ipairs(view.rows) do order[#order + 1] = row.cvar end
     local r = view.rows
@@ -131,86 +118,65 @@ test("S1-3 one row per setting the client has, in the table's order, with the pl
         and r[4].name == "Picture sharpness" and levelTexts(r[4]) == "50%|60%|70%|80%|90%|100%|125%|150%|175%|200%", order[3] .. " " .. levelTexts(r[4])
 end)
 
-test("S1-4 the tab in use highlights the game's live value, the other tab its saved value, and ticks follow what is saved", function()
+test("S1-4 the rows highlight the game's live levels and the ticks follow what the profile in use holds", function()
     local e, s = boot()
     CVARS.graphicsShadowQuality = "3"
-    local mine = s.model({ tab = "everyday" }, ctxOf(e))
-    local other = s.model({ tab = "crowded" }, ctxOf(e))
+    local mine = s.model({ page = "light" }, ctxOf(e))
+    local crowd = s.model({ page = "light" }, ctxOf(e, { active = "crowded" }))
     return selectedOf(mine.rows[1]) == "3" and mine.rows[1].kept and selectedOf(mine.rows[2]) == "1" and not mine.rows[2].kept
-        and selectedOf(other.rows[1]) == "0" and other.rows[1].kept and selectedOf(other.rows[2]) == "" and not other.rows[2].kept
-        and selectedOf(other.rows[4]) == "", selectedOf(mine.rows[1]) .. selectedOf(other.rows[1])
+        and selectedOf(crowd.rows[1]) == "3" and crowd.rows[1].kept and not crowd.rows[2].kept and selectedOf(crowd.rows[4]) == "1",
+        selectedOf(mine.rows[1]) .. selectedOf(crowd.rows[1])
 end)
 
-test("S1-5 a level clicked on the tab in use is applied and kept through setValue, silently", function()
+test("S1-5 a level click is applied and kept in the profile in use through setValue, silently", function()
     local e, s, db, p = boot()
     local calls = {}
     local real = p.setValue
     p.setValue = function(cvar, value, silent) calls[#calls + 1] = { cvar, value, silent } return real(cvar, value, silent) end
-    s.open("everyday")
+    s.open("light")
     s.click("level:graphicsShadowQuality:3")
     return #calls == 1 and calls[1][1] == "graphicsShadowQuality" and calls[1][2] == "3" and calls[1][3] == true
         and CVARS.graphicsShadowQuality == "3" and db.profiles.everyday.values.graphicsShadowQuality == "3"
         and db.want.graphicsShadowQuality == "3" and #OUT == 0, outText()
 end)
 
-test("S1-6 a level clicked on the other tab is only stored: nothing is written to the game or to the profile in use", function()
+test("S1-7 unticking stops keeping a setting: the game keeps its value", function()
     local e, s, db = boot()
-    s.open("crowded")
-    local wantBefore, everydayBefore = copyOf(db.want), copyOf(db.profiles.everyday.values)
-    s.click("level:graphicsShadowQuality:1")
-    s.click("level:graphicsSSAO:3")
-    return db.profiles.crowded.values.graphicsShadowQuality == "1" and db.profiles.crowded.values.graphicsSSAO == "3"
-        and #SETLOG == 0 and CVARS.graphicsShadowQuality == "2" and CVARS.graphicsSSAO == "1" and sameTable(db.want, wantBefore)
-        and sameTable(db.profiles.everyday.values, everydayBefore) and db.active == "everyday" and #OUT == 0, outText()
+    s.open("light")
+    s.click("keep:graphicsShadowQuality")
+    return db.profiles.everyday.values.graphicsShadowQuality == nil and db.want.graphicsShadowQuality == nil
+        and CVARS.graphicsShadowQuality == "2" and #OUT == 0, outText()
 end)
 
-test("S1-7 unticking stops keeping a setting: on the tab in use the game keeps its value, on the other it is forgotten", function()
-    local e, s, db = boot()
-    s.open("everyday")
-    s.click("keep:graphicsShadowQuality")
-    local mine = db.profiles.everyday.values.graphicsShadowQuality == nil and db.want.graphicsShadowQuality == nil
-        and CVARS.graphicsShadowQuality == "2"
-    s.click("tab:crowded")
-    s.click("keep:graphicsShadowQuality")
-    return mine and db.profiles.crowded.values.graphicsShadowQuality == nil and #OUT == 0, outText()
-end)
-
-test("S1-8 ticking an unticked row keeps the game's current value, on either tab", function()
+test("S1-8 ticking an unticked row keeps the game's current value in the profile in use", function()
     local e, s, db = boot()
     CVARS.graphicsSSAO = "3"
-    s.open("everyday")
+    s.open("light")
     s.click("keep:graphicsSSAO")
-    local mine = db.profiles.everyday.values.graphicsSSAO == "3" and db.want.graphicsSSAO == "3"
-    SETLOG = {}
-    s.click("tab:crowded")
-    s.click("keep:graphicsSSAO")
-    return mine and db.profiles.crowded.values.graphicsSSAO == "3" and #SETLOG == 0 and #OUT == 0, outText()
+    return db.profiles.everyday.values.graphicsSSAO == "3" and db.want.graphicsSSAO == "3" and db.profiles.crowded.values.graphicsSSAO == nil
+        and #OUT == 0, outText()
 end)
 
 test("S1-9 in combat or during a test every control is greyed with its reason, and clicks that still arrive write nothing", function()
     local e, s, db = boot()
-    local combat = s.model({ tab = "everyday" }, ctxOf(e, { locked = "combat" }))
-    local busy = s.model({ tab = "everyday" }, ctxOf(e, { locked = "busy" }))
+    local combat = s.model({ page = "light" }, ctxOf(e, { locked = "combat" }))
+    local busy = s.model({ page = "light" }, ctxOf(e, { locked = "busy" }))
     local greyed = true
     for _, view in ipairs({ combat, busy }) do
-        for _, tab in ipairs(view.tabs) do greyed = greyed and tab.enabled == false end
         for _, row in ipairs(view.rows) do greyed = greyed and row.enabled == false end
-        local byButton = {}
-        for _, button in ipairs(view.buttons) do byButton[button.key] = button end
-        greyed = greyed and byButton.use.enabled == false and byButton.close.enabled == true and byButton.maximum.enabled == false
     end
-    s.open("everyday")
+    s.open("light")
     local function nothingWrites(setup, undo)
         setup()
-        local before = { copyOf(db.profiles.everyday.values), copyOf(db.profiles.crowded.values), copyOf(db.want), s.state().tab }
+        local before = { copyOf(db.profiles.everyday.values), copyOf(db.profiles.crowded.values), copyOf(db.want), db.active }
         SETLOG = {}
         s.click("level:graphicsShadowQuality:4")
         s.click("keep:graphicsSSAO")
         s.click("keep:graphicsShadowQuality")
-        s.click("tab:crowded")
-        s.click("use")
+        s.click("profile:crowded")
+        s.click("save:everyday")
         local same = sameTable(db.profiles.everyday.values, before[1]) and sameTable(db.profiles.crowded.values, before[2])
-            and sameTable(db.want, before[3]) and s.state().tab == before[4] and #SETLOG == 0 and CVARS.graphicsShadowQuality == "2"
+            and sameTable(db.want, before[3]) and db.active == before[4] and #SETLOG == 0 and CVARS.graphicsShadowQuality == "2"
         undo()
         return same
     end
@@ -219,37 +185,25 @@ test("S1-9 in combat or during a test every control is greyed with its reason, a
     return combat.locked == COMBAT_TEXT and busy.locked == BUSY_TEXT and greyed and inCombat and running, outText()
 end)
 
-test("S1-10 Use what I have in the game now saves the game's settings into the tab's profile and the rows then show them kept", function()
+test("S1-11 a profile switched from outside moves the pill and the highlight within the refresh interval", function()
     local e, s, db, p = boot()
-    local calls = {}
-    local real = p.save
-    p.save = function(name, silent) calls[#calls + 1] = { name, silent } return real(name, silent) end
-    s.open("crowded")
-    s.click("use")
-    local view = s.model(s.state(), ctxOf(e, { saved = { everyday = db.profiles.everyday.values, crowded = db.profiles.crowded.values } }))
-    return #calls == 1 and calls[1][1] == "crowded" and calls[1][2] == true and db.profiles.crowded.values.graphicsShadowQuality == "2"
-        and db.profiles.crowded.values.graphicsSSAO == "1" and view.rows[2].kept and selectedOf(view.rows[2]) == "1" and #OUT == 0, outText()
-end)
-
-test("S1-11 a profile switched from outside moves the in-use mark and the highlight within the refresh interval", function()
-    local e, s, db, p = boot()
-    s.open("crowded")
+    s.open("light")
     local f = window()
-    local before = byKey(f, "tab:crowded")._text == "Crowded" and byKey(f, "tab:everyday")._text == "Everyday (in use)"
+    local before = byKey(f, "pill").label._text == "Everyday"
     p.switch("crowded")
     e.pump(1, function() return 0.05 end)
-    local after = byKey(f, "tab:crowded")._text == "Crowded (in use)" and byKey(f, "tab:everyday")._text == "Everyday"
+    local after = byKey(f, "pill").label._text == "Crowded"
     local highlighted = byKey(f, "level:graphicsShadowQuality:0").skinState.selected == true
         and byKey(f, "level:graphicsShadowQuality:2").skinState.selected == false
-    return before and after and highlighted, tostring(byKey(f, "tab:crowded")._text)
+    return before and after and highlighted, tostring(byKey(f, "pill").label._text)
 end)
 
 test("S1-12 the window's pages: a tick and level buttons per setting on each page, 13 levels wrap onto three lines of six, the X closes it, Escape is listed once, no raw names", function()
     local e, s, db = boot()
     local b = e.ns.bench
     b.state().tiers.graphicsSSAO = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }
-    s.open("everyday")
-    s.open("everyday")
+    s.open("light")
+    s.open("light")
     local f = window()
     if not f then return false, "no window: " .. outText() end
     local function count(prefix)
@@ -276,9 +230,7 @@ test("S1-12 the window's pages: a tick and level buttons per setting on each pag
     local keepBox, live = byKey(f, "keep:graphicsShadowQuality"), byKey(f, "level:graphicsShadowQuality:2")
     local keptNow = keepBox ~= nil and keepBox:GetChecked() == true
     local liveSelected = live ~= nil and live.skinState.selected == true
-    local titled = hasText(f, "Light and shadows") and hasText(f, "Shadow detail") and hasText(f, "Everyday (in use)")
-    byKey(f, "tab:crowded"):Click()
-    local switched = s.state().tab == "crowded"
+    local titled = hasText(f, "Light and shadows") and hasText(f, "Shadow detail") and byKey(f, "pill").label._text == "Everyday"
     s.click("page:world")
     local worldKeeps, worldLevels = count("keep:"), count("level:")
     raw = raw or rawIn(f)
@@ -288,7 +240,7 @@ test("S1-12 the window's pages: a tick and level buttons per setting on each pag
     local listed = 0
     for _, name in ipairs(UISpecialFrames) do if name == "ForeverSettingsSettings" then listed = listed + 1 end end
     f.close:Click()
-    return titled and keptNow and liveSelected and switched and not f:IsShown() and listed == 1 and not raw
+    return titled and keptNow and liveSelected and not f:IsShown() and listed == 1 and not raw
         and lightKeeps == 2 and lightLevels == 5 + 13 and ssaoLines == 3 and worldKeeps == 1 and worldLevels == 3
         and sizeKeeps == 1 and sizeLevels == 10,
         tostring(lightKeeps) .. " " .. tostring(lightLevels) .. " " .. tostring(ssaoLines) .. " " .. tostring(worldKeeps) .. " "
@@ -297,15 +249,15 @@ end)
 
 test("S1-13 no action of the window prints to chat", function()
     local e, s = boot()
-    s.open("everyday")
+    s.open("light")
     s.click("level:graphicsShadowQuality:3")
     s.click("keep:graphicsSSAO")
     s.click("keep:graphicsSSAO")
-    s.click("tab:crowded")
+    s.click("profile:crowded")
     s.click("level:graphicsShadowQuality:1")
     s.click("keep:graphicsShadowQuality")
-    s.click("use")
-    s.click("tab:everyday")
+    s.click("save:everyday")
+    s.click("profile:everyday")
     return #OUT == 0, outText()
 end)
 
@@ -317,7 +269,7 @@ local COST_CROWD = "Costs from your crowd test. Measured in Stormwind City, 2 ho
 local COST_NONE = "Run Find my best settings to see what each level costs."
 local MATTERS_NOTE = [["Matters to the picture" is the addon's own judgement, not something it measured.]]
 local MAX_ON = "You're using Maximum (everything at its highest). It includes the sharpest textures, which need plenty of "
-    .. "graphics memory. Switch to Everyday or Crowded on the Home page to change these."
+    .. "graphics memory."
 local LEFT_OUT_1 = "1 setting stays as it is: the addon has not learned its levels yet."
 local NOTHING = "Maximum has nothing to set yet: run Find my best settings once so the addon learns what each setting can do."
 local SKIPPED_3 = "The test skipped the highest levels of 3 settings, so there is no total yet. Run Find my best settings and choose Thorough."
@@ -411,42 +363,42 @@ end
 test("S2-1 each level's cost is its frame rate minus the held level's, in whole numbers, with now, same and ?; no line without a held level", function()
     local e, s = boot()
     local entry = quietEntry()
-    local mine = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, entry) }))                   -- Shadows 2, SSAO 1 in the game
-    local other = s.model({ tab = "crowded" }, ctxOf(e, { costs = costsOf(e, entry),
-        saved = { everyday = { graphicsShadowQuality = "2" }, crowded = { graphicsShadowQuality = "1" } } }))
+    local mine = s.model({ page = "light" }, ctxOf(e, { costs = costsOf(e, entry) }))                   -- Shadows 2, SSAO 1 in the game
+    CVARS.graphicsShadowQuality = "1"                                                                      -- Crowded in use holds Shadows 1
+    local crowd = s.model({ page = "light" }, ctxOf(e, { active = "crowded", costs = costsOf(e, entry) }))
     CVARS.graphicsShadowQuality = "3"                                                                      -- a level the test never measured
-    local unmeasured = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, entry) }))
+    local unmeasured = s.model({ page = "light" }, ctxOf(e, { costs = costsOf(e, entry) }))
     CVARS.graphicsShadowQuality = "2"
-    local noTest = s.model({ tab = "everyday" }, ctxOf(e, {}))
+    local noTest = s.model({ page = "light" }, ctxOf(e, {}))
     local near = quietEntry()
     near.rows[2].deltaMs, near.rows[2].meanMs = -0.001, 3.999           -- Shadows 1: 0.06 fps faster than the held level 2
     near.rows[4].deltaMs, near.rows[4].meanMs = -0.31, 3.69             -- SSAO 0: 0.73 fps faster than the held level 1
-    local rounded = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, near) }))
+    local rounded = s.model({ page = "light" }, ctxOf(e, { costs = costsOf(e, near) }))
     local none = "-|-|-|-|-"
     return costTexts(rowOf(mine, "graphicsShadowQuality")) == "+83 fps|+28 fps|now|?|?"
         and costTexts(rowOf(mine, "graphicsSSAO")) == "+24 fps|now|-20 fps|?|?"
         and costTexts(rowOf(mine, "groundEffectDensity")) == "-|-|-" and costTexts(rowOf(mine, "RenderScale")) == "-|-|-|-|-|-|-|-|-|-"
-        and costTexts(rowOf(other, "graphicsShadowQuality")) == "+56 fps|now|-28 fps|?|?"
-        and costTexts(rowOf(other, "graphicsSSAO")) == none
+        and costTexts(rowOf(crowd, "graphicsShadowQuality")) == "+56 fps|now|-28 fps|?|?"
+        and costTexts(rowOf(crowd, "graphicsSSAO")) == "+24 fps|now|-20 fps|?|?"
         and costTexts(rowOf(unmeasured, "graphicsShadowQuality")) == none
         and costTexts(rowOf(noTest, "graphicsShadowQuality")) == none and costTexts(rowOf(noTest, "graphicsSSAO")) == none
         and costTexts(rowOf(rounded, "graphicsShadowQuality")) == "+83 fps|same|now|?|?"
         and costTexts(rowOf(rounded, "graphicsSSAO")) == "+1 fps|now|-20 fps|?|?",
-        costTexts(rowOf(mine, "graphicsShadowQuality")) .. " / " .. costTexts(rowOf(other, "graphicsShadowQuality")) .. " / "
+        costTexts(rowOf(mine, "graphicsShadowQuality")) .. " / " .. costTexts(rowOf(crowd, "graphicsShadowQuality")) .. " / "
             .. costTexts(rowOf(rounded, "graphicsShadowQuality"))
 end)
 
-test("S2-2 the note under the intro names the test the costs come from or says to run one; the Crowded tab prefers the crowd result", function()
+test("S2-2 the note under the intro names the test the costs come from or says to run one; with Crowded in use the crowd result comes first", function()
     local e, s = boot()
     local entry = quietEntry()
-    local quiet = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, entry) }))
-    local crowd = s.model({ tab = "crowded" }, ctxOf(e, { costs = costsOf(e, entry, "crowd", "Measured in Stormwind City, 2 hours ago.") }))
-    local noLine = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, entry, "quiet", false) }))
-    local noTest = s.model({ tab = "everyday" }, ctxOf(e, {}))
-    local empty = s.model({ tab = "everyday" }, ctxOf(e, { costs = { kind = "quiet", fps = { nowFps = 250, byCvar = {} } } }))
+    local quiet = s.model({ page = "light" }, ctxOf(e, { costs = costsOf(e, entry) }))
+    local crowd = s.model({ page = "light" }, ctxOf(e, { costs = costsOf(e, entry, "crowd", "Measured in Stormwind City, 2 hours ago.") }))
+    local noLine = s.model({ page = "light" }, ctxOf(e, { costs = costsOf(e, entry, "quiet", false) }))
+    local noTest = s.model({ page = "light" }, ctxOf(e, {}))
+    local empty = s.model({ page = "light" }, ctxOf(e, { costs = { kind = "quiet", fps = { nowFps = 250, byCvar = {} } } }))
     local forms = quiet.costNote == COST_QUIET and crowd.costNote == COST_CROWD and noLine.costNote == "Costs from your quiet-spot test."
         and noTest.costNote == COST_NONE and empty.costNote == COST_NONE
-    -- through context(): the Crowded tab reads the rebuilt crowd entry, the Everyday tab the quiet-spot test
+    -- through context(): with Crowded in use the window reads the rebuilt crowd entry, with Everyday the quiet-spot test
     local e2, s2 = bootWith(quietEntry())
     local asked = {}
     e2.ns.ui.savedResult = function(kind)
@@ -455,16 +407,16 @@ test("S2-2 the note under the intro names the test the costs come from or says t
             return { entry = e2.ns.recommend.crowdEntry(quietEntry(), crowdFixture()), measuredLine = "Measured in Stormwind City, 2 hours ago." }
         end
     end
-    s2.open("everyday")
+    s2.open("light")
     local f = window()
     local everyday = hasText(f, COST_QUIET) and costFor(f, "graphicsShadowQuality", "0") == "+83 fps"
-    s2.click("tab:crowded")
+    s2.click("profile:crowded")                    -- Crowded holds Shadows 0
     local crowded = hasText(f, COST_CROWD) and not hasText(f, COST_QUIET) and costFor(f, "graphicsShadowQuality", "0") == "now"
         and costFor(f, "graphicsShadowQuality", "1") == "-29 fps" and costFor(f, "graphicsShadowQuality", "2") == "-43 fps"
-    -- without a saved crowd result the Crowded tab reads the quiet-spot test
+    -- without a saved crowd result Crowded reads the quiet-spot test
     e2.ns.ui.savedResult = function() return nil end
-    s2.click("tab:everyday")
-    s2.click("tab:crowded")
+    s2.click("profile:everyday")
+    s2.click("profile:crowded")
     local fallback = hasText(f, COST_QUIET) and not hasText(f, COST_CROWD)
     return forms and everyday and crowded and fallback and #OUT == 0, tostring(forms) .. tostring(everyday) .. tostring(crowded)
         .. tostring(fallback) .. outText()
@@ -474,10 +426,10 @@ test("S2-3 each setting says how much it matters to the picture, from the rankin
     local e, s = boot()
     local resolved = e.ns.bench.resolve()
     resolved[#resolved + 1] = { cvar = "someUnknownSetting", label = "Something", tiers = { "0", "1" } }
-    local view = s.model({ tab = "everyday" }, ctxOf(e, { resolved = resolved }))
+    local view = s.model({ page = "light" }, ctxOf(e, { resolved = resolved }))
     local words = {}
     for _, row in ipairs(view.rows) do words[#words + 1] = row.cvar .. "=" .. tostring(row.matters) end
-    local bare = s.model({ tab = "everyday" }, ctxOf(e, { resolved = { { cvar = "someUnknownSetting", label = "Something", tiers = { "0", "1" } } } }))
+    local bare = s.model({ page = "light" }, ctxOf(e, { resolved = { { cvar = "someUnknownSetting", label = "Something", tiers = { "0", "1" } } } }))
     return table.concat(words, ",") == "graphicsShadowQuality=Matters to the picture: some.,graphicsSSAO=Matters to the picture: a little.,"
         .. "groundEffectDensity=Matters to the picture: a little.,RenderScale=Matters to the picture: a lot.,someUnknownSetting=nil"
         and view.mattersNote == MATTERS_NOTE and bare.mattersNote == nil and bare.rows[1].matters == nil, table.concat(words, ",")
@@ -487,7 +439,7 @@ test("S2-4 the total line: the estimate, the skipped count in the plural and the
     local e, s = boot()
     local costs = costsOf(e, quietEntry())
     local function total(max, withCosts)
-        return s.model({ tab = "everyday" }, ctxOf(e, { costs = withCosts, maximum = max })).totalLine
+        return s.model({ page = "light" }, ctxOf(e, { costs = withCosts, maximum = max })).totalLine
     end
     local forms = total({ fps = 92.4, skipped = 0, leftOut = 0 }, costs) == "Everything at the highest: about 92 fps."
         and total({ skipped = 3, leftOut = 0 }, costs) == SKIPPED_3 and total({ skipped = 1, leftOut = 0 }, costs) == SKIPPED_1
@@ -516,51 +468,21 @@ test("S2-4 the total line: the estimate, the skipped count in the plural and the
         tostring(forms) .. tostring(measured) .. tostring(skipped) .. tostring(noTest) .. tostring(nothing)
 end)
 
-test("S2-5 Switch to Maximum sits between Use and Close, is greyed when locked, is absent while Maximum is in use, and switches silently", function()
-    local e, s, db, p = bootWith(fullEntry())
-    local function keys(view)
-        local list = {}
-        for _, button in ipairs(view.buttons) do list[#list + 1] = button.key .. ":" .. tostring(button.enabled) end
-        return table.concat(list, ",")
-    end
-    local idle = s.model({ tab = "everyday" }, ctxOf(e))
-    local combat = s.model({ tab = "everyday" }, ctxOf(e, { locked = "combat" }))
-    local inUse = s.model({ tab = "everyday" }, ctxOf(e, { active = "maximum" }))
-    local shape = keys(idle) == "use:true,maximum:true,close:true" and idle.buttons[2].text == "Switch to Maximum"
-        and keys(combat) == "use:false,maximum:false,close:true" and keys(inUse) == "use:true,switch:true,close:true"
-    local calls = {}
-    local real = p.switch
-    p.switch = function(name, silent) calls[#calls + 1] = tostring(name) .. ":" .. tostring(silent) return real(name, silent) end
-    s.open("everyday")
-    COMBAT = true
-    s.click("maximum")
-    COMBAT = false
-    e.ns.suspended = true
-    s.click("maximum")
-    e.ns.suspended = false
-    local lockedWrites = #calls == 0 and #SETLOG == 0 and db.active == "everyday"
-    s.click("maximum")
-    local f = window()
-    local switched = #calls == 1 and calls[1] == "maximum:true" and db.active == "maximum" and #OUT == 0
-        and CVARS.graphicsShadowQuality == "4" and hasText(f, MAX_ON) and byKey(f, "maximum") == nil
-    return shape and lockedWrites and switched, tostring(shape) .. tostring(lockedWrites) .. tostring(switched) .. " " .. table.concat(calls, ",") .. outText()
-end)
-
 test("S2-5b a click that is refused for combat or a test says why in the window until the next click", function()
     local e, s, db = bootWith(nil)
     s.open("everyday")
     local f = window()
     COMBAT = true
-    s.click("maximum")
+    s.click("profile:maximum")
     local inCombat = hasText(f, COMBAT_TEXT)
     COMBAT = false
-    s.click("tab:crowded")
+    s.click("page:world")
     local cleared = not hasText(f, COMBAT_TEXT)
     e.ns.suspended = true
-    s.click("maximum")
+    s.click("profile:maximum")
     local running = hasText(f, BUSY_TEXT)
     e.ns.suspended = false
-    s.click("tab:everyday")
+    s.click("page:light")
     return inCombat and cleared and running and db.active == "everyday" and #SETLOG == 0 and #OUT == 0, outText()
 end)
 
@@ -592,38 +514,25 @@ test("S2-6 a Quick test, an old test, a crowd test and a held level never measur
     local heldNever = costFor(fUnmeasured, "graphicsShadowQuality", "0") == nil and costFor(fUnmeasured, "graphicsSSAO", "0") == "+24 fps"
     local fBroken, okBroken = drawn({ valid = true, kind = "setup", zone = "Highmountain", time = NOW - 100,
         rows = { lv("graphicsShadowQuality", "Shadows", "1", 0.5) } })             -- no baseline: the recommender cannot read it
-    -- a saved crowd result that cannot be rebuilt: the Crowded tab falls back to the quiet-spot test and still draws
+    -- a saved crowd result that cannot be rebuilt: with Crowded in use the window falls back to the quiet-spot test and still draws
     local e7, s7 = bootWith(quietEntry())
     e7.ns.ui.savedResult = function() error("no crowd result") end
-    s7.open("crowded")
+    e7.ns.profiles.switch("crowded", true)
+    OUT = {}
+    s7.open("light")
     local okSaved = #OUT == 0 and hasText(window(), COST_QUIET)
     return okQuick and okOld and okCrowd and okBroken and okSaved and quickRow == "?" and quickNote and oldBare and heldNever
         and hasText(fBroken, COST_NONE), tostring(quickRow) .. tostring(quickNote) .. tostring(oldBare) .. tostring(heldNever) .. outText()
 end)
 
-test("S2-7 with Maximum in use a level click and a keep tick still only store into the tab's profile, and the note shows", function()
-    local e, s, db, p = bootWith(nil)
-    CVARS.graphicsComputeEffects = "1"             -- in the client, levels not learned: Maximum leaves it as it is
-    p.switch("maximum", true)
-    OUT, SETLOG = {}, {}
-    s.open("crowded")
-    local wantBefore = copyOf(db.want)
-    s.click("level:graphicsShadowQuality:3")
-    s.click("keep:graphicsSSAO")
-    local f = window()
-    return db.active == "maximum" and db.profiles.crowded.values.graphicsShadowQuality == "3"
-        and db.profiles.crowded.values.graphicsSSAO == CVARS.graphicsSSAO and #SETLOG == 0 and sameTable(db.want, wantBefore)
-        and CVARS.graphicsShadowQuality == "4" and hasText(f, MAX_ON) and hasText(f, LEFT_OUT_1) and #OUT == 0, outText()
-end)
-
-test("S2-8 a click on Switch to Maximum with nothing to set shows the plain reason in the window, writes nothing and prints nothing", function()
+test("S2-8 a click on the Maximum card with nothing to set shows the plain reason in the window, writes nothing and prints nothing", function()
     local e = H.boot({ graphicsShadowQuality = "2", graphicsSSAO = "1", vsync = "0" }, { fresh = true })     -- no levels learned here
     local s, p = e.ns.settings, e.ns.profiles
     local db = p.state()
     local before = db.active
     s.open("everyday")
     OUT, SETLOG = {}, {}
-    s.click("maximum")
+    s.click("profile:maximum")
     local f = window()
     local shown = hasText(f, NOTHING)
     -- a redraw the window makes by itself (a test started elsewhere) drops it
@@ -632,16 +541,16 @@ test("S2-8 a click on Switch to Maximum with nothing to set shows the plain reas
     local droppedOnRedraw = not hasText(f, NOTHING) and hasText(f, BUSY_TEXT)
     e.ns.suspended = false
     e.pump(1, function() return 0.05 end)
-    s.click("maximum")
+    s.click("profile:maximum")
     local again = hasText(f, NOTHING)
-    s.click("tab:crowded")
+    s.click("page:world")
     local cleared = not hasText(f, NOTHING)
     return db.active == before and #SETLOG == 0 and #OUT == 0 and shown and droppedOnRedraw and again and cleared,
         tostring(db.active == before) .. tostring(#SETLOG) .. tostring(#OUT) .. tostring(shown) .. tostring(droppedOnRedraw)
             .. tostring(again) .. tostring(cleared) .. outText()
 end)
 
-test("S2-9 the window draws the costs under the level buttons, the matters words, the notes and the footer buttons, and takes them away again without a test", function()
+test("S2-9 the window draws the costs under the level buttons, the matters words and the notes, and takes them away again without a test", function()
     local e, s, db, p = bootWith(fullEntry())
     s.open("everyday")
     local f = window()
@@ -663,16 +572,16 @@ test("S2-9 the window draws the costs under the level buttons, the matters words
     end
     local matters = hasText(f, "matters: some") and hasText(f, "matters: a little")
     local notes = hasText(f, COST_QUIET) and hasText(f, MATTERS_NOTE) and hasText(f, "Everything at the highest: about 152 fps.")
-        and byKey(f, "maximum") ~= nil and byKey(f, "maximum")._text == "Switch to Maximum"
+        and byKey(f, "maximum") == nil
     -- a draw with no test: the second lines, the cost note and the total go away, the matters words and their note stay
     e.ns.bench.state().history[1] = nil
     s.open("everyday")
     local gone = costFor(f, "graphicsShadowQuality", "0") == nil and not hasText(f, "Everything at the highest")
         and hasText(f, COST_NONE) and not hasText(f, COST_QUIET) and hasText(f, MATTERS_NOTE) and hasText(f, "matters: some")
-    -- with Maximum in use the third button goes
+    -- with Maximum in use the pill says so and the page is read-only
     p.switch("maximum", true)
     s.open("everyday")
-    local noButton = byKey(f, "maximum") == nil
+    local noButton = byKey(f, "pill").label._text == "Maximum" and hasText(f, "Maximum can't be changed. To change settings, edit:")
     return match and drawnCosts > 0 and matters and notes and gone and noButton,
         tostring(match) .. tostring(drawnCosts) .. tostring(matters) .. tostring(notes) .. tostring(gone) .. tostring(noButton)
 end)
@@ -682,24 +591,24 @@ test("S2-13 a level the game will not take when Maximum is switched on from the 
     SETFAIL.graphicsShadowQuality = "clamp"
     s.open("everyday")
     OUT = {}
-    s.click("maximum")
+    s.click("profile:maximum")
     local f = window()
     local one = db.active == "maximum" and hasText(f, "The game would not take the highest level for: Shadow detail.")
         and hasText(f, MAX_ON) and #OUT == 0
-    s.click("tab:crowded")                                   -- a redraw by itself drops it, as the other refusal
+    s.click("page:world")                                    -- a redraw by itself drops it, as the other refusal
     local gone = not hasText(f, "would not take")
-    s.click("tab:everyday")
+    s.click("page:light")
     local e2, s2 = bootWith(nil)
     SETFAIL.graphicsShadowQuality = "clamp"
     SETFAIL.graphicsSSAO = "clamp"
     s2.open("everyday")
-    s2.click("maximum")
+    s2.click("profile:maximum")
     local f2 = window()
     local two = hasText(f2, "The game would not take the highest level for: ") and hasText(f2, "Shadow detail")
         and hasText(f2, "Soft corner shadows")
     local e3, s3, db3 = bootWith(nil)                        -- nothing refused: no such line
     s3.open("everyday")
-    s3.click("maximum")
+    s3.click("profile:maximum")
     local none = not hasText(window(), "would not take")
     local e4, s4, db4 = bootWith(nil)                        -- a setting with no plain name that the game also refuses is not listed
     db4.original.values.maxFPS = "60"
@@ -707,7 +616,7 @@ test("S2-13 a level the game will not take when Maximum is switched on from the 
     SETFAIL.maxFPS = "clamp"
     SETFAIL.graphicsShadowQuality = "clamp"
     s4.open("everyday")
-    s4.click("maximum")
+    s4.click("profile:maximum")
     local unnamed = hasText(window(), "The game would not take the highest level for: Shadow detail.") and not hasText(window(), "maxFPS")
     return one and gone and two and none and unnamed, outText()
 end)
@@ -719,19 +628,19 @@ test("S2-14 while Maximum is in use the note says levels learned since are not a
     s.open("everyday")
     local before = hasText(window(), LEFT_OUT_1) and not hasText(window(), "highest level at the next loading screen")
     e.ns.bench.state().tiers.graphicsComputeEffects = { "0", "1", "2", "3" }
-    s.click("tab:crowded")
+    s.click("page:world")
     local pending1 = "1 setting will go to its highest level at the next loading screen, or when you choose Maximum in the menu again."
     local learned = hasText(window(), pending1) and not hasText(window(), LEFT_OUT_1)
     e.ns.bench.state().tiers.graphicsShadowQuality = { "0", "1", "2", "3", "4", "5" }      -- a higher level than the one set
-    s.click("tab:everyday")
+    s.click("page:light")
     local pending2 = "2 settings will go to their highest level at the next loading screen, or when you choose Maximum in the menu again."
     local higher = hasText(window(), pending2)
     e.fire("PLAYER_ENTERING_WORLD")
-    s.click("tab:crowded")
+    s.click("page:world")
     local applied = not hasText(window(), "highest level at the next loading screen") and not hasText(window(), LEFT_OUT_1)
         and CVARS.graphicsComputeEffects == "3" and CVARS.graphicsShadowQuality == "5"
     local function note(left, pending)
-        return s.model({ tab = "everyday" }, ctxOf(e, { active = "maximum", maximum = { skipped = 0, leftOut = left, pending = pending } })).notice
+        return s.model({ page = "light" }, ctxOf(e, { active = "maximum", maximum = { skipped = 0, leftOut = left, pending = pending } })).notice
     end
     local two = "2 settings will go to their highest level at the next loading screen, or when you choose Maximum in the menu again."
     local both = note(1, 2) == MAX_ON .. " " .. LEFT_OUT_1 .. " " .. two
@@ -766,10 +675,10 @@ end)
 
 test("S2-11 the note while Maximum is in use counts the settings it left as they were, in the singular and the plural", function()
     local e, s = boot()
-    local function note(left) return s.model({ tab = "everyday" }, ctxOf(e, { active = "maximum", maximum = { skipped = 0, leftOut = left } })).notice end
+    local function note(left) return s.model({ page = "light" }, ctxOf(e, { active = "maximum", maximum = { skipped = 0, leftOut = left } })).notice end
     local plural = "2 settings stay as they are: the addon has not learned their levels yet."
     return note(0) == MAX_ON and note(1) == MAX_ON .. " " .. LEFT_OUT_1 and note(2) == MAX_ON .. " " .. plural
-        and s.model({ tab = "everyday" }, ctxOf(e, { active = "maximum" })).notice == MAX_ON, tostring(note(2))
+        and s.model({ page = "light" }, ctxOf(e, { active = "maximum" })).notice == MAX_ON, tostring(note(2))
 end)
 
 test("S2-10 no raw setting name in any text this change adds", function()
@@ -782,14 +691,18 @@ test("S2-10 no raw setting name in any text this change adds", function()
             list[#list + 1] = row.matters or ""
             for _, level in ipairs(row.levels) do list[#list + 1] = level.cost or "" end
         end
-        for _, button in ipairs(view.buttons) do list[#list + 1] = button.text end
+        if view.readOnly then
+            list[#list + 1] = view.readOnly.text
+            for _, button in ipairs(view.readOnly.buttons) do list[#list + 1] = button.text end
+        end
+        list[#list + 1] = view.profile.text
         return table.concat(list, "\n")
     end
     local costs = costsOf(e, fullEntry())
-    local text = names(s.model({ tab = "everyday" }, ctxOf(e, { costs = costs, maximum = { fps = 151.5, skipped = 0, leftOut = 2 },
+    local text = names(s.model({ page = "light" }, ctxOf(e, { costs = costs, maximum = { fps = 151.5, skipped = 0, leftOut = 2 },
         estimate = { fps = 94.4, counted = 2, notCounted = 2 } })))
-        .. names(s.model({ tab = "everyday" }, ctxOf(e, { active = "maximum", costs = costs, maximum = { skipped = 3, leftOut = 1 } })))
-        .. names(s.model({ tab = "crowded", notice = NOTHING }, ctxOf(e, {})))
+        .. names(s.model({ page = "light" }, ctxOf(e, { active = "maximum", costs = costs, maximum = { skipped = 3, leftOut = 1 } })))
+        .. names(s.model({ notice = NOTHING }, ctxOf(e, {})))
     local raw
     for _, name in ipairs(RAW) do
         if text:find(name, 1, true) then raw = name end
@@ -818,7 +731,7 @@ test("S3-1 the live total line: the tab's name, a whole number, the not-counted 
     local e, s = boot()
     local costs = costsOf(e, quietEntry())
     local function line(tab, estimate, withCosts)
-        return s.model({ tab = tab }, ctxOf(e, { costs = withCosts, estimate = estimate })).yourLine
+        return s.model({ page = "light" }, ctxOf(e, { active = tab, costs = withCosts, estimate = estimate })).yourLine
     end
     local ok = line("everyday", { fps = 94.4, counted = 3, notCounted = 0 }, costs) == "Your Everyday settings: about 94 fps" .. YOUR_TAIL
         and line("crowded", { fps = 94.6, counted = 1, notCounted = 0 }, costs) == "Your Crowded settings: about 95 fps" .. YOUR_TAIL
@@ -833,7 +746,7 @@ test("S3-1 the live total line: the tab's name, a whole number, the not-counted 
     return ok and none, tostring(line("everyday", { fps = 94.4, counted = 2, notCounted = 1 }, costs))
 end)
 
-test("S3-2 through the window the estimate is recommend's for the levels the tab holds: live ones on the tab in use, saved ones on the other, and it follows every click", function()
+test("S3-2 through the window the estimate is recommend's for the levels the profile in use holds, and it follows every click and every switch", function()
     local e, s = bootWith(fullEntry())
     s.open("everyday")
     local f = window()
@@ -843,10 +756,10 @@ test("S3-2 through the window the estimate is recommend's for the levels the tab
     local one = yourText(f) == "Your Everyday settings: about 204 fps" .. YOUR_TAIL
     s.click("level:graphicsSSAO:4")                           -- +0.8 ms with the Shadows above: 6.0 ms
     local two = yourText(f) == "Your Everyday settings: about 167 fps" .. YOUR_TAIL
-    s.click("tab:crowded")                                    -- the Crowded profile keeps Shadows 0 only: 3.0 ms
-    local other = yourText(f) == "Your Crowded settings: about 333 fps" .. YOUR_TAIL
-    s.click("level:graphicsSSAO:0")                           -- stored only: -0.6 ms more, 2.4 ms
-    local stored = yourText(f) == "Your Crowded settings: about 417 fps" .. YOUR_TAIL and CVARS.graphicsSSAO == "4"
+    s.click("profile:crowded")                                -- Crowded keeps Shadows 0; SSAO goes back to Original's 1: 2.7 ms
+    local other = yourText(f) == "Your Crowded settings: about 370 fps" .. YOUR_TAIL
+    s.click("level:graphicsSSAO:0")                           -- kept in Crowded and applied: -0.6 ms more, 2.4 ms
+    local stored = yourText(f) == "Your Crowded settings: about 417 fps" .. YOUR_TAIL and CVARS.graphicsSSAO == "0"
     return start and one and two and other and stored and #OUT == 0,
         tostring(start) .. tostring(one) .. tostring(two) .. tostring(other) .. tostring(stored) .. tostring(yourText(f)) .. outText()
 end)
@@ -862,22 +775,29 @@ test("S3-3 a setting the test did not measure at the held level is left out of t
     return one and two, tostring(one) .. tostring(two) .. tostring(yourText(window()))
 end)
 
-test("S3-4 no line without a test or for a tab that keeps nothing, and the rest of the window still draws", function()
+test("S3-4 no line without a test or for a profile that keeps nothing, and the rest of the window still draws", function()
     local e, s = bootWith(nil)
     s.open("everyday")
     local noTest = not hasText(window(), "Your Everyday settings") and hasText(window(), COST_NONE)
     local e2, s2, db2 = bootWith(fullEntry())
     db2.profiles.crowded.values = {}
-    s2.open("crowded")
+    s2.open("light")
+    s2.click("profile:crowded")
     local f = window()
     local empty = not hasText(f, "Your Crowded settings") and hasText(f, COST_QUIET) and hasText(f, "Everything at the highest")
-    s2.click("tab:everyday")
+    s2.click("profile:everyday")
     local back = yourText(f) == "Your Everyday settings: about 270 fps" .. YOUR_TAIL
-    db2.profiles.crowded.values = { RenderScale = "0.75" }               -- a level the test never measured: nothing to add up
-    s2.click("tab:crowded")
-    local unmeasured = not hasText(f, "Your Crowded settings") and hasText(f, COST_QUIET)
-    return noTest and empty and back and unmeasured and #OUT == 0,
-        tostring(noTest) .. tostring(empty) .. tostring(back) .. tostring(unmeasured) .. outText()
+    local model = s2.model({ page = "light" }, ctxOf(e2, { active = "crowded", saved = { everyday = {}, crowded = {} },
+        costs = costsOf(e2, fullEntry()), estimate = { fps = 250, counted = 3, notCounted = 0 } }))
+    local keepsNothing = model.yourLine == nil
+    -- the game holds only levels the test never measured: no line, it would only repeat today's frame rate (spec P8)
+    local e3, s3, db3 = bootWith(quietEntry())
+    db3.profiles.everyday.values = { graphicsShadowQuality = "4" }
+    CVARS.graphicsShadowQuality, CVARS.graphicsSSAO = "4", "4"
+    s3.open("light")
+    local unmeasured = not hasText(window(), "Your Everyday settings") and hasText(window(), COST_QUIET)
+    return noTest and empty and back and keepsNothing and unmeasured and #OUT == 0,
+        tostring(noTest) .. tostring(empty) .. tostring(back) .. tostring(keepsNothing) .. tostring(unmeasured) .. outText()
 end)
 
 test("S3-5 an estimate that cannot be made leaves the window drawn, without the line and without a message", function()
@@ -919,58 +839,41 @@ local function lit(f)                               -- the one size button highl
     return found
 end
 
-test("S4-1 the picture size block shows the tab's own size: label, range, whether it is kept, the warning and the Shift line above 100%, Back to 100% only off 100%, greyed when locked, absent without the setting", function()
+test("S4-1 the picture size block shows the game's size: label, range, whether the profile in use keeps it, the warning and the Shift line above 100%, Back to 100% only off 100%, greyed when locked or read-only", function()
     local e, s = boot()
-    local function size(st, over)
-        return s.model(st, ctxOf(e, over)).size
-    end
-    CVARS.RenderScale = "1"
-    local none = size({ tab = "everyday" }, { size = { live = 100 } })
-    CVARS.RenderScale = "1.5"
-    local usedKept = size({ tab = "everyday" }, { size = { live = 150 }, saved = { everyday = { RenderScale = "1.5" }, crowded = {} } })
-    local locked = size({ tab = "everyday" }, { size = { live = 150 }, saved = { everyday = { RenderScale = "1.5" }, crowded = {} }, locked = "combat" })
-    CVARS.RenderScale = "1"
-    local otherKept = size({ tab = "crowded" }, { size = { live = 100 }, saved = { everyday = {}, crowded = { RenderScale = "0.8" } } })
-    local otherHigh = size({ tab = "crowded" }, { size = { live = 100 }, saved = { everyday = {}, crowded = { RenderScale = "2" } } })
-    local otherNone = size({ tab = "crowded" }, { size = { live = 100 }, saved = { everyday = {}, crowded = {} } })
-    CVARS.RenderScale = "1.5"
-    local inUseDrift = size({ tab = "everyday" }, { size = { live = 150 }, saved = { everyday = { RenderScale = "0.8" }, crowded = {} } })
-    CVARS.RenderScale = "1"
-    local skipped = size({ tab = "everyday" }, { size = { live = 100 }, saved = { everyday = { RenderScale = "1.5" }, crowded = {} } })
-    local settled = size({ tab = "everyday" }, { size = { live = 100 }, saved = { everyday = { RenderScale = "1" }, crowded = {} } })
-    CVARS.RenderScale = "1.15"
-    local rounded = size({ tab = "everyday" }, { size = { live = 115 } })
-    CVARS.RenderScale = "1.3"
-    local otherNoneLive = size({ tab = "crowded" }, { size = { live = 130 }, saved = { everyday = {}, crowded = {} } })
-    CVARS.RenderScale = "0.3"
-    local low = size({ tab = "everyday" }, { size = { live = 30 } })
-    CVARS.RenderScale = "2.5"
-    local high = size({ tab = "everyday" }, { size = { live = 250 } })
-    CVARS.RenderScale = "1.05"
-    local near105 = size({ tab = "everyday" }, { size = { live = 105 } })
+    local function size(over) return s.model({ page = "size" }, ctxOf(e, over)).size end
+    local keeps = function(everyday, crowded) return { everyday = everyday or {}, crowded = crowded or {} } end
+    local none = size({ size = { live = 100 } })
+    local usedKept = size({ size = { live = 150 }, saved = keeps({ RenderScale = "1.5" }) })
+    local locked = size({ size = { live = 150 }, saved = keeps({ RenderScale = "1.5" }), locked = "combat" })
+    local crowdKept = size({ active = "crowded", size = { live = 80 }, saved = keeps(nil, { RenderScale = "0.8" }) })
+    local maxi = size({ active = "maximum", size = { live = 100 }, want = { RenderScale = "1" } })
+    local inUseDrift = size({ size = { live = 150 }, saved = keeps({ RenderScale = "0.8" }) })
+    local skipped = size({ size = { live = 100 }, saved = keeps({ RenderScale = "1.5" }) })
+    local settled = size({ size = { live = 100 }, saved = keeps({ RenderScale = "1" }) })
+    local rounded = size({ size = { live = 115 } })
+    local roundKept = size({ size = { live = 115 }, saved = keeps({ RenderScale = "1.15" }) })
+    local maxiBig = size({ active = "maximum", size = { live = 150 }, want = {} })
+    local low, high, near105 = size({ size = { live = 30 } }), size({ size = { live = 250 } }), size({ size = { live = 105 } })
     return none ~= nil and none.percent == 100 and none.label == "Picture sharpness right now: 100%" and none.min == 50 and none.max == 200
         and none.step == 5 and none.value == 100 and none.note == NOTE_NONE and none.warning == nil and none.safe == nil
         and none.canPutBack == false and none.enabled == true
         and usedKept.label == "Picture sharpness right now: 150%" and usedKept.note == NOTE_KEPT and usedKept.warning == SIZE_WARNING
         and usedKept.safe == SIZE_SAFE and usedKept.canPutBack == true and usedKept.value == 150
         and locked.enabled == false and locked.canPutBack == false
-        and otherKept.label == "Crowded keeps picture sharpness at 80%" and otherKept.note == "Kept in Crowded: used when you switch to Crowded."
-        and otherKept.value == 80 and otherKept.canPutBack == true and otherKept.warning == nil
-        and otherHigh.warning == SIZE_WARNING and otherHigh.safe == SIZE_SAFE and otherHigh.value == 200
-        and otherNone.label == "Crowded keeps no picture sharpness yet (the game has 100% now)" and otherNone.value == 100
-        and otherNone.note == "Not kept in Crowded yet: drag the slider or click a size to keep it." and otherNone.canPutBack == false
-        and inUseDrift.label == "Picture sharpness right now: 150%" and inUseDrift.value == 150
-        and inUseDrift.note == "Kept in Everyday at 80%: the game has 150% now." and inUseDrift.canPutBack == true
-        and skipped.label == "Picture sharpness right now: 100%" and skipped.value == 100
+        and crowdKept.label == "Picture sharpness right now: 80%" and crowdKept.note == "Kept in Crowded: the addon puts it back at every loading screen."
+        and crowdKept.value == 80 and crowdKept.canPutBack == true and crowdKept.warning == nil
+        and maxi.enabled == false and maxi.canPutBack == false and maxi.note == nil and maxi.label == "Picture sharpness right now: 100%"
+        and inUseDrift.note == "Kept in Everyday at 80%: the game has 150% now." and inUseDrift.canPutBack == true and inUseDrift.value == 150
         and skipped.note == "Kept in Everyday at 150%: the game has 100% now." and skipped.warning == SIZE_WARNING and skipped.safe == SIZE_SAFE
-        and skipped.canPutBack == true
+        and skipped.canPutBack == true and skipped.label == "Picture sharpness right now: 100%"
+        and roundKept.note == NOTE_KEPT and roundKept.canPutBack == true
+        and maxiBig.enabled == false and maxiBig.canPutBack == false and maxiBig.note == nil and maxiBig.warning == SIZE_WARNING
         and settled.note == NOTE_KEPT and settled.canPutBack == false and settled.warning == nil and settled.safe == nil
         and rounded.label == "Picture sharpness right now: 115%" and rounded.value == 115
-        and otherNoneLive.label == "Crowded keeps no picture sharpness yet (the game has 130% now)" and otherNoneLive.value == 130
-        and otherNoneLive.canPutBack == true
         and low.value == 50 and low.label == "Picture sharpness right now: 30%" and high.value == 200 and high.warning == SIZE_WARNING
         and near105.warning == SIZE_WARNING
-        and s.model({ tab = "everyday" }, ctxOf(e, {})).size == nil, tostring(usedKept and usedKept.label) .. tostring(otherNone and otherNone.label)
+        and s.model({ page = "size" }, ctxOf(e, {})).size == nil, tostring(usedKept and usedKept.label) .. tostring(crowdKept and crowdKept.note)
 end)
 
 test("S4-2 the window draws the block; letting go of the slider keeps and applies the size like a button does, Back to 100% sets 100%, and nothing prints", function()
@@ -1014,35 +917,6 @@ test("S4-3 the buttons and the slider always show the same size: a button moves 
     drag(f, 200)
     local h = lit(f) == "2" and CVARS.RenderScale == "2" and byKey(f, "size")._value == 200
     return a and b and c and d and g and h, tostring(a) .. tostring(b) .. tostring(c) .. tostring(d) .. tostring(g) .. tostring(h)
-end)
-
-test("S4-4 on a tab that is not in use the same two controls keep the size for that profile only, and show it", function()
-    local e, s, db = bootWith(fullEntry())
-    s.open("size")
-    s.click("tab:crowded")
-    local f = window()
-    local first = byKey(f, "size")._value == 100 and hasText(f, "Crowded keeps no picture sharpness yet (the game has 100% now)") and lit(f) == nil
-        and byKey(f, "keep:RenderScale"):GetChecked() == false
-    drag(f, 130)
-    local dragged = db.profiles.crowded.values.RenderScale == "1.3" and CVARS.RenderScale == "1" and db.profiles.everyday.values.RenderScale == nil
-        and db.want.RenderScale == nil and byKey(f, "size")._value == 130 and hasText(f, "Crowded keeps picture sharpness at 130%")
-        and lit(f) == nil and byKey(f, "keep:RenderScale"):GetChecked() == true and hasText(f, SIZE_WARNING)
-        and not hasText(f, "The game kept")
-    byKey(f, "level:RenderScale:1.5"):Click()
-    local clicked = db.profiles.crowded.values.RenderScale == "1.5" and byKey(f, "size")._value == 150 and lit(f) == "1.5" and CVARS.RenderScale == "1"
-    byKey(f, "sizeback"):Click()
-    local back = db.profiles.crowded.values.RenderScale == "1" and lit(f) == "1" and CVARS.RenderScale == "1"
-    return first and dragged and clicked and back and #OUT == 0, tostring(first) .. tostring(dragged) .. tostring(clicked) .. tostring(back)
-end)
-
-test("S4-4b a tab that keeps no size shows the game's own size, rounded to a whole percent", function()
-    local e, s = bootWith(fullEntry())
-    CVARS.RenderScale = "1.15"
-    s.open("size")
-    s.click("tab:crowded")
-    local f = window()
-    return hasText(f, "Crowded keeps no picture sharpness yet (the game has 115% now)") and byKey(f, "size")._value == 115,
-        tostring(byKey(f, "size")._value)
 end)
 
 test("S4-5 dragging only moves the label; nothing is written until the mouse button is released", function()
@@ -1127,7 +1001,7 @@ test("S4-10 a size the game will not take is said in the window, in plain words,
         and byKey(f, "size")._value == 100 and #OUT == 0, outText()
 end)
 
-test("S4-11 the keep tick and Use what I have in the game now keep the size the game has, above 100% too", function()
+test("S4-11 the keep tick and Save as Everyday keep the size the game has, above 100% too", function()
     local e, s, db = bootWith(fullEntry())
     s.open("size")
     drag(window(), 150)
@@ -1137,14 +1011,14 @@ test("S4-11 the keep tick and Use what I have in the game now keep the size the 
     s.click("keep:RenderScale")                           -- tick: the size the game has now is kept
     local on = db.profiles.everyday.values.RenderScale == "1.5" and db.want.RenderScale == "1.5" and CVARS.RenderScale == "1.5"
     CVARS.RenderScale = "1.75"
-    s.click("use")
+    s.click("save:everyday")
     local used = db.profiles.everyday.values.RenderScale == "1.75" and db.want.RenderScale == "1.75"
     return off and on and used, tostring(off) .. tostring(on) .. tostring(used)
 end)
 
 test("S4-12 the size card has the six levels the test measures and four above 100% it never measured; only the test's levels are measured, and the test's own list is untouched", function()
     local e, s = boot()
-    local view = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, fullEntry()) }))
+    local view = s.model({ page = "light" }, ctxOf(e, { costs = costsOf(e, fullEntry()) }))
     local row = rowOf(view, "RenderScale")
     local values, shorts, costs = {}, {}, {}
     for _, level in ipairs(row.levels) do
@@ -1356,10 +1230,10 @@ end)
 test("S10-4 the model offers the two save buttons on every page, greyed when locked, with the confirmation the last click left", function()
     local e, s = boot()
     local function bar(st, locked) return s.model(st, ctxOf(e, { locked = locked })).saveBar end
-    local plain = bar({ tab = "everyday", page = "home" })
-    local locked = bar({ tab = "everyday", page = "about" }, "combat")
-    local busy = bar({ tab = "crowded", page = "size" }, "busy")
-    local said = bar({ tab = "everyday", page = "light", saved = "Saved 3 settings as Crowded." })
+    local plain = bar({ page = "home" })
+    local locked = bar({ page = "about" }, "combat")
+    local busy = bar({ page = "size" }, "busy")
+    local said = bar({ page = "light", saved = "Saved 3 settings as Crowded." })
     return plain ~= nil and plain.caption == SAVE_CAPTION and #plain.buttons == 2 and plain.note == nil
         and plain.buttons[1].key == "save:everyday" and plain.buttons[1].text == "Save as Everyday" and plain.buttons[1].enabled == true
         and plain.buttons[2].key == "save:crowded" and plain.buttons[2].text == "Save as Crowded" and plain.buttons[2].enabled == true
@@ -1368,81 +1242,16 @@ test("S10-4 the model offers the two save buttons on every page, greyed when loc
         and said.note == "Saved 3 settings as Crowded." and said.buttons[1].enabled == true, tostring(plain and plain.caption)
 end)
 
--- Editing a tab that is not the profile in use (the owner's report, 2026-11-02: Maximum in use, the Everyday tab edited, then Save as
--- Everyday copied the game's 100% over the edit): the page says where a change goes, one click switches, and a save says what it replaced.
-test("S11-1 the model offers Switch to <tab> when the tab shown is not the profile in use, greyed when locked", function()
-    local e, s = boot()
-    local function buttons(st, over)
-        local list = {}
-        for _, b in ipairs(s.model(st, ctxOf(e, over)).buttons) do list[b.key] = b end
-        return list
-    end
-    local inUse = buttons({ tab = "everyday" }, {})
-    local other = buttons({ tab = "crowded" }, {})
-    local maximum = buttons({ tab = "everyday" }, { active = "maximum" })
-    local original = buttons({ tab = "crowded" }, { active = "original" })
-    local locked = buttons({ tab = "crowded" }, { locked = "combat" })
-    return inUse.switch == nil and other.switch ~= nil and other.switch.text == "Switch to Crowded" and other.switch.enabled == true
-        and maximum.switch ~= nil and maximum.switch.text == "Switch to Everyday" and maximum.maximum == nil
-        and original.switch ~= nil and original.switch.text == "Switch to Crowded"
-        and locked.switch ~= nil and locked.switch.enabled == false,
-        tostring(other.switch and other.switch.text) .. tostring(maximum.switch and maximum.switch.text)
-end)
-
-test("S11-2 the size block says where a change goes when the tab shown is not the profile in use, and says nothing when it is", function()
-    local e, s = boot()
-    local function where(st, over)
-        over.size = { live = 100 }
-        return s.model(st, ctxOf(e, over)).size.where
-    end
-    return where({ tab = "everyday" }, { active = "maximum" })
-            == "The game is using Maximum. Changes here are stored in Everyday and take effect when you switch to Everyday."
-        and where({ tab = "everyday" }, { active = "original" })
-            == "The game is using Original. Changes here are stored in Everyday and take effect when you switch to Everyday."
-        and where({ tab = "crowded" }, {})
-            == "The game is using Everyday. Changes here are stored in Crowded and take effect when you switch to Crowded."
-        and where({ tab = "everyday" }, {}) == nil
-end)
-
-test("S11-3 with Maximum in use the page says where the change goes, and Switch to Everyday puts the profile in use and the size in the game", function()
-    local e, s, db = bootWith(fullEntry(), { active = "maximum" })
-    s.open("size")
-    local f = window()
-    local WHERE = "The game is using Maximum. Changes here are stored in Everyday and take effect when you switch to Everyday."
-    local switch = byKey(f, "switch")
-    local first = hasText(f, WHERE) and switch ~= nil and switch._text == "Switch to Everyday" and switch.enabled == true
-    drag(f, 150)
-    local stored = db.profiles.everyday.values.RenderScale == "1.5" and CVARS.RenderScale == "1" and hasText(f, WHERE)
-    s.click("page:light")
-    local leaves = not hasText(window(), WHERE)
-    s.click("page:size")
-    stored = stored and leaves and hasText(window(), WHERE)
-    COMBAT = true
-    s.open("size")
-    local greyed = byKey(window(), "switch").enabled == false
-    s.click("switch")
-    local stays = db.active == "maximum"
-    COMBAT = false
-    s.open("size")
-    byKey(window(), "switch"):Click()
-    f = window()
-    local switched = db.active == "everyday" and CVARS.RenderScale == "1.5" and not hasText(f, WHERE) and byKey(f, "switch") == nil
-        and byKey(f, "size")._value == 150 and hasText(f, "Picture sharpness right now: 150%") and #OUT == 0
-    return first and stored and greyed and stays and switched, tostring(first) .. tostring(stored) .. tostring(greyed) .. tostring(stays)
-        .. tostring(switched)
-end)
-
-test("S11-4 Save as and Use what I have in the game now say what they replace: the setting, what the profile held and what it holds now", function()
+-- A save copies the game over what the profile held (the owner's report, 2026-11-02: Maximum in use, Save as Everyday copied the
+-- game's 100% over an Everyday kept at 150%): the window says what it replaced.
+test("S11-4 Save as says what it replaces: the setting, what the profile held and what it holds now; nothing when they were the same", function()
     local e, s, db = bootWith(fullEntry(), { active = "maximum" })
     local n = managedPresent(e)
+    db.profiles.everyday.values.RenderScale = "1.5"
     s.open("size")
-    drag(window(), 150)
     byKey(window(), "save:everyday"):Click()
     local a = hasText(window(), savedLine(n, "Everyday")) and hasText(window(), "Picture sharpness was 150%, now 100%.")
-        and db.profiles.everyday.values.RenderScale == "1"
-    drag(window(), 175)
-    byKey(window(), "use"):Click()
-    local b = hasText(window(), savedLine(n, "Everyday")) and hasText(window(), "Picture sharpness was 175%, now 100%.") and #OUT == 0
+        and db.profiles.everyday.values.RenderScale == "1" and db.active == "maximum" and #OUT == 0
     local e2, s2, db2 = bootWith(fullEntry())
     s2.open("size")
     drag(window(), 150)
@@ -1453,59 +1262,179 @@ test("S11-4 Save as and Use what I have in the game now say what they replace: t
     s3.open("light")
     byKey(window(), "save:everyday"):Click()
     local capped = hasText(window(), "Shadow detail was 0, now 2; Soft corner shadows was 0, now 1; Grass and plants (exact amount) was 48, now 64; and 1 more.")
-    return a and b and quiet and capped, tostring(a) .. tostring(b) .. tostring(quiet) .. tostring(capped)
+    return a and quiet and capped, tostring(a) .. tostring(quiet) .. tostring(capped)
 end)
 
-test("S11-5 with Maximum in use (the longest banner) the size block with its where line still stands above the summary, in order", function()
-    local e, s = bootWith(fullEntry(), { active = "maximum" })
-    s.open("size")
-    drag(window(), 150)                                    -- stored in Everyday: the warning and the Shift line show as well
-    STRINGHEIGHT = function(fs)
-        local text = fs._text or ""
-        local perLine = math.max(1, math.floor((fs._width or 520) / 9))
-        return 14 * math.max(1, math.ceil(#text / perLine))
-    end
-    s.open("size")
-    local f = window()
-    local where = fontStringWith(f, "The game is using Maximum. Changes here are stored in Everyday and take effect when you switch to Everyday.")
-    local warn, safe = fontStringWith(f, SIZE_WARNING), fontStringWith(f, SIZE_SAFE)
-    local note = fontStringWith(f, "Kept in Everyday: used when you switch to Everyday.")
-    local slider, switch, use = byKey(f, "size"), byKey(f, "switch"), byKey(f, "use")
-    local your
+-- My settings edits the profile in use (spec 2026-11-02-edit-the-profile-in-use-design.md): no tabs, no footer, a profile pill in
+-- the header, and Original and Maximum shown read-only with a way out.
+local READ_ONLY_MAX = "Maximum can't be changed. To change settings, edit:"
+local function keysShown(f, prefix)
+    local list = {}
     walk(f, function(frame)
-        for _, fs in ipairs(frame.fontStrings) do
-            if fs.shown and fs._text and fs._text:find("Everything at the highest", 1, true) then your = fs end
-        end
+        if frame.shown and frame.key and frame.key:sub(1, #prefix) == prefix then list[#list + 1] = frame.key end
     end)
-    local function top(item) return -item._point[5] end
-    local ok = where ~= nil and warn ~= nil and safe ~= nil and note ~= nil and slider ~= nil and switch ~= nil and use ~= nil
-        and top(where) >= top(slider) + 16 and top(warn) >= top(where) + STRINGHEIGHT(where) and top(safe) >= top(warn) + STRINGHEIGHT(warn)
-        and top(note) >= top(safe) + STRINGHEIGHT(safe)
-        and switch._point[1] == "BOTTOMRIGHT" and switch._point[4] == -(16 + 230 + 8) and use._point[4] == -16 and byKey(f, "maximum") == nil
-    local fits = your == nil or 8 + top(note) + STRINGHEIGHT(note) <= 522 - (your._point[5] + STRINGHEIGHT(your))
-    STRINGHEIGHT = nil
-    return ok and fits, tostring(ok) .. tostring(fits) .. " " .. tostring(where and top(where)) .. " " .. tostring(note and top(note))
+    table.sort(list)
+    return table.concat(list, ",")
+end
+
+test("ED-1 the model edits the profile in use: no tabs, no footer buttons, rows editable, the pill names the profile and its colour", function()
+    local e, s = boot()
+    local every = s.model({ page = "light" }, ctxOf(e, {}))
+    local crowd = s.model({ page = "light" }, ctxOf(e, { active = "crowded" }))
+    local orig = s.model({ page = "light" }, ctxOf(e, { active = "original" }))
+    local maxi = s.model({ page = "light" }, ctxOf(e, { active = "maximum" }))
+    local ok = every.tabs == nil and every.buttons == nil and every.readOnly == nil and rowOf(every, "graphicsShadowQuality").enabled == true
+        and rowOf(every, "graphicsShadowQuality").kept == true
+        and every.profile.key == "everyday" and every.profile.text == "Everyday" and every.profile.color == "profileEveryday"
+        and crowd.profile.text == "Crowded" and crowd.profile.color == "profileCrowded" and rowOf(crowd, "graphicsShadowQuality").kept == true
+        and orig.profile.text == "Original" and orig.profile.color == "profileOriginal"
+        and maxi.profile.text == "Maximum" and maxi.profile.color == "profileMaximum"
+    return ok, tostring(every.tabs) .. tostring(every.buttons) .. tostring(every.profile and every.profile.text)
 end)
 
-test("S11-6 with Everyday in use and the Crowded tab shown the footer has three buttons, Switch to Crowded labelled and placed left of Use, hidden off the settings pages, and a second click does nothing", function()
-    local e, s, db, p = bootWith(fullEntry())
-    local calls = {}
-    local real = p.switch
-    p.switch = function(name, silent) calls[#calls + 1] = tostring(name) return real(name, silent) end
+test("ED-2 with Maximum or Original in use the rows show the game's levels greyed, ticks follow what the profile holds, and a line offers Everyday and Crowded", function()
+    local e, s = boot()
+    CVARS.graphicsShadowQuality = "3"
+    local maxi = s.model({ page = "light" }, ctxOf(e, { active = "maximum", want = { graphicsShadowQuality = "4" } }))
+    local orig = s.model({ page = "light" }, ctxOf(e, { active = "original" }))
+    local locked = s.model({ page = "light" }, ctxOf(e, { active = "maximum", locked = "combat" }))
+    local row = rowOf(maxi, "graphicsShadowQuality")
+    local ro = maxi.readOnly
+    local ok = row.enabled == false and selectedOf(row) == "3" and row.kept == true and rowOf(maxi, "graphicsSSAO").kept == false
+        and ro ~= nil and ro.text == READ_ONLY_MAX and #ro.buttons == 2
+        and ro.buttons[1].key == "edit:everyday" and ro.buttons[1].text == "Everyday" and ro.buttons[1].color == "profileEveryday" and ro.buttons[1].enabled == true
+        and ro.buttons[2].key == "edit:crowded" and ro.buttons[2].text == "Crowded" and ro.buttons[2].color == "profileCrowded"
+        and orig.readOnly.text == "Original can't be changed. To change settings, edit:" and rowOf(orig, "graphicsShadowQuality").enabled == false
+        and rowOf(orig, "graphicsShadowQuality").kept == false
+        and locked.readOnly.buttons[1].enabled == false and locked.readOnly.buttons[2].enabled == false
+        and (maxi.notice or ""):find("Switch to Everyday or Crowded", 1, true) == nil and orig.notice == nil
+    return ok, tostring(ro and ro.text) .. " / " .. tostring(maxi.notice) .. " / " .. tostring(orig.notice)
+end)
+
+test("ED-3 the estimate line is for the profile in use, and only for Everyday or Crowded; the size block follows the same rule", function()
+    local e, s = boot()
+    local entry = quietEntry()
+    local est = { fps = 240, counted = 1, notCounted = 0 }
+    local crowd = s.model({ page = "size" }, ctxOf(e, { active = "crowded", costs = costsOf(e, entry), estimate = est, size = { live = 100 } }))
+    local maxi = s.model({ page = "size" }, ctxOf(e, { active = "maximum", costs = costsOf(e, entry), estimate = est, size = { live = 100 },
+        want = { graphicsShadowQuality = "4" } }))
+    local orig = s.model({ page = "size" }, ctxOf(e, { active = "original", costs = costsOf(e, entry), estimate = est, size = { live = 100 } }))
+    return (crowd.yourLine or ""):find("Your Crowded settings: about 240 fps", 1, true) ~= nil and maxi.yourLine == nil and orig.yourLine == nil
+        and crowd.size.enabled == true and crowd.size.label == "Picture sharpness right now: 100%"
+        and maxi.size.enabled == false and maxi.size.canPutBack == false and maxi.size.note == nil and maxi.size.label == "Picture sharpness right now: 100%"
+        and maxi.size.where == nil and crowd.size.where == nil, tostring(crowd.yourLine) .. " / " .. tostring(maxi.size and maxi.size.note)
+end)
+
+test("ED-4 the window has no tabs and no footer; the header pill shows the profile in use in its colour and opens Home, in combat too", function()
+    local e, s, db = bootWith(fullEntry())
     s.open("light")
-    s.click("tab:crowded")
     local f = window()
-    local switch, use, maximum = byKey(f, "switch"), byKey(f, "use"), byKey(f, "maximum")
-    local placed = switch ~= nil and use ~= nil and maximum ~= nil and switch._text == "Switch to Crowded"
-        and maximum._point[4] == -16 and use._point[4] == -(16 + 160 + 8) and switch._point[4] == -(16 + 160 + 8 + 230 + 8)
+    local pill = byKey(f, "pill")
+    local function dotColour(frame)
+        for _, tex in ipairs(frame.dot.textures) do
+            if tex._texture then return tex._vertex end
+        end
+    end
+    local bare = keysShown(f, "tab:") == "" and byKey(f, "use") == nil and byKey(f, "maximum") == nil and byKey(f, "switch") == nil
+    local shown = pill ~= nil and pill.label._text == "Everyday" and pill.dot ~= nil
+        and pill._point[1] == "RIGHT" and pill._point[2] == f.close and pill._point[3] == "LEFT" and pill._point[4] == -8
+    local r, g, b = e.ns.skin.color("profileEveryday")
+    local c = dotColour(pill)
+    local coloured = c ~= nil and c[1] == r and c[2] == g and c[3] == b
+    COMBAT = true
+    pill:Click()
+    local home = s.state().page == "home" and hasText(window(), "In use now: Everyday")
+    COMBAT = false
+    s.click("profile:crowded")
+    pill = byKey(window(), "pill")
+    local r2 = e.ns.skin.color("profileCrowded")
+    local follows = pill.label._text == "Crowded" and dotColour(pill)[1] == r2
+    return bare and shown and coloured and home and follows, tostring(bare) .. tostring(shown) .. tostring(coloured) .. tostring(home) .. tostring(follows)
+end)
+
+test("ED-5 a level click, a tick and the slider change the profile in use and the game at once; with Crowded in use, Crowded", function()
+    local e, s, db = bootWith(fullEntry())
+    db.active = "crowded"
+    db.want = e.ns.profiles.plan("crowded").want
+    s.open("light")
+    byKey(window(), "level:graphicsShadowQuality:3"):Click()
+    local level = db.profiles.crowded.values.graphicsShadowQuality == "3" and CVARS.graphicsShadowQuality == "3"
+        and db.profiles.everyday.values.graphicsShadowQuality == "2"
+    s.click("page:size")
+    drag(window(), 150)
+    local size = db.profiles.crowded.values.RenderScale == "1.5" and CVARS.RenderScale == "1.5" and db.profiles.everyday.values.RenderScale == nil
+    return level and size and #OUT == 0, tostring(level) .. tostring(size)
+end)
+
+test("ED-6 with Maximum in use the page says so with Everyday and Crowded buttons, nothing on it can be changed, and Crowded switches to Crowded", function()
+    local e, s, db = bootWith(fullEntry(), { active = "maximum" })
+    s.open("light")
+    local f = window()
+    local every, crowd = byKey(f, "edit:everyday"), byKey(f, "edit:crowded")
+    local shown = hasText(f, READ_ONLY_MAX) and every ~= nil and crowd ~= nil and every._text == "Everyday" and crowd._text == "Crowded"
+        and every.dot ~= nil and crowd.dot ~= nil and byKey(f, "level:graphicsShadowQuality:3").enabled == false
+        and byKey(f, "keep:graphicsShadowQuality").enabled == false
+    -- the game's level still shows, greyed (the fresh review of 2026-11-02, finding 1)
+    local held = byKey(f, "level:graphicsShadowQuality:" .. CVARS.graphicsShadowQuality)
+    local other = byKey(f, "level:graphicsShadowQuality:" .. (CVARS.graphicsShadowQuality == "0" and "1" or "0"))
+    local selR = e.ns.skin.color("selected")
+    local fillR = e.ns.skin.color("fill")
+    shown = shown and held.bg._color[1] == selR and other.bg._color[1] == fillR
+    local before = CVARS.graphicsShadowQuality
+    s.click("level:graphicsShadowQuality:0")
+    s.click("keep:graphicsSSAO")
+    s.click("page:size")
+    local sized = byKey(window(), "size").enabled == false and byKey(window(), "sizeback").enabled == false
+        and not hasText(window(), "Kept in") and not hasText(window(), "Not kept")
     s.click("page:home")
-    local hidden = byKey(window(), "switch") == nil
+    sized = sized and not hasText(window(), READ_ONLY_MAX) and byKey(window(), "edit:everyday") == nil
+    s.click("page:size")
+    s.click("size:150")
+    s.click("sizeback")
+    local untouched = CVARS.graphicsShadowQuality == before and CVARS.RenderScale == "1" and db.profiles.everyday.values.graphicsShadowQuality == "2"
+        and db.profiles.everyday.values.RenderScale == nil and db.active == "maximum"
+    COMBAT = true
     s.click("page:light")
-    s.click("switch")
-    local once = #calls == 1 and calls[1] == "crowded" and db.active == "crowded" and byKey(window(), "switch") == nil
-    s.click("switch")
-    local twice = #calls == 1
-    return placed and hidden and once and twice, tostring(placed) .. tostring(hidden) .. tostring(once) .. tostring(twice)
+    local greyed = byKey(window(), "edit:crowded").enabled == false
+    s.click("edit:crowded")
+    local stays = db.active == "maximum"
+    COMBAT = false
+    s.click("page:light")
+    byKey(window(), "edit:crowded"):Click()
+    f = window()
+    local switched = db.active == "crowded" and not hasText(f, READ_ONLY_MAX) and byKey(f, "edit:crowded") == nil
+        and byKey(f, "pill").label._text == "Crowded" and byKey(f, "level:graphicsShadowQuality:3").enabled == true and #OUT == 0
+    return shown and sized and untouched and greyed and stays and switched,
+        tostring(shown) .. tostring(sized) .. tostring(untouched) .. tostring(greyed) .. tostring(stays) .. tostring(switched)
+end)
+
+test("ED-7 the Home cards carry the profile dots; the old tab, Use, Switch and Maximum keys do nothing", function()
+    local e, s, db = bootWith(fullEntry())
+    s.open("home")
+    local f = window()
+    local ok = true
+    for key, colour in pairs({ original = "profileOriginal", everyday = "profileEveryday", crowded = "profileCrowded", maximum = "profileMaximum" }) do
+        local card = byKey(f, "profile:" .. key)
+        local r = e.ns.skin.color(colour)
+        local found
+        for _, tex in ipairs(card and card.dot and card.dot.textures or {}) do
+            if tex._texture then found = tex._vertex end
+        end
+        ok = ok and found ~= nil and found[1] == r
+    end
+    local before = copyOf(db.profiles.everyday.values)
+    CVARS.graphicsShadowQuality = "4"
+    for _, key in ipairs({ "tab:crowded", "use", "switch", "maximum" }) do s.click(key) end
+    local inert = db.active == "everyday" and sameTable(before, db.profiles.everyday.values)
+    return ok and inert, tostring(ok) .. tostring(inert)
+end)
+
+test("ED-8 without the footer the summary block sits at the bottom of the page", function()
+    local e, s = bootWith(fullEntry())
+    s.open("light")
+    local f = window()
+    local matters = fontStringWith(f, MATTERS_NOTE)
+    return matters ~= nil and matters._point[1] == "BOTTOMLEFT" and matters._point[5] == 12, tostring(matters and matters._point[5])
 end)
 
 -- The Home page (spec 2026-11-02-flat-hub-window-design.md section 5).
@@ -1583,7 +1512,7 @@ test("S8-3 a profile click switches silently and the page follows; in combat the
     local switched = db.active == "crowded" and byKey(f, "profile:crowded").skinState.selected == true
         and byKey(f, "profile:everyday").skinState.selected == false and hasText(f, "In use now: Crowded") and #OUT == 0
     byKey(f, "profile:original"):Click()
-    local original = db.active == "original" and hasText(f, "In use now: Original") and hasText(f, ORIGINAL_NOTE)
+    local original = db.active == "original" and hasText(f, "In use now: Original") and byKey(f, "pill").label._text == "Original"
     COMBAT = true
     s.open("home")
     local greyed = byKey(f, "profile:everyday").enabled == false and byKey(f, "profile:maximum").enabled == false
@@ -1683,7 +1612,7 @@ local DYNAMIC_ON = "Dynamic render scale is on. It changes the picture size by i
 
 test("S7-1 the model words the dynamic render scale line for both states and says nothing without the setting", function()
     local e, s = boot()
-    local function line(dynamic) return s.model({ tab = "everyday" }, ctxOf(e, { dynamicScale = dynamic })).dynamicLine end
+    local function line(dynamic) return s.model({ page = "light" }, ctxOf(e, { dynamicScale = dynamic })).dynamicLine end
     return line({ on = false }) == DYNAMIC_OFF and line({ on = true }) == DYNAMIC_ON and line(nil) == nil, tostring(line({ on = true }))
 end)
 
@@ -1726,9 +1655,9 @@ test("S5-1 the pages and their order; the model lists them with the current one 
         for _, p in ipairs(view.pages) do if p.selected then list[#list + 1] = p.key end end
         return table.concat(list, ",")
     end
-    local none = s.model({ tab = "everyday" }, ctxOf(e, {}))
-    local size = s.model({ tab = "everyday", page = "size" }, ctxOf(e, {}))
-    local bogus = s.model({ tab = "everyday", page = "nosuchpage" }, ctxOf(e, {}))
+    local none = s.model({}, ctxOf(e, {}))
+    local size = s.model({ page = "size" }, ctxOf(e, {}))
+    local bogus = s.model({ page = "nosuchpage" }, ctxOf(e, {}))
     local listed = {}
     for _, p in ipairs(size.pages) do listed[#listed + 1] = p.key .. ":" .. p.text end
     return table.concat(keys, ",") == "home,light,world,size,tests,about"
@@ -1749,15 +1678,15 @@ test("S5-2 every known setting sits on exactly one page by the table, and a sett
     end
     local resolved = e.ns.bench.resolve()
     resolved[#resolved + 1] = { cvar = "someUnknownSetting", label = "Something", tiers = { "0", "1" } }
-    local view = s.model({ tab = "everyday" }, ctxOf(e, { resolved = resolved }))
+    local view = s.model({ page = "light" }, ctxOf(e, { resolved = resolved }))
     local pages = {}
     for _, row in ipairs(view.rows) do pages[row.cvar] = row.page end
     return #wrong == 0 and pages.graphicsShadowQuality == "light" and pages.graphicsSSAO == "light" and pages.groundEffectDensity == "world"
         and pages.RenderScale == "size" and pages.someUnknownSetting == "world", table.concat(wrong, ",")
 end)
 
-test("S5-3 open takes a page, a tab, or nothing: a tab picks its first settings page, nothing keeps the last page (Home the first time)", function()
-    local e, s = boot()
+test("S5-3 open takes a page, a profile name, or nothing: a profile name opens the first settings page without switching, nothing keeps the last page (Home the first time)", function()
+    local e, s, db = boot()
     s.open()
     local first = s.state().page == "home"
     s.open("size")
@@ -1765,9 +1694,10 @@ test("S5-3 open takes a page, a tab, or nothing: a tab picks its first settings 
     s.open()
     local kept = s.state().page == "size"
     s.open("crowded")
-    local crowded = s.state().tab == "crowded" and s.state().page == "light"
+    local crowded = s.state().tab == nil and s.state().page == "light" and db.active == "everyday"
+    s.open("home")
     s.open("everyday")
-    local everyday = s.state().tab == "everyday" and s.state().page == "light"
+    local everyday = s.state().page == "light" and db.active == "everyday"
     s.open("nosuchpage")
     local bogus = s.state().page == "light"
     return first and sized and kept and crowded and everyday and bogus and #OUT == 0, tostring(first) .. tostring(sized) .. tostring(kept)
@@ -1801,7 +1731,7 @@ end
 
 test("S6-0 the model gives each level its short label and each row its matters words; columns are two, three above six cards", function()
     local e, s = boot()
-    local view = s.model({ tab = "everyday" }, ctxOf(e, { costs = costsOf(e, quietEntry()) }))
+    local view = s.model({ page = "light" }, ctxOf(e, { costs = costsOf(e, quietEntry()) }))
     local shadows, clutter = rowOf(view, "graphicsShadowQuality"), rowOf(view, "groundEffectDensity")
     return shadows.mattersWords == "some" and shadows.levels[1].short == "0" and shadows.levels[1].text == "0 (lowest)"
         and shadows.levels[5].short == "4" and shadows.levels[5].text == "4 (highest)" and clutter.levels[1].short == "48"
@@ -1951,84 +1881,83 @@ test("S6-5 every page fits inside the page area with a 9-pixel wrap and a long n
     return fits and clear, tostring(#buttons) .. " " .. tostring(8 + lowest) .. " < " .. tostring(summaryTop)
 end)
 
-test("S6-6 every button label is centred both ways on one line at its width; the page rows keep theirs at the left", function()
-    local e, s = bootWith(fullEntry())
-    s.open("everyday")
-    local f = window()
+test("S6-6 every button label is centred both ways on one line at its width; the page rows keep theirs at the left, the pill its name beside the dot", function()
     local bad = {}
     local count = 0
-    for _, b in ipairs(shownButtons(f)) do
-        count = count + 1
-        local label = b.label
-        if b.navItem then
-            if not (label._justifyH == "LEFT" and label._justifyV == "MIDDLE") then bad[#bad + 1] = "nav:" .. tostring(b._text) end
-        else
-            if not (label._point and label._point[1] == "CENTER" and label._justifyH == "CENTER" and label._justifyV == "MIDDLE"
-                and label._wordWrap == false) then bad[#bad + 1] = "centre:" .. tostring(b._text) end
-            if #(b._text or "") * 6.5 > b._width - 8 then bad[#bad + 1] = "wide:" .. tostring(b._text) end
+    local function check(f)
+        for _, b in ipairs(shownButtons(f)) do
+            count = count + 1
+            local label = b.label
+            if b.navItem then
+                if not (label._justifyH == "LEFT" and label._justifyV == "MIDDLE") then bad[#bad + 1] = "nav:" .. tostring(b._text) end
+            elseif b.key == "pill" then
+                if not (label._point and label._point[1] == "LEFT" and label._point[4] == 24) then bad[#bad + 1] = "pill" end
+                if #(label._text or "") * 6.5 > b._width - 28 then bad[#bad + 1] = "wide:pill" end
+            else
+                if not (label._point and label._point[1] == "CENTER" and label._justifyH == "CENTER" and label._justifyV == "MIDDLE"
+                    and label._wordWrap == false) then bad[#bad + 1] = "centre:" .. tostring(b._text) end
+                if #(b._text or "") * 6.5 > b._width - 8 then bad[#bad + 1] = "wide:" .. tostring(b._text) end
+            end
         end
     end
-    local use, maximum = byKey(f, "use"), byKey(f, "maximum")
-    return count >= 14 and #bad == 0 and use._width == 230 and use._height == 26 and maximum._width == 160 and maximum._height == 26,
+    local e, s = bootWith(fullEntry())
+    s.open("light")
+    check(window())
+    local pill = byKey(window(), "pill")
+    local e2, s2 = bootWith(fullEntry(), { active = "maximum" })
+    s2.open("light")
+    check(window())
+    local edit = byKey(window(), "edit:everyday")
+    return count >= 30 and #bad == 0 and pill._width == 104 and pill._height == 22 and edit._width == 112 and edit._height == 24,
         table.concat(bad, ",") .. " " .. count
 end)
 
-test("S6-7 the footer holds Use what I have in the game now and Switch to Maximum, right-aligned; Maximum goes while it is in use; both grey when locked", function()
+test("S6-8 the summary block stands at the bottom of the page: the live line, the total and the matters note, bottom-up", function()
     local e, s = bootWith(fullEntry())
-    s.open("everyday")
-    local f = window()
-    local use, maximum = byKey(f, "use"), byKey(f, "maximum")
-    local placed = use ~= nil and maximum ~= nil and maximum._point[1] == "BOTTOMRIGHT" and maximum._point[4] == -16
-        and use._point[1] == "BOTTOMRIGHT" and use._point[4] == -(16 + 160 + 8) and use._text == "Use what I have in the game now"
-        and maximum._text == "Switch to Maximum" and use.enabled == true and maximum.enabled == true
-    COMBAT = true
-    s.open("everyday")
-    local greyed = byKey(f, "use").enabled == false and byKey(f, "maximum").enabled == false
-    COMBAT = false
-    local e2, s2, _, p2 = bootWith(fullEntry())
-    p2.switch("maximum", true)
-    s2.open("everyday")
-    local f2 = window()
-    local inMaximum = byKey(f2, "maximum") == nil and byKey(f2, "use") ~= nil and byKey(f2, "use")._point[4] == -16
-    return placed and greyed and inMaximum, tostring(placed) .. tostring(greyed) .. tostring(inMaximum)
-end)
-
-test("S6-8 the summary block stands above the footer: the live line, the total and the matters note, bottom-up", function()
-    local e, s = bootWith(fullEntry())
-    s.open("everyday")
+    s.open("light")
     local f = window()
     local your = fontStringWith(f, "Your Everyday settings: about 270 fps (an estimate; settings affect each other).")
     local total = fontStringWith(f, "Everything at the highest: about 152 fps.")
     local note = fontStringWith(f, MATTERS_NOTE)
     STRINGHEIGHT = function() return 14 end
     local ok = your ~= nil and total ~= nil and note ~= nil and your._point[1] == "BOTTOMLEFT" and your._point[4] == 167
-        and note._point[5] >= 44 and total._point[5] >= note._point[5] + 14 and your._point[5] >= total._point[5] + 14
+        and note._point[5] == 12 and total._point[5] >= note._point[5] + 14 and your._point[5] >= total._point[5] + 14
     STRINGHEIGHT = nil
     local e2, s2 = bootWith(nil)
-    s2.open("everyday")
+    s2.open("light")
     local none = not hasText(window(), "Your Everyday settings") and not hasText(window(), "Everything at the highest")
-    return ok and none, tostring(ok) .. tostring(none)
+    return ok and none, tostring(ok) .. tostring(none) .. " " .. tostring(note and note._point[5])
 end)
 
-test("S6-9 the Everyday and Crowded switch changes the tab and marks it; the notices stand as one banner", function()
+test("S6-9 with Maximum in use the notices stand as one banner, then the read-only line, then Everyday and Crowded side by side, then the cards", function()
     local e, s = bootWith(fullEntry(), { active = "maximum" })
-    s.open("everyday")
+    COMBAT = true
+    s.open("light")
+    COMBAT = false
     local f = window()
-    local everyday, crowded = byKey(f, "tab:everyday"), byKey(f, "tab:crowded")
-    local start = everyday ~= nil and crowded ~= nil and everyday.skinState.selected == true and crowded.skinState.selected == false
-        and everyday._width == 120 and hasText(f, MAX_ON)
-    crowded:Click()
-    local moved = s.state().tab == "crowded" and byKey(f, "tab:crowded").skinState.selected == true and byKey(f, "tab:everyday").skinState.selected == false
-    return start and moved and #OUT == 0, tostring(start) .. tostring(moved)
+    local banner
+    walk(f, function(frame)
+        for _, fs in ipairs(frame.fontStrings) do
+            if fs.shown and fs._text and fs._text:find(MAX_ON, 1, true) then banner = fs end
+        end
+    end)
+    local line = fontStringWith(f, READ_ONLY_MAX)
+    local every, crowd, card = byKey(f, "edit:everyday"), byKey(f, "edit:crowded"), byKey(f, "keep:graphicsShadowQuality")
+    local function top(item) return -item._point[5] end
+    local one = banner ~= nil and banner._text:find(COMBAT_TEXT, 1, true) ~= nil
+    local ok = one and line ~= nil and every ~= nil and crowd ~= nil and card ~= nil
+        and top(line) > top(banner) and top(every) > top(line) and top(crowd) == top(every)
+        and every._point[4] == 0 and crowd._point[4] == 112 + 8 and top(card) >= top(every) + 24 + 8
+    return ok, tostring(one) .. " " .. tostring(line and top(line)) .. " " .. tostring(every and top(every)) .. " " .. tostring(card and top(card))
 end)
 
 test("S6-10 in combat every control is greyed with the reason shown, clicks write nothing, and the pages still switch", function()
     local e, s = bootWith(fullEntry())
     COMBAT = true
-    s.open("everyday")
+    s.open("light")
     local f = window()
     local greyed = byKey(f, "level:graphicsShadowQuality:3").enabled == false and byKey(f, "keep:graphicsShadowQuality").enabled == false
-        and byKey(f, "tab:crowded").enabled == false and byKey(f, "use").enabled == false and hasText(f, COMBAT_TEXT)
+        and byKey(f, "save:crowded").enabled == false and hasText(f, COMBAT_TEXT)
     SETLOG = {}
     s.click("level:graphicsShadowQuality:3")
     s.click("keep:graphicsSSAO")

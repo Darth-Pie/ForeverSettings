@@ -302,4 +302,59 @@ test("SK-9 the window is rounded by 8, buttons, check boxes and page rows by 4, 
             .. tostring(tickHover) .. tostring(tickLeave) .. tostring(rowOk) .. tostring(barInset) .. tostring(rowSelected)
 end)
 
+-- The profile colours and the dot (spec 2026-11-02-edit-the-profile-in-use-design.md P4, P5).
+test("SK-10 the four profile colours are in the palette, and a dot is an 8 pixel circle of four corner pictures that can be recoloured", function()
+    local _, skin = boot()
+    local colours = colorIs(skin.COLORS.profileOriginal, "b4b2a9") and colorIs(skin.COLORS.profileEveryday, "5dcaa5")
+        and colorIs(skin.COLORS.profileCrowded, "ef9f27") and colorIs(skin.COLORS.profileMaximum, "f0997b")
+    local f = CreateFrame("Frame", nil, UIParent)
+    local dot = skin.dot(f, "profileCrowded")
+    local corners, tinted = 0, true
+    for _, tex in ipairs(dot.textures) do
+        if tex._texture then
+            corners = corners + 1
+            tinted = tinted and colorIs(tex._vertex, "ef9f27") and tex._width == 4 and tex._height == 4
+        end
+    end
+    dot:SetColorName("profileMaximum")
+    local recoloured = true
+    for _, tex in ipairs(dot.textures) do
+        if tex._texture then recoloured = recoloured and colorIs(tex._vertex, "f0997b") end
+    end
+    return colours and dot._width == 8 and dot._height == 8 and corners == 4 and tinted and recoloured and dot.parent == f,
+        tostring(colours) .. tostring(corners) .. tostring(tinted) .. tostring(recoloured)
+end)
+
+-- A read-only page greys its controls but still shows what the game has (the fresh review of 2026-11-02, finding 1, and spec
+-- 2026-11-02-edit-the-profile-in-use-design.md P2).
+test("SK-11 a disabled selected button keeps the selected fill with dim text and the plain edge; a disabled check box shows a dim mark and no hover", function()
+    local _, skin = boot()
+    local parent = skin.window("SkinTestWindow11", 400, 300, "t")
+    local b = skin.button(parent, "2", 50, 22)
+    b:SetSelected(true)
+    b:SetEnabled(false)
+    local held = colorIs(b.bg._color, "232850") and colorIs(b.edges[1]._color, "2f3440") and colorIs(b.label._textColor, "8b90a0")
+    b:SetSelected(false)
+    local plain = colorIs(b.bg._color, "14161b", 0.96) and colorIs(b.label._textColor, "5d6170")
+    b:SetSelected(true)
+    b:SetEnabled(true)
+    local back = colorIs(b.bg._color, "232850") and colorIs(b.edges[1]._color, "9a9cff") and colorIs(b.label._textColor, "eef0f6")
+    local box = skin.check(parent)
+    local mark, dimMark = box._checkedTexture, box._disabledCheckedTexture
+    local marks = mark ~= nil and colorIs(mark._color, "9a9cff") and dimMark ~= nil and dimMark ~= mark and colorIs(dimMark._color, "8b90a0")
+        and dimMark._width == 8 and dimMark._height == 8 and dimMark._point ~= nil and dimMark._point[1] == "CENTER"
+    local edge
+    for _, tex in ipairs(box.textures) do
+        if tex._color and colorIs(tex._color, "2f3440") then edge = tex end
+    end
+    box:SetEnabled(false)
+    box.scripts.OnEnter(box)
+    local quiet = edge ~= nil and colorIs(edge._color, "2f3440")
+    box:SetEnabled(true)
+    box.scripts.OnEnter(box)
+    local lit = edge ~= nil and colorIs(edge._color, "3a3f4b")
+    return held and plain and back and marks and quiet and lit,
+        tostring(held) .. tostring(plain) .. tostring(back) .. tostring(marks) .. tostring(quiet) .. tostring(lit)
+end)
+
 return H.results()
