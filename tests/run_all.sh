@@ -33,6 +33,9 @@ toc=$SRC/ForeverSettings.toc
 tocfail() { echo "TOC FAIL: $1"; status=1; }
 grep -q '^## Interface: 16001, 120105$' "$toc" || tocfail "the Interface line changed"
 grep -q '^## SavedVariables: ForeverSettingsDB$' "$toc" || tocfail "the SavedVariables line is missing"
+# The game's AddOns list shows the gauge icon and the description in plain words (owner request 2026-11-03).
+grep -q '^## IconTexture: Interface/AddOns/ForeverSettings/Media/icon.tga$' "$toc" || tocfail "the IconTexture line is missing"
+grep -q '^## Notes: Finds good graphics settings for your PC and keeps them. An addon for WoW Forever.$' "$toc" || tocfail "the Notes line changed"
 first=$(grep -n '^ForeverSettings\.lua$' "$toc" | cut -d: -f1)
 second=$(grep -n '^Bench\.lua$' "$toc" | cut -d: -f1)
 if [ -z "$first" ] || [ -z "$second" ] || [ "$first" -ge "$second" ]; then

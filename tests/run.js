@@ -1976,6 +1976,11 @@ end
   'ui-icon-gear': ['UI.lua', `icon:SetTexture("Interface/AddOns/" .. addonName .. "/Media/icon.tga")`, `icon:SetTexture("Interface/Icons/INV_Misc_Gear_01")`],
   'ui-icon-size': ['UI.lua', `    icon:SetSize(20, 20)`, `    icon:SetSize(24, 24)`],
   'ui-icon-layer': ['UI.lua', `local icon = button:CreateTexture(nil, "ARTWORK")`, `local icon = button:CreateTexture(nil, "OVERLAY")`],
+  // The gauge icon in the title bar (owner request 2026-11-03)
+  'skin-title-icon-picture': ['Skin.lua', `    f.icon:SetTexture(MEDIA .. "icon.tga")`, `    f.icon:SetTexture(MEDIA .. "fill4.tga")`],
+  'skin-title-icon-size': ['Skin.lua', `    f.icon:SetSize(20, 20)`, `    f.icon:SetSize(24, 24)`],
+  'skin-title-icon-place': ['Skin.lua', `f.icon:SetPoint("LEFT", header, "LEFT", 12, 0)`, `f.icon:SetPoint("LEFT", header, "LEFT", 14, 0)`],
+  'skin-title-not-after-icon': ['Skin.lua', `f.titleText:SetPoint("LEFT", f.icon, "RIGHT", 8, 0)`, `f.titleText:SetPoint("LEFT", header, "LEFT", 14, 0)`],
 };
 
 function main() {

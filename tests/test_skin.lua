@@ -325,6 +325,19 @@ test("SK-10 the four profile colours are in the palette, and a dot is an 8 pixel
         tostring(colours) .. tostring(corners) .. tostring(tinted) .. tostring(recoloured)
 end)
 
+-- The addon's gauge in the title bar, left of the title (owner request 2026-11-03).
+test("SK-12 a window's header shows the gauge icon at 20 pixels at its left, with the title to its right and the version label after the title", function()
+    local _, skin = boot()
+    local f = skin.window("SkinTestWindow12", 780, 560, "ForeverSettings")
+    local icon = f.icon
+    local ip, tp, vp = icon and icon._point, f.titleText._point, f.versionText._point
+    return icon ~= nil and icon._texture == "Interface/AddOns/ForeverSettings/Media/icon.tga" and icon._width == 20 and icon._height == 20
+        and ip ~= nil and ip[1] == "LEFT" and ip[2] == f.header and ip[3] == "LEFT" and ip[4] == 12 and ip[5] == 0
+        and tp ~= nil and tp[1] == "LEFT" and tp[2] == icon and tp[3] == "RIGHT" and tp[4] == 8
+        and vp ~= nil and vp[2] == f.titleText and vp[3] == "BOTTOMRIGHT",
+        tostring(icon and icon._texture) .. " " .. tostring(tp and tp[2] == f.header)
+end)
+
 -- A read-only page greys its controls but still shows what the game has (the fresh review of 2026-11-02, finding 1, and spec
 -- 2026-11-02-edit-the-profile-in-use-design.md P2).
 test("SK-11 a disabled selected button keeps the selected fill with dim text and the plain edge; a disabled check box shows a dim mark and no hover", function()

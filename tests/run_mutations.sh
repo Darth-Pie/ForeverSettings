@@ -1201,6 +1201,10 @@ live-held-none|test_settings|S3-2|killed
 ui-icon-gear|test_ui|B10-11b|killed
 ui-icon-size|test_ui|B10-11b|killed
 ui-icon-layer|test_ui|B10-11b|killed
+skin-title-icon-picture|test_skin|SK-12|killed
+skin-title-icon-size|test_skin|SK-12|killed
+skin-title-icon-place|test_skin|SK-12|killed
+skin-title-not-after-icon|test_skin|SK-12|killed
 control-comment|test_bench||survive
 control-missing|test_bench||error
 control-syntax|test_bench||error'

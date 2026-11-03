@@ -1,6 +1,7 @@
 ## Interface: 16001, 120105
 ## Title: ForeverSettings
-## Notes: Keeps chosen CVars at the values you want, re-applied at every loading screen. Type /fset for help.
+## Notes: Finds good graphics settings for your PC and keeps them. An addon for WoW Forever.
+## IconTexture: Interface/AddOns/ForeverSettings/Media/icon.tga
 ## Version: 0.10.1
 ## X-Wago-ID: BKpEVPGE
 ## SavedVariables: ForeverSettingsDB
