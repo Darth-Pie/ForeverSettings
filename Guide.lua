@@ -335,6 +335,16 @@ function guide.state()
     return state
 end
 
+-- True while the test this window shows is running: My settings keeps its Find my settings page up meanwhile.
+function guide.running()
+    return state ~= nil and state.view == "running"
+end
+
+-- True when there is a view to draw on Find my settings; without one the page shows its two test buttons.
+function guide.hasView()
+    return state ~= nil
+end
+
 -- True while a run that this window started is still going: its report is offered on the Finished view's button, so
 -- it does not open by itself on top of the window (ui.runFinished asks).
 function guide.handlesReport()

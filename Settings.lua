@@ -39,6 +39,8 @@ local TAB_TEXT = { everyday = "Everyday", crowded = "Crowded" }
 local SAVE_CAPTION = "Save the game's current settings as:"
 local PROFILE_KEYS = { "original", "everyday", "crowded", "maximum" }
 local TESTS_INTRO = "The test measures what each graphics setting costs on this PC. Run it in a quiet spot first, then in a busy place."
+local RESULTS_INTRO = "The results of your tests. Show one to see what each setting costs and to save its settings."
+local NO_RESULTS = "No results yet: run Find my best settings first."
 local ABOUT_LINES = {
     "ForeverSettings finds the graphics settings that fit your PC: it measures what each one costs, keeps the levels you choose in "
         .. "profiles, and puts them back at every loading screen.",
@@ -62,12 +64,15 @@ local function addonVersion()
     return "unknown"
 end
 
--- The pages of the window (spec 2026-11-02-flat-hub-window-design.md H5) and the page each setting sits on; a setting this
--- table does not know sits on World detail.
+-- The pages of the window (specs 2026-11-02-flat-hub-window-design.md H5 and 2026-11-03-tests-and-results-in-my-settings-design.md
+-- M1) and the page each setting sits on; a setting this table does not know sits on World detail.
 settings.PAGES = {
     { key = "home", text = "Home" }, { key = "light", text = "Light and shadows" }, { key = "world", text = "World detail" },
-    { key = "size", text = "Picture size" }, { key = "tests", text = "Tests and results" }, { key = "about", text = "About" },
+    { key = "size", text = "Picture size" }, { key = "test", text = "Find my settings" }, { key = "results", text = "My results" },
+    { key = "about", text = "About" },
 }
+-- The two pages the guided test and the results draw into (Guide.lua and Results.lua), each in a host frame of its own.
+local HOSTED = { test = "guide", results = "results" }
 local PAGE_KEYS = {}
 for _, page in ipairs(settings.PAGES) do PAGE_KEYS[page.key] = true end
 settings.PAGE_OF = {
@@ -159,16 +164,21 @@ function settings.model(st, ctx)
     local names = ns.names
     local locked = ctx.locked
     local view = { title = "My settings", intro = INTRO, rows = {} }
-    view.page = PAGE_KEYS[st.page] and st.page or "home"
+    -- While a test runs the window stays on Find my settings (spec 2026-11-03 M2): the other pages are greyed.
+    local running = ctx.running == true
+    view.running = running
+    view.page = running and "test" or (PAGE_KEYS[st.page] and st.page or "home")
     view.pages = {}
     for _, page in ipairs(settings.PAGES) do
-        view.pages[#view.pages + 1] = { key = page.key, text = page.text, selected = page.key == view.page, enabled = true }
+        view.pages[#view.pages + 1] = { key = page.key, text = page.text, selected = page.key == view.page,
+            enabled = not running or page.key == "test" }
     end
     -- The settings pages edit the profile in use (spec 2026-11-02-edit-the-profile-in-use-design.md P1). Original and Maximum cannot
     -- be edited: their pages are read-only and offer Everyday and Crowded (P2). The header pill names the profile in use (P4).
     local editing = TAB_TEXT[ctx.active] and ctx.active or nil
     local labels = ns.profiles and ns.profiles.LABEL or {}
-    view.profile = { key = ctx.active, text = labels[ctx.active] or tostring(ctx.active), color = PROFILE_COLOR[ctx.active] or "dim" }
+    view.profile = { key = ctx.active, text = labels[ctx.active] or tostring(ctx.active), color = PROFILE_COLOR[ctx.active] or "dim",
+        enabled = not running }
     if not editing then
         view.readOnly = { text = view.profile.text .. READ_ONLY_TAIL, buttons = {} }
         for _, key in ipairs(TABS) do
@@ -187,7 +197,8 @@ function settings.model(st, ctx)
     -- The two save buttons at the bottom of the page list, on every page; `st.saved` is what the last click said, shown once.
     view.saveBar = { caption = SAVE_CAPTION, note = st.saved, buttons = {} }
     for _, key in ipairs(TABS) do
-        view.saveBar.buttons[#view.saveBar.buttons + 1] = { key = "save:" .. key, text = "Save as " .. TAB_TEXT[key], enabled = locked == nil }
+        view.saveBar.buttons[#view.saveBar.buttons + 1] = { key = "save:" .. key, text = "Save as " .. TAB_TEXT[key],
+            enabled = locked == nil and not running }
     end
     -- A test whose costs there is nothing to read from (a run that measured nothing) is no test here.
     local costs = ctx.costs
@@ -299,15 +310,24 @@ function settings.model(st, ctx)
         view.home.profiles[#view.home.profiles + 1] = { key = key, title = title, note = note, selected = ctx.active == key,
             enabled = locked == nil, color = PROFILE_COLOR[key] }
     end
-    -- The Tests and results page: a line for each saved result with a Show results button, and the progress of a running test.
+    -- Find my settings with no test open: the two tests to start (spec 2026-11-03 M2).
+    view.testPage = { intro = TESTS_INTRO, buttons = {
+        { key = "run:setup", text = "Find my best settings", enabled = locked == nil and not running },
+        { key = "run:crowd", text = "Find my crowded settings", enabled = locked == nil and not running },
+    } }
+    -- My results with no result open: a line for each saved result with a Show results button, the progress of a test that runs
+    -- on its own (a mark, a run typed in chat), and a pointer to Find my settings when nothing is saved (M3).
     local tests = ctx.tests or {}
-    view.testsPage = { intro = TESTS_INTRO, results = {}, progress = tests.progress }
+    view.resultsPage = { intro = RESULTS_INTRO, results = {}, progress = tests.progress }
+    local any = false
     for _, kind in ipairs({ "best", "crowded" }) do
         local label = kind == "best" and "Quiet-spot test" or "Crowd test"
         local saved = tests.results and tests.results[kind]
-        view.testsPage.results[#view.testsPage.results + 1] = { kind = kind, label = label, canShow = saved ~= nil,
+        if saved then any = true end
+        view.resultsPage.results[#view.resultsPage.results + 1] = { kind = kind, label = label, canShow = saved ~= nil,
             text = label .. ": " .. (saved and saved.line or "not done yet.") }
     end
+    if not any then view.resultsPage.none = NO_RESULTS end
     view.about = { version = addonVersion(), lines = ABOUT_LINES }
     local saved = home.saved or {}
     view.home.tests = {
@@ -440,7 +460,7 @@ local function context(withCosts)
     local ctx = {
         active = db and db.active or "original", saved = saved, want = db and db.want or {}, live = function(cvar) return GetCVar(cvar) end,
         resolved = ns.bench and ns.bench.resolve() or {}, locked = lockReason(), size = sizeContext(),
-        dynamicScale = dynamicContext(),
+        dynamicScale = dynamicContext(), running = ns.guide and ns.guide.running and ns.guide.running() == true or false,
     }
     if withCosts then
         -- The costs of the profile in use (Crowded prefers the crowd test); Original and Maximum read the quiet-spot test.
@@ -487,6 +507,7 @@ function settings.open(which)
     elseif PAGE_KEYS[which] then
         state.page = which
     end
+    if ns.guide and ns.guide.running and ns.guide.running() then state.page = "test" end      -- a running test keeps its page
     guarded(function()
         settings.render()
         settings.show()
@@ -549,14 +570,15 @@ end
 -- level:<cvar>:<value>, size:<percent>, sizeback, save:<name>, test:<kind>, show:<kind>, close. A refusal is shown in the window
 -- until the next click or redraw.
 function settings.click(key)
+    local running = ns.guide and ns.guide.running and ns.guide.running()
     if key == "close" then
         settings.hide()
         return
     end
     local pageKey = key:match("^page:(.+)$")
     if key == "pill" then pageKey = "home" end      -- the profile pill opens Home, where the profile is switched
-    if pageKey then                          -- turning a page is not a change: it works in combat and during a test
-        if PAGE_KEYS[pageKey] then
+    if pageKey then                          -- turning a page is not a change: it works in combat (a running test keeps its page)
+        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then
             state.page = pageKey
             draw()
         end
@@ -591,22 +613,22 @@ function settings.click(key)
         if TAB_TEXT[editKey] then switchProfile(editKey) end
         return
     end
-    -- The guided test and the results window are their own windows: this one steps aside so they do not sit on top of it.
+    -- A Home test button shows the saved result on My results, or starts that test on Find my settings (ui.openSaved decides).
     local testKey = key:match("^test:(.+)$")
     if testKey then
-        if (testKey == "best" or testKey == "crowded") and ns.ui and ns.ui.openSaved then
-            ns.ui.openSaved(testKey)
-            settings.hide()
-        end
+        if (testKey == "best" or testKey == "crowded") and ns.ui and ns.ui.openSaved then ns.ui.openSaved(testKey) end
+        return
+    end
+    -- Find my settings with no test open: start that test's intro.
+    local runKey = key:match("^run:(.+)$")
+    if runKey then
+        if (runKey == "setup" or runKey == "crowd") and ns.guide and ns.guide.open then ns.guide.open(runKey) end
         return
     end
     local showKey = key:match("^show:(.+)$")                -- Show results: only for a result that is saved
     if showKey then
         local info = testsContext(nil)
-        if info.results[showKey] and ns.ui and ns.ui.openSaved then
-            ns.ui.openSaved(showKey)
-            settings.hide()
-        end
+        if info.results[showKey] and ns.ui and ns.ui.openSaved then ns.ui.openSaved(showKey) end
         return
     end
     -- Save as Everyday / Save as Crowded: keeps the game's current settings in that profile, whatever page is showing.
@@ -725,7 +747,7 @@ end
 
 -- A signature of everything the window shows that can change outside it.
 local function signature(ctx)
-    local list = { tostring(ctx.active), tostring(ctx.locked) }
+    local list = { tostring(ctx.active), tostring(ctx.locked), tostring(ctx.running) }
     for _, entry in ipairs(ctx.resolved) do
         local cvar = entry.cvar
         list[#list + 1] = cvar .. "=" .. tostring(ctx.live(cvar)) .. "/" .. tostring(ctx.saved.everyday[cvar]) .. "/"
@@ -868,8 +890,15 @@ local function build()
     end
     p.testsNote = skin.text(area, "small", "dim", AREA_W)
 
-    -- The Tests and results page, and the About page.
+    -- Find my settings and My results when no test or result is open (the choosers), and the About page.
     p.testsIntro = skin.text(area, "normal", "dim", AREA_W)
+    p.runButtons = {}
+    for i = 1, 2 do
+        local button = skin.button(area, "", TEST_BTN_W, TEST_BTN_H)
+        button:SetScript("OnClick", clicked)
+        p.runButtons[i] = button
+    end
+    p.resultsIntro = skin.text(area, "normal", "dim", AREA_W)
     p.resultLines, p.resultButtons = {}, {}
     for i = 1, 2 do
         p.resultLines[i] = skin.text(area, "normal", "text", AREA_W - 150)
@@ -877,7 +906,20 @@ local function build()
         show:SetScript("OnClick", clicked)
         p.resultButtons[i] = show
     end
+    p.noResults = skin.text(area, "normal", "text", AREA_W)
+    p.goTest = skin.button(area, "Go to Find my settings", TEST_BTN_W, TEST_BTN_H)
+    p.goTest.key = "page:test"
+    p.goTest:SetScript("OnClick", clicked)
     p.progressLine = skin.text(area, "normal", "accentLight", AREA_W)
+    -- The frames Guide.lua and Results.lua draw into: the whole page area, each shown only on its own page.
+    p.hosts = {}
+    for key in pairs(HOSTED) do
+        local host = CreateFrame("Frame", nil, area)
+        host:SetPoint("TOPLEFT", area, "TOPLEFT", 0, 0)
+        host:SetSize(AREA_W, PAGE_H - TOP - SUMMARY_BOTTOM)
+        host:Hide()
+        p.hosts[key] = host
+    end
     p.aboutVersion = skin.text(area, "normal", "bright", AREA_W)
     p.aboutText = skin.text(area, "normal", "text", AREA_W)
 
@@ -891,7 +933,19 @@ local function build()
         sinceRefresh = sinceRefresh + elapsed
         if sinceRefresh < REFRESH then return end
         sinceRefresh = 0
+        -- A running test redraws its progress, and notices a run that ended elsewhere; the results follow combat.
+        if ns.guide and ns.guide.refresh then guarded(ns.guide.refresh) end
+        if ns.results and ns.results.refresh then guarded(ns.results.refresh) end
         if signature(context()) ~= lastSignature then draw() end
+    end)
+    -- While a test runs the window cannot be put away (the close button, Escape, code): it comes straight back. Closing it at any
+    -- other time ends the results' offer, as closing the results window did.
+    f:SetScript("OnHide", function(self)
+        if ns.guide and ns.guide.running and ns.guide.running() then
+            self:Show()
+            return
+        end
+        if ns.results and ns.results.endOffer then ns.results.endOffer() end
     end)
     frame, parts = f, p
     return f
@@ -912,6 +966,10 @@ function settings.render()
     state.saved = nil                        -- so is what a save button said
     lastSignature = signature(ctx)
     local onSettings = SETTINGS_PAGE[view.page] == true
+    -- Find my settings with a test open and My results with a result open are drawn by Guide.lua and Results.lua into their host.
+    local owner = HOSTED[view.page] and ns[HOSTED[view.page]]
+    local hosted = owner and owner.renderPage and ((view.page == "test" and owner.hasView and owner.hasView())
+        or (view.page == "results" and owner.hasOffer and owner.hasOffer())) or false
 
     local title = ""
     for i, entry in ipairs(view.pages) do
@@ -919,7 +977,13 @@ function settings.render()
         p.nav[i]:SetEnabled(entry.enabled)
         if entry.selected then title = entry.text end
     end
-    p.title:SetText(title)
+    p.title:SetText(hosted and "" or title)
+    p.pill:SetEnabled(view.profile.enabled ~= false)
+    -- Escape closes the window, except while a test runs (the name is taken out of the list and put back after).
+    for i = #UISpecialFrames, 1, -1 do
+        if UISpecialFrames[i] == FRAME_NAME then tremove(UISpecialFrames, i) end
+    end
+    if not view.running then tinsert(UISpecialFrames, FRAME_NAME) end
     for i, spec in ipairs(view.saveBar.buttons) do p.saveButtons[i]:SetEnabled(spec.enabled) end
     if view.saveBar.note then
         p.saveNote:SetText(view.saveBar.note)
@@ -951,7 +1015,7 @@ function settings.render()
     if view.notice then notices[#notices + 1] = view.notice end
     if view.locked then notices[#notices + 1] = view.locked end
     if view.refusal then notices[#notices + 1] = view.refusal end
-    if #notices > 0 then placeText(p.banner, table.concat(notices, "\n")) else hideText(p.banner) end
+    if #notices > 0 and not hosted then placeText(p.banner, table.concat(notices, "\n")) else hideText(p.banner) end
     -- Original or Maximum in use: the settings pages are read-only and offer Everyday and Crowded.
     if onSettings and view.readOnly then
         placeText(p.readOnly, view.readOnly.text)
@@ -1056,7 +1120,7 @@ function settings.render()
     release(p.levels)
     release(p.costs, true)
 
-    -- The two test buttons (Home and the Tests and results page), in a row at the current height.
+    -- The two test buttons of Home, in a row at the current height.
     local function placeTestButtons()
         for i, test in ipairs(view.home.tests) do
             local button = p.testButtons[i]
@@ -1095,11 +1159,33 @@ function settings.render()
         for _, card in ipairs(p.profileCards) do card:Hide() end
     end
 
-    -- The Tests and results page: the two test buttons, a line and a Show results button for each result, the progress of a test.
-    if view.page == "tests" then
-        placeText(p.testsIntro, view.testsPage.intro)
-        placeTestButtons()
-        for i, result in ipairs(view.testsPage.results) do
+    if view.page ~= "home" then
+        for _, button in ipairs(p.testButtons) do button:Hide() end
+    end
+
+    -- Find my settings with no test open: the intro and the two tests to start.
+    if view.page == "test" and not hosted then
+        placeText(p.testsIntro, view.testPage.intro)
+        for i, spec in ipairs(view.testPage.buttons) do
+            local button = p.runButtons[i]
+            button.key = spec.key
+            button:SetLabel(spec.text)
+            button:SetEnabled(spec.enabled)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (TEST_BTN_W + 12), -y)
+            button:Show()
+        end
+        y = y + TEST_BTN_H + 8
+    else
+        hideText(p.testsIntro)
+        for _, button in ipairs(p.runButtons) do button:Hide() end
+    end
+
+    -- My results with no result open: a line and a Show results button for each result, the progress of a test, or the pointer.
+    if view.page == "results" and not hosted then
+        local page = view.resultsPage
+        placeText(p.resultsIntro, page.intro)
+        for i, result in ipairs(page.results) do
             p.resultLines[i]:SetText(result.text)
             p.resultLines[i]:ClearAllPoints()
             p.resultLines[i]:SetPoint("TOPLEFT", p.area, "TOPLEFT", 0, -(y + 4))
@@ -1111,17 +1197,37 @@ function settings.render()
             if result.canShow then show:Show() else show:Hide() end
             y = y + 30
         end
-        if view.testsPage.progress then placeText(p.progressLine, view.testsPage.progress) else hideText(p.progressLine) end
+        if page.progress then placeText(p.progressLine, page.progress) else hideText(p.progressLine) end
+        if page.none then
+            placeText(p.noResults, page.none)
+            p.goTest:ClearAllPoints()
+            p.goTest:SetPoint("TOPLEFT", p.area, "TOPLEFT", 0, -y)
+            p.goTest:Show()
+            y = y + TEST_BTN_H + 8
+        else
+            hideText(p.noResults)
+            p.goTest:Hide()
+        end
     else
-        hideText(p.testsIntro)
+        hideText(p.resultsIntro)
         hideText(p.progressLine)
+        hideText(p.noResults)
+        p.goTest:Hide()
         for i = 1, 2 do
             hideText(p.resultLines[i])
             p.resultButtons[i]:Hide()
         end
     end
-    if view.page ~= "home" and view.page ~= "tests" then
-        for _, button in ipairs(p.testButtons) do button:Hide() end
+
+    -- The pages Guide.lua and Results.lua draw: only the host of the page shown, and only with a test or a result open.
+    for key, host in pairs(p.hosts) do
+        if hosted and key == view.page then
+            host:Show()
+            local ok, err = pcall(owner.renderPage, host)
+            if not ok then ns.say("the " .. key .. " page could not be drawn: " .. tostring(err)) end
+        else
+            host:Hide()
+        end
     end
 
     -- The About page.
@@ -1191,7 +1297,19 @@ function settings.show()
 end
 
 function settings.hide()
-    if frame then frame:Hide() end
+    if frame then frame:Hide() end           -- while a test runs the window's OnHide shows it again
+end
+
+-- The frame Guide.lua ("test") or Results.lua ("results") draws its page into; nil for any other page.
+function settings.host(key)
+    if not HOSTED[key] then return nil end
+    ensure()
+    return parts.hosts[key]
+end
+
+-- Draws the window again when it is on screen (Guide.lua and Results.lua call it after a change of their own).
+function settings.redraw()
+    if frame and frame:IsShown() then draw() end
 end
 
 function settings.frame()

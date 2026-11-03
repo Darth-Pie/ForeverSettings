@@ -1387,10 +1387,6 @@ end`],
   'ui-level-width': ['Settings.lua', `local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 50, 22, 3, 14`, `local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 36, 22, 3, 14`],
   'ui-cost-no-extra-width': ['Settings.lua', `local COST_W = LEVEL_W + 8`, `local COST_W = LEVEL_W`],
   'ui-cost-uncentred': ['Settings.lua', `bx - (COST_W - LEVEL_W) / 2`, `bx`],
-  'ui-test-hub-stays': ['Settings.lua', `            ns.ui.openSaved(testKey)
-            settings.hide()`, `            ns.ui.openSaved(testKey)`],
-  'ui-show-hub-stays': ['Settings.lua', `            ns.ui.openSaved(showKey)
-            settings.hide()`, `            ns.ui.openSaved(showKey)`],
 
   // The live total in My settings ("Your Everyday settings: about N fps")
   'live-counted-zero': ['Settings.lua', `type(est.fps) == "number" and (est.counted or 0) > 0 then`, `type(est.fps) == "number" then`],
@@ -1545,8 +1541,6 @@ end`],
   'hub-nav-click-missing': ['Settings.lua', `        item:SetScript("OnClick", clicked)`, `        local _ = clicked`],
   'hub-nav-gap': ['Settings.lua', `-(10 + (i - 1) * 30 + (i > 4 and 14 or 0))`, `-(10 + (i - 1) * 30)`],
   'hub-nav-selected-unmarked': ['Settings.lua', `p.nav[i]:SetSelected(entry.selected)`, `p.nav[i]:SetSelected(false)`],
-  'hub-title-missing': ['Settings.lua', `    p.title:SetText(title)`, `    p.title:SetText("")`],
-  'hub-banner-missing': ['Settings.lua', `    if #notices > 0 then placeText(p.banner, table.concat(notices`, `    if false then placeText(p.banner, table.concat(notices`],
   'hub-card-tick-unchecked': ['Settings.lua', `box:SetChecked(row.kept)`, `box:SetChecked(false)`],
   'hub-card-tick-never-greyed': ['Settings.lua', `box:SetEnabled(row.enabled)`, `box:SetEnabled(true)`],
   'hub-card-name-missing': ['Settings.lua', `name:SetText(row.name)`, `name:SetText("")`],
@@ -1557,8 +1551,6 @@ end`],
   'hub-level-never-greyed': ['Settings.lua', `button:SetEnabled(row.enabled)`, `button:SetEnabled(true)`],
   // Save as Everyday / Save as Crowded at the bottom of the page list (owner request 2026-11-02)
   'saveas-caption-text': ['Settings.lua', `local SAVE_CAPTION = "Save the game's current settings as:"`, `local SAVE_CAPTION = "Save the game's current settings as"`],
-  'saveas-model-label': ['Settings.lua', `text = "Save as " .. TAB_TEXT[key], enabled = locked == nil }`, `text = TAB_TEXT[key], enabled = locked == nil }`],
-  'saveas-model-never-greyed': ['Settings.lua', `text = "Save as " .. TAB_TEXT[key], enabled = locked == nil }`, `text = "Save as " .. TAB_TEXT[key], enabled = true }`],
   'saveas-button-label': ['Settings.lua', `skin.button(page, "Save as " .. TAB_TEXT[key], SAVE_W, SAVE_H)`, `skin.button(page, TAB_TEXT[key], SAVE_W, SAVE_H)`],
   'saveas-frame-never-greyed': ['Settings.lua', `p.saveButtons[i]:SetEnabled(spec.enabled)`, `p.saveButtons[i]:SetEnabled(true)`],
   'saveas-key': ['Settings.lua', `button.key = "save:" .. key`, `button.key = "saveas:" .. key`],
@@ -1632,10 +1624,6 @@ end`],
   'tests-progress-text': ['Settings.lua', `"A test is running: step %d of %d (%s)"`, `"Running: step %d of %d (%s)"`],
   'tests-show-without-result': ['Settings.lua', `if info.results[showKey] and ns.ui and ns.ui.openSaved then`, `if ns.ui and ns.ui.openSaved then`],
   'tests-show-wrong-kind': ['Settings.lua', `ns.ui.openSaved(showKey)`, `ns.ui.openSaved("best")`],
-  'tests-page-everywhere': ['Settings.lua', `    if view.page == "tests" then
-        placeText(p.testsIntro`, `    if true then
-        placeText(p.testsIntro`],
-  'tests-buttons-not-hidden': ['Settings.lua', `    if view.page ~= "home" and view.page ~= "tests" then`, `    if false then`],
   'about-version-unknown': ['Settings.lua', `    return "unknown"
 end`, `    return ""
 end`],
@@ -1690,21 +1678,9 @@ end
   // The pages of the hub window
   'page-order-wrong': ['Settings.lua', `{ key = "light", text = "Light and shadows" }, { key = "world", text = "World detail" },`, `{ key = "world", text = "World detail" }, { key = "light", text = "Light and shadows" },`],
   'page-text-wrong': ['Settings.lua', `{ key = "size", text = "Picture size" }`, `{ key = "size", text = "Picture sizes" }`],
-  'page-selected-wrong': ['Settings.lua', `selected = page.key == view.page, enabled = true`, `selected = false, enabled = true`],
-  'page-default-wrong': ['Settings.lua', `view.page = PAGE_KEYS[st.page] and st.page or "home"`, `view.page = PAGE_KEYS[st.page] and st.page or "light"`],
-  'page-bogus-accepted': ['Settings.lua', `view.page = PAGE_KEYS[st.page] and st.page or "home"`, `view.page = st.page or "home"`],
   'page-of-wrong': ['Settings.lua', `graphicsssao = "light"`, `graphicsssao = "world"`],
   'page-of-size-wrong': ['Settings.lua', `renderscale = "size",`, `renderscale = "world",`],
   'page-unknown-not-world': ['Settings.lua', `settings.PAGE_OF[cvar:lower()] or "world"`, `settings.PAGE_OF[cvar:lower()] or "light"`],
-  'page-click-ignored': ['Settings.lua', `        if PAGE_KEYS[pageKey] then
-            state.page = pageKey`, `        if false then
-            state.page = pageKey`],
-  'page-click-bogus': ['Settings.lua', `        if PAGE_KEYS[pageKey] then
-            state.page = pageKey`, `        if pageKey then
-            state.page = pageKey`],
-  'page-click-locked': ['Settings.lua', `        if PAGE_KEYS[pageKey] then
-            state.page = pageKey`, `        if PAGE_KEYS[pageKey] and not InCombatLockdown() then
-            state.page = pageKey`],
 
 
   // Maximum and costs, review fix pass: Maximum is re-derived at a loading screen, the window names a level the game refused
@@ -1879,7 +1855,6 @@ end
   // My settings edits the profile in use: the new code
   'ed-costs-profile-in-use': ['Settings.lua', `costsAndMaximum(TAB_TEXT[ctx.active] and ctx.active or "everyday")`, `costsAndMaximum("everyday")`],
   'ed-pill-label': ['Settings.lua', `text = labels[ctx.active] or tostring(ctx.active), color = PROFILE_COLOR`, `text = tostring(ctx.active), color = PROFILE_COLOR`],
-  'ed-pill-colour': ['Settings.lua', `color = PROFILE_COLOR[ctx.active] or "dim" }`, `color = "dim" }`],
   'ed-open-profile-page': ['Settings.lua', `    if which == "everyday" or which == "crowded" then
         state.page = "light"`, `    if which == "everyday" or which == "crowded" then
         state.page = state.page`],
@@ -1930,11 +1905,6 @@ end
         hideText(p.readOnly)`, `        y = y + 8
     else
         hideText(p.readOnly)`],
-  'ed-frame-edit-enabled': ['Settings.lua', `            button:SetEnabled(spec.enabled)
-            button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1)`, `            button:SetEnabled(true)
-            button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1)`],
   'ed-frame-edit-left-shown': ['Settings.lua', `for _, button in ipairs(p.editButtons) do button:Hide() end`, `local _ = p.editButtons`],
   'ed-frame-pill-size': ['Settings.lua', `local PILL_W, PILL_H = 104, 22`, `local PILL_W, PILL_H = 100, 22`],
   'ed-frame-edit-size': ['Settings.lua', `local EDIT_W, EDIT_H = 112, 24`, `local EDIT_W, EDIT_H = 120, 24`],
@@ -2028,6 +1998,74 @@ end
   'gr-click-wrong-level': ['Graph.lua', `local onPick, value = options.onPick, p.value`, `local onPick, value = options.onPick, points[1].point.value`],
   'gr-marks-left-behind': ['Graph.lua', `        release(dots)
         release(rings)`, `        local _ = dots`],
+  // The two pages in My settings (spec 2026-11-03-tests-and-results-in-my-settings-design.md M1-M3); the first thirteen re-anchor
+  // older rows on the changed lines
+  'hub-title-missing': ['Settings.lua', `    p.title:SetText(hosted and "" or title)`, `    p.title:SetText("")`],
+  'hub-banner-missing': ['Settings.lua', `if #notices > 0 and not hosted then placeText(p.banner, table.concat(notices`, `if false then placeText(p.banner, table.concat(notices`],
+  'saveas-model-label': ['Settings.lua', `text = "Save as " .. TAB_TEXT[key],
+            enabled = locked == nil and not running }`, `text = TAB_TEXT[key],
+            enabled = locked == nil and not running }`],
+  'saveas-model-never-greyed': ['Settings.lua', `text = "Save as " .. TAB_TEXT[key],
+            enabled = locked == nil and not running }`, `text = "Save as " .. TAB_TEXT[key],
+            enabled = true }`],
+  'tests-page-everywhere': ['Settings.lua', `    if view.page == "results" and not hosted then
+        local page = view.resultsPage`, `    if not hosted then
+        local page = view.resultsPage`],
+  'tests-buttons-not-hidden': ['Settings.lua', `    if view.page ~= "home" then
+        for _, button in ipairs(p.testButtons) do button:Hide() end`, `    if false then
+        for _, button in ipairs(p.testButtons) do button:Hide() end`],
+  'page-selected-wrong': ['Settings.lua', `selected = page.key == view.page,
+            enabled = not running`, `selected = false,
+            enabled = not running`],
+  'page-default-wrong': ['Settings.lua', `(PAGE_KEYS[st.page] and st.page or "home")`, `(PAGE_KEYS[st.page] and st.page or "light")`],
+  'page-bogus-accepted': ['Settings.lua', `(PAGE_KEYS[st.page] and st.page or "home")`, `(st.page or "home")`],
+  'page-click-ignored': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if false then`],
+  'page-click-bogus': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if pageKey and not (running and pageKey ~= "test") then`],
+  'page-click-locked': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if PAGE_KEYS[pageKey] and not InCombatLockdown() and not (running and pageKey ~= "test") then`],
+  'ed-pill-colour': ['Settings.lua', `color = PROFILE_COLOR[ctx.active] or "dim",
+        enabled = not running }`, `color = "dim",
+        enabled = not running }`],
+  'ed-frame-edit-enabled': ['Settings.lua', `            button:SetEnabled(spec.enabled)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (EDIT_W`, `            button:SetEnabled(true)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (EDIT_W`],
+  'pg-running-not-forced': ['Settings.lua', `view.page = running and "test" or (PAGE_KEYS[st.page] and st.page or "home")`, `view.page = PAGE_KEYS[st.page] and st.page or "home"`],
+  'pg-running-pages-live': ['Settings.lua', `enabled = not running or page.key == "test" }`, `enabled = true }`],
+  'pg-running-pill-live': ['Settings.lua', `color = PROFILE_COLOR[ctx.active] or "dim",
+        enabled = not running }`, `color = PROFILE_COLOR[ctx.active] or "dim",
+        enabled = true }`],
+  'pg-running-savebar-live': ['Settings.lua', `            enabled = locked == nil and not running }
+    end`, `            enabled = locked == nil }
+    end`],
+  'pg-pill-not-greyed': ['Settings.lua', `    p.pill:SetEnabled(view.profile.enabled ~= false)`, `    p.pill:SetEnabled(true)`],
+  'pg-running-click-moves': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if PAGE_KEYS[pageKey] then`],
+  'pg-open-not-kept': ['Settings.lua', `    if ns.guide and ns.guide.running and ns.guide.running() then state.page = "test" end`, `    local _ = ns.guide`],
+  'pg-escape-kept': ['Settings.lua', `    if not view.running then tinsert(UISpecialFrames, FRAME_NAME) end`, `    tinsert(UISpecialFrames, FRAME_NAME)`],
+  'pg-escape-not-restored': ['Settings.lua', `    if not view.running then tinsert(UISpecialFrames, FRAME_NAME) end`, `    local _ = view.running`],
+  'pg-onhide-closes': ['Settings.lua', `        if ns.guide and ns.guide.running and ns.guide.running() then
+            self:Show()`, `        if false then
+            self:Show()`],
+  'pg-endoffer-missing': ['Settings.lua', `        if ns.results and ns.results.endOffer then ns.results.endOffer() end`, `        local _ = ns.results`],
+  'pg-host-wrong-page': ['Settings.lua', `        if hosted and key == view.page then`, `        if hosted then`],
+  'pg-host-not-drawn': ['Settings.lua', `local ok, err = pcall(owner.renderPage, host)`, `local ok, err = true, nil`],
+  'pg-title-on-host': ['Settings.lua', `    p.title:SetText(hosted and "" or title)`, `    p.title:SetText(title)`],
+  'pg-banner-on-host': ['Settings.lua', `if #notices > 0 and not hosted then placeText(p.banner`, `if #notices > 0 then placeText(p.banner`],
+  'pg-test-chooser-missing': ['Settings.lua', `    if view.page == "test" and not hosted then
+        placeText(p.testsIntro`, `    if false then
+        placeText(p.testsIntro`],
+  'pg-test-chooser-on-host': ['Settings.lua', `    if view.page == "test" and not hosted then
+        placeText(p.testsIntro`, `    if view.page == "test" then
+        placeText(p.testsIntro`],
+  'pg-run-key-wrong': ['Settings.lua', `{ key = "run:setup", text = "Find my best settings"`, `{ key = "run:crowd", text = "Find my best settings"`],
+  'pg-run-never-greyed': ['Settings.lua', `{ key = "run:setup", text = "Find my best settings", enabled = locked == nil and not running },`, `{ key = "run:setup", text = "Find my best settings", enabled = true },`],
+  'pg-run-click-ignored': ['Settings.lua', `if (runKey == "setup" or runKey == "crowd") and ns.guide and ns.guide.open then ns.guide.open(runKey) end`, `local _ = runKey`],
+  'pg-results-none-missing': ['Settings.lua', `    if not any then view.resultsPage.none = NO_RESULTS end`, `    local _ = any`],
+  'pg-results-none-always': ['Settings.lua', `    if not any then view.resultsPage.none = NO_RESULTS end`, `    view.resultsPage.none = NO_RESULTS`],
+  'pg-go-test-key': ['Settings.lua', `p.goTest.key = "page:test"`, `p.goTest.key = "page:home"`],
+  'pg-test-hides-window': ['Settings.lua', `ns.ui.openSaved then ns.ui.openSaved(testKey) end`, `ns.ui.openSaved then ns.ui.openSaved(testKey) settings.hide() end`],
+  'pg-show-hides-window': ['Settings.lua', `if info.results[showKey] and ns.ui and ns.ui.openSaved then ns.ui.openSaved(showKey) end`, `if info.results[showKey] and ns.ui and ns.ui.openSaved then ns.ui.openSaved(showKey) settings.hide() end`],
+  'pg-host-width': ['Settings.lua', `        host:SetSize(AREA_W, PAGE_H - TOP - SUMMARY_BOTTOM)`, `        host:SetSize(AREA_W + 3, PAGE_H - TOP - SUMMARY_BOTTOM)`],
 };
 
 function main() {

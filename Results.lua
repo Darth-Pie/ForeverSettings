@@ -455,6 +455,14 @@ function results.selected()
     return current and current.selected or nil
 end
 
+-- Whether a result is on offer (My results draws it), and the end of the offer (the window closed: nothing is saved from it).
+function results.hasOffer()
+    return current ~= nil
+end
+function results.endOffer()
+    current = nil
+end
+
 function results.hide()
     if frame then frame:Hide() end
 end

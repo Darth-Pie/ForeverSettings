@@ -351,6 +351,16 @@ local function fontStringWith(f, str)
     end)
     return found
 end
+-- How many shown font strings say exactly `str` (a page's name is in the page list and, on its chooser, in the title too).
+local function countText(f, str)
+    local n = 0
+    walk(f, function(frame)
+        for _, fs in ipairs(frame.fontStrings) do
+            if fs.shown and fs._text == str then n = n + 1 end
+        end
+    end)
+    return n
+end
 -- The fixture client with a quiet-spot test in the bench history (newest), so context() reads it.
 local function bootWith(entry, over)
     local e, s, db, p = boot(over)
@@ -1133,7 +1143,7 @@ test("S6-13 a level button and its cost have room: 50 pixels for the label, 58 f
     return oneLine and roomy and widest ~= nil and #widest * 6 <= 58, tostring(oneLine) .. tostring(roomy) .. tostring(widest)
 end)
 
-test("S8-6 a test or result button hides the hub window so the window it opens does not sit on top of it; in combat nothing opens and the hub stays", function()
+test("S8-6 a test or result button opens its page inside the window, which stays open; in combat nothing opens", function()
     local e, s = bootWith(fullEntry())
     local opened = {}
     e.ns.ui.openSaved = function(kind) opened[#opened + 1] = kind end
@@ -1142,10 +1152,10 @@ test("S8-6 a test or result button hides the hub window so the window it opens d
     s.open("home")
     local f = window()
     byKey(f, "test:best"):Click()
-    local test = table.concat(opened, ",") == "best" and not f:IsShown()
-    s.open("tests")
+    local test = table.concat(opened, ",") == "best" and f:IsShown()
+    s.open("results")
     byKey(f, "show:crowded"):Click()
-    local show = table.concat(opened, ",") == "best,crowded" and not f:IsShown()
+    local show = table.concat(opened, ",") == "best,crowded" and f:IsShown()
     COMBAT = true
     s.open("home")
     s.click("test:best")
@@ -1547,10 +1557,12 @@ test("S8-4 the test buttons open the existing windows, are marked when a result 
     return drawn and noted and routed and greyed and #opened == 2, tostring(drawn) .. tostring(noted) .. tostring(routed) .. tostring(greyed) .. #opened
 end)
 
--- The Tests and results page and the About page (spec 2026-11-02-flat-hub-window-design.md section 5).
+-- Find my settings and My results (spec 2026-11-03-tests-and-results-in-my-settings-design.md M1-M3) and the About page.
 local TESTS_INTRO = "The test measures what each graphics setting costs on this PC. Run it in a quiet spot first, then in a busy place."
+local RESULTS_INTRO = "The results of your tests. Show one to see what each setting costs and to save its settings."
+local NO_RESULTS = "No results yet: run Find my best settings first."
 
-test("S9-1 Tests and results: the two test buttons, a line and a Show results button for each saved result, and the progress line while a test runs", function()
+test("S9-1 My results with no result open: a line and a Show results button for each saved result, and the progress line while a test runs", function()
     local e, s = bootWith(fullEntry())
     local opened = {}
     e.ns.ui.openSaved = function(kind) opened[#opened + 1] = kind end
@@ -1558,33 +1570,145 @@ test("S9-1 Tests and results: the two test buttons, a line and a Show results bu
     e.ns.ui.savedResult = function(kind)
         if kind == "best" then return { measuredLine = "Measured in Highmountain, 3 days ago." } end
     end
-    s.open("tests")
+    s.open("results")
     local f = window()
-    local drawn = hasText(f, TESTS_INTRO) and byKey(f, "test:best") ~= nil and byKey(f, "test:crowded") ~= nil
+    local drawn = hasText(f, RESULTS_INTRO) and countText(f, "My results") == 1
         and hasText(f, "Quiet-spot test: Measured in Highmountain, 3 days ago.") and hasText(f, "Crowd test: not done yet.")
         and byKey(f, "show:best") ~= nil and byKey(f, "show:best")._text == "Show results" and byKey(f, "show:crowded") == nil
-        and not hasText(f, "A test is running")
+        and not hasText(f, "A test is running") and not hasText(f, NO_RESULTS)
     byKey(f, "show:best"):Click()
     s.click("show:crowded")                                 -- nothing saved: nothing opens
     local routed = table.concat(opened, ",") == "best"
     e.ns.ui.savedResult = function() return { measuredLine = "Measured in Stormwind City, 2 hours ago." } end
-    s.open("tests")
+    s.open("results")
     byKey(f, "show:crowded"):Click()
     routed = routed and table.concat(opened, ",") == "best,crowded" and hasText(f, "Crowd test: Measured in Stormwind City, 2 hours ago.")
     e.ns.ui.buildContext = function()
         return { saved = {}, active = true, progress = { phase = "sweep", label = "Shadows 3", cvar = "graphicsShadowQuality", value = "3", done = 12, total = 45 } }
     end
-    s.open("tests")
+    s.open("results")
     local running = hasText(f, "A test is running: step 12 of 45 (Now testing: Shadow detail, level 3)")
     e.ns.ui.savedResult = function() error("boom") end        -- the saved results cannot be read: the page still draws, silently
     OUT = {}
-    s.open("tests")
-    local guarded = hasText(f, "Quiet-spot test: not done yet.") and #OUT == 0
+    s.open("results")
+    local go
+    walk(f, function(frame) if frame.shown and frame._text == "Go to Find my settings" then go = frame end end)
+    local guarded = hasText(f, "Quiet-spot test: not done yet.") and #OUT == 0 and hasText(f, NO_RESULTS) and go ~= nil and go.key == "page:test"
     s.click("page:light")
-    local elsewhere = byKey(f, "show:best") == nil and not hasText(f, TESTS_INTRO) and byKey(f, "test:best") == nil
-        and not hasText(f, "A test is running")
+    local elsewhere = byKey(f, "show:best") == nil and not hasText(f, RESULTS_INTRO) and not hasText(f, "A test is running")
     return drawn and routed and running and guarded and elsewhere,
         tostring(drawn) .. tostring(routed) .. tostring(running) .. tostring(guarded) .. tostring(elsewhere)
+end)
+
+test("P-2 Find my settings with no test open: the intro and the two test buttons, which open that test's start; greyed in combat", function()
+    local e, s = bootWith(fullEntry())
+    local opened = {}
+    e.ns.guide.open = function(kind) opened[#opened + 1] = kind end
+    s.open("test")
+    local f = window()
+    local best, crowd = byKey(f, "run:setup"), byKey(f, "run:crowd")
+    local drawn = countText(f, "Find my settings") == 1 and hasText(f, TESTS_INTRO) and best ~= nil and crowd ~= nil
+        and best._text == "Find my best settings" and crowd._text == "Find my crowded settings" and byKey(f, "test:best") == nil
+    best:Click()
+    crowd:Click()
+    COMBAT = true
+    s.open("test")
+    local greyed = byKey(f, "run:setup").enabled == false
+    s.click("run:setup")
+    COMBAT = false
+    return drawn and table.concat(opened, ",") == "setup,crowd" and greyed and f:IsShown(), table.concat(opened, ",")
+end)
+
+test("P-7 a page with a test or a result open hands its host to the guide or the results, hides the choosers and the banner there", function()
+    local e, s = bootWith(fullEntry())
+    local drawnInto = {}
+    e.ns.guide.hasView = function() return true end
+    e.ns.guide.renderPage = function(host) drawnInto.test = host end
+    e.ns.results.hasOffer = function() return true end
+    e.ns.results.renderPage = function(host) drawnInto.results = host end
+    COMBAT = true                                           -- the combat line would stand in the banner on another page
+    s.open("test")
+    local f = window()
+    local testHost = s.host("test")
+    local onTest = drawnInto.test == testHost and testHost.shown and byKey(f, "run:setup") == nil and not hasText(f, TESTS_INTRO)
+        and not hasText(f, "You are in combat") and countText(f, "Find my settings") == 0
+    s.open("results")
+    local resultsHost = s.host("results")
+    local onResults = drawnInto.results == resultsHost and resultsHost.shown and not testHost.shown and byKey(f, "show:best") == nil
+        and not hasText(f, RESULTS_INTRO)
+    s.open("home")
+    COMBAT = false
+    local away = not testHost.shown and not resultsHost.shown
+    return onTest and onResults and away, tostring(onTest) .. tostring(onResults) .. tostring(away)
+end)
+
+test("P-8 each page host is one frame in the page area, under the window, the width of the area, the same frame every time", function()
+    local e, s = bootWith(fullEntry())
+    s.open("test")
+    local a, b = s.host("test"), s.host("test")
+    local c = s.host("results")
+    return a ~= nil and a == b and c ~= nil and c ~= a and a._width == 675 and a._point ~= nil and a._point[1] == "TOPLEFT"
+        and a._point[4] == 0 and a._point[5] == 0 and s.host("light") == nil, tostring(a and a._width)
+end)
+
+test("P-RUN-1 while a test runs the window stays on Find my settings: the other pages, the pill and the save bar are greyed and do nothing", function()
+    local e, s, db = bootWith(fullEntry())
+    local running = false
+    e.ns.guide.running = function() return running end
+    s.open("light")
+    running = true                                         -- a test starts while the window shows Light and shadows
+    s.redraw()
+    local f = window()
+    local pages = {}
+    for _, item in ipairs(s.PAGES) do pages[#pages + 1] = item.key .. "=" .. tostring(byKey(f, "page:" .. item.key).enabled) end
+    local onTest = byKey(f, "page:test").skinState.selected == true
+    s.open("about")
+    s.click("page:home")
+    s.click("pill")
+    local stayed = byKey(f, "page:test").skinState.selected == true
+    local greyed = byKey(f, "pill").enabled == false and byKey(f, "save:everyday").enabled == false
+    running = false
+    s.open()                                               -- the run is over: the window is still on its page, not on About
+    stayed = stayed and byKey(f, "page:test").skinState.selected == true
+    s.open("about")
+    local free = byKey(f, "page:about").skinState.selected == true and byKey(f, "page:home").enabled == true and byKey(f, "pill").enabled == true
+    return onTest and stayed and greyed and free and table.concat(pages, ",") == "home=false,light=false,world=false,size=false,test=true,results=false,about=false",
+        table.concat(pages, ",") .. " " .. tostring(onTest) .. tostring(stayed) .. tostring(greyed) .. tostring(free)
+end)
+
+test("P-RUN-2 while a test runs the close button, Escape and closing from code do nothing; afterwards they close the window again", function()
+    local e, s = bootWith(fullEntry())
+    local running = true
+    e.ns.guide.running = function() return running end
+    s.open("test")
+    local f = window()
+    local function listed()
+        for _, name in ipairs(UISpecialFrames) do if name == "ForeverSettingsSettings" then return true end end
+        return false
+    end
+    local escapeOff = not listed()
+    f.close:Click()
+    local afterX = f:IsShown()
+    s.click("close")
+    s.hide()
+    local afterCode = f:IsShown()
+    running = false
+    s.open("test")
+    local escapeOn = listed()
+    f.close:Click()
+    return escapeOff and afterX and afterCode and escapeOn and not f:IsShown(),
+        tostring(escapeOff) .. tostring(afterX) .. tostring(afterCode) .. tostring(escapeOn)
+end)
+
+test("P-6 closing the window ends the results' offer; a page switch keeps it", function()
+    local e, s = bootWith(fullEntry())
+    local ended = 0
+    e.ns.results.endOffer = function() ended = ended + 1 end
+    s.open("results")
+    s.click("page:light")
+    local kept = ended == 0
+    window().close:Click()
+    return kept and ended == 1, tostring(ended)
 end)
 
 test("S9-2 About shows the version, what the addon does, the chat commands and the no-data sentence; the header carries the version", function()
@@ -1660,9 +1784,9 @@ test("S5-1 the pages and their order; the model lists them with the current one 
     local bogus = s.model({ page = "nosuchpage" }, ctxOf(e, {}))
     local listed = {}
     for _, p in ipairs(size.pages) do listed[#listed + 1] = p.key .. ":" .. p.text end
-    return table.concat(keys, ",") == "home,light,world,size,tests,about"
-        and table.concat(texts, "|") == "Home|Light and shadows|World detail|Picture size|Tests and results|About"
-        and table.concat(listed, "|") == "home:Home|light:Light and shadows|world:World detail|size:Picture size|tests:Tests and results|about:About"
+    return table.concat(keys, ",") == "home,light,world,size,test,results,about"
+        and table.concat(texts, "|") == "Home|Light and shadows|World detail|Picture size|Find my settings|My results|About"
+        and table.concat(listed, "|") == "home:Home|light:Light and shadows|world:World detail|size:Picture size|test:Find my settings|results:My results|about:About"
         and none.page == "home" and selected(none) == "home" and size.page == "size" and selected(size) == "size"
         and bogus.page == "home" and selected(bogus) == "home", table.concat(listed, "|")
 end)
@@ -1740,7 +1864,7 @@ test("S6-0 the model gives each level its short label and each row its matters w
         tostring(shadows.mattersWords) .. tostring(shadows.levels[1].short)
 end)
 
-test("S6-1 the window is flat and 780 by 560, with the header, six page rows and no scroll frame", function()
+test("S6-1 the window is flat and 860 by 560, with the header, seven page rows and no scroll frame", function()
     local e, s = bootWith(fullEntry())
     s.open("everyday")
     local f = window()
@@ -1753,7 +1877,7 @@ test("S6-1 the window is flat and 780 by 560, with the header, six page rows and
     end
     return f ~= nil and f.name == "ForeverSettingsSettings" and f.template == nil and f._width == 860 and f._height == 560
         and f.titleText._text == "ForeverSettings" and f.close ~= nil and scrolls == 0
-        and table.concat(rows, "|") == "Home|Light and shadows|World detail|Picture size|Tests and results|About", table.concat(rows, "|")
+        and table.concat(rows, "|") == "Home|Light and shadows|World detail|Picture size|Find my settings|My results|About", table.concat(rows, "|")
 end)
 
 test("S6-2 the page list marks the current page, a click changes it, and the page's title follows", function()
@@ -1766,7 +1890,8 @@ test("S6-2 the page list marks the current page, a click changes it, and the pag
     local moved = s.state().page == "world" and byKey(f, "page:world").skinState.selected == true
         and byKey(f, "page:light").skinState.selected == false and fontStringWith(f, "World detail") ~= nil
     local function rowY(key) return -byKey(f, "page:" .. key)._point[5] end
-    local spaced = rowY("size") - rowY("world") == 30 and rowY("tests") - rowY("size") == 44          -- a gap before Tests and results
+    local spaced = rowY("size") - rowY("world") == 30 and rowY("test") - rowY("size") == 44           -- a gap before Find my settings
+        and rowY("results") - rowY("test") == 30
     byKey(f, "page:about"):Click()
     local bare = byKey(f, "tab:everyday") == nil and byKey(f, "use") == nil and byKey(f, "maximum") == nil
         and not hasText(f, "Everything at the highest") and not hasText(f, "Your Everyday settings")
