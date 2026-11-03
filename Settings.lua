@@ -287,8 +287,15 @@ function settings.model(st, ctx)
             note = "Kept in " .. tab .. ": used when you switch to " .. tab .. "."
         end
         local risky = percent > 100 or (keptPercent ~= nil and keptPercent > 100)
+        -- A tab that is not the profile in use only stores what is chosen on it: the game does not change until that profile is
+        -- switched on (the owner's report: with Maximum in use a stored size looked like it did nothing, then Save as undid it).
+        local where
+        if not onTabInUse then
+            local usedLabel = (ns.profiles and ns.profiles.LABEL or {})[ctx.active] or tostring(ctx.active)
+            where = "The game is using " .. usedLabel .. ". Changes here are stored in " .. tab .. " and take effect when you switch to " .. tab .. "."
+        end
         view.size = { percent = percent, value = math.max(SIZE_MIN, math.min(SIZE_MAX, percent)), min = SIZE_MIN, max = SIZE_MAX,
-            step = SIZE_STEP, label = label, note = note, warning = risky and SIZE_WARNING or nil,
+            step = SIZE_STEP, label = label, note = note, where = where, warning = risky and SIZE_WARNING or nil,
             safe = risky and SIZE_SAFE or nil, enabled = locked == nil,
             canPutBack = (percent ~= 100 or differs) and locked == nil }
     end
@@ -323,6 +330,9 @@ function settings.model(st, ctx)
         { key = "crowded", text = "Find my crowded settings", enabled = locked == nil, done = saved.crowded == true },
     }
     view.buttons[#view.buttons + 1] = { key = "use", text = USE_TEXT, enabled = locked == nil }
+    if st.tab ~= ctx.active and TAB_TEXT[st.tab] then
+        view.buttons[#view.buttons + 1] = { key = "switch", text = "Switch to " .. TAB_TEXT[st.tab], enabled = locked == nil }
+    end
     if ctx.active ~= "maximum" then
         view.buttons[#view.buttons + 1] = { key = "maximum", text = MAXIMUM_TEXT, enabled = locked == nil }
     end
@@ -530,7 +540,41 @@ local function saveSize(percent)
     draw()
 end
 
--- A button or tick of the window, by the keys of the model: tab:<tab>, keep:<cvar>, level:<cvar>:<value>, use, maximum,
+-- Which settings a save replaced, in words: "Picture sharpness was 150%, now 100%; ...", at most three and then "and N more", or ""
+-- when the profile held nothing that differs (what it held before, what it holds now).
+local function replacedText(before, after)
+    local lines = {}
+    for _, cvar in ipairs(ns.profiles.MANAGED) do
+        local was, now = before[cvar], after[cvar]
+        if was ~= nil and now ~= nil and not sameValue(was, now) then
+            lines[#lines + 1] = ns.names.label(cvar, cvar) .. " was " .. ns.names.level(cvar, was) .. ", now " .. ns.names.level(cvar, now)
+        end
+    end
+    if #lines == 0 then return "" end
+    local shown = {}
+    for i = 1, math.min(3, #lines) do shown[i] = lines[i] end
+    local text = table.concat(shown, "; ")
+    if #lines > 3 then text = text .. "; and " .. (#lines - 3) .. " more" end
+    return text .. "."
+end
+
+-- Save as Everyday / Save as Crowded and Use what I have in the game now: keeps the game's current settings in a profile, and says
+-- what that replaced (a profile edited while another was in use held values the game does not have).
+local function keepCurrent(name)
+    local db = ns.profiles.state()
+    local before = {}
+    for cvar, value in pairs(db and db.profiles[name] and db.profiles[name].values or {}) do before[cvar] = value end
+    local count = ns.profiles.save(name, true)
+    if count then
+        local text = "Saved " .. plural(count, "setting") .. " as " .. TAB_TEXT[name] .. "."
+        local replaced = replacedText(before, db.profiles[name].values)
+        if replaced ~= "" then text = text .. " " .. replaced end
+        state.saved = text
+    end
+    draw()
+end
+
+-- A button or tick of the window, by the keys of the model: tab:<tab>, keep:<cvar>, level:<cvar>:<value>, use, switch, maximum,
 -- close. A refusal Maximum gives is shown in the window until the next click or redraw.
 function settings.click(key)
     if key == "close" then
@@ -600,15 +644,16 @@ function settings.click(key)
     -- Save as Everyday / Save as Crowded: keeps the game's current settings in that profile, whatever page or tab is showing.
     local saveKey = key:match("^save:(.+)$")
     if saveKey then                          -- Original, Maximum and a name that is no profile are refused by save, quietly
-        local count = ns.profiles.save(saveKey, true)
-        if count then state.saved = "Saved " .. plural(count, "setting") .. " as " .. TAB_TEXT[saveKey] .. "." end
-        draw()
+        keepCurrent(saveKey)
         return
     end
     local profile = state.tab
     if key == "use" then
-        ns.profiles.save(profile, true)
-        draw()
+        keepCurrent(profile)
+        return
+    end
+    if key == "switch" then                  -- Switch to <the tab shown>: it becomes the profile in use
+        if TAB_TEXT[profile] and profile ~= ctx.active then switchProfile(profile) end
         return
     end
     local cvar = key:match("^keep:(.+)$")
@@ -646,6 +691,7 @@ local CARD_GAP_X, CARD_GAP_Y = 18, 6
 local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 50, 22, 3, 14
 local COST_W = LEVEL_W + 8                         -- the cost under a level button is a little wider than the button: "+136 fps"
 local FOOTER_USE_W, FOOTER_MAX_W, FOOTER_BTN_H = 230, 160, 26
+local FOOTER_SWITCH_W = 170                           -- Switch to Everyday / Switch to Crowded
 local SUMMARY_GAP = 6
 local TAB_W = 120
 local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6       -- the save buttons at the bottom of the page list
@@ -817,6 +863,7 @@ local function build()
     p.sizeBack.key = "sizeback"
     p.sizeBack:SetScript("OnClick", clicked)
     p.sizeWarn = skin.text(area, "small", "warning", AREA_W)
+    p.sizeWhere = skin.text(area, "small", "accentLight", AREA_W)
     p.sizeSafe = skin.text(area, "small", "dim", AREA_W)
     p.sizeNote = skin.text(area, "small", "dim", AREA_W)
     p.dynamicLine = skin.text(area, "small", "dim", AREA_W)
@@ -869,6 +916,9 @@ local function build()
     p.maximum = skin.button(page, MAXIMUM_TEXT, FOOTER_MAX_W, FOOTER_BTN_H)
     p.maximum.key = "maximum"
     p.maximum:SetScript("OnClick", clicked)
+    p.switch = skin.button(page, "Switch to Everyday", FOOTER_SWITCH_W, FOOTER_BTN_H)
+    p.switch.key = "switch"
+    p.switch:SetScript("OnClick", clicked)
 
     f:SetScript("OnUpdate", function(self, elapsed)
         if not self:IsShown() then return end
@@ -1121,6 +1171,7 @@ function settings.render()
         p.sizeBack:SetEnabled(size.canPutBack)
         p.sizeBack:Show()
         y = y + 16 + 12
+        if size.where then placeText(p.sizeWhere, size.where) else hideText(p.sizeWhere) end
         if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end
         if size.safe then placeText(p.sizeSafe, size.safe) else hideText(p.sizeSafe) end
         placeText(p.sizeNote, size.note)
@@ -1128,6 +1179,7 @@ function settings.render()
         p.sizeSlider:Hide()
         p.sizeBack:Hide()
         hideText(p.sizeLabel)
+        hideText(p.sizeWhere)
         hideText(p.sizeWarn)
         hideText(p.sizeSafe)
         hideText(p.sizeNote)
@@ -1156,8 +1208,9 @@ function settings.render()
     stack(p.total, view.totalLine)
     stack(p.your, view.yourLine)
 
-    -- The footer: Use what I have in the game now and Switch to Maximum, right-aligned.
-    local hasMaximum = false
+    -- The footer, right-aligned: Switch to <the tab shown> (only when that tab is not the profile in use), Use what I have in the
+    -- game now, and Switch to Maximum (only when Maximum is not in use).
+    local hasMaximum, hasSwitch = false, false
     for _, button in ipairs(view.buttons) do
         if button.key == "use" then
             p.use:SetLabel(button.text)
@@ -1166,19 +1219,28 @@ function settings.render()
             hasMaximum = true
             p.maximum:SetLabel(button.text)
             p.maximum:SetEnabled(button.enabled)
+        elseif button.key == "switch" then
+            hasSwitch = true
+            p.switch:SetLabel(button.text)
+            p.switch:SetEnabled(button.enabled)
         end
     end
     if onSettings then
+        local useRight = PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0)
         p.use:ClearAllPoints()
         p.maximum:ClearAllPoints()
+        p.switch:ClearAllPoints()
         p.maximum:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -PAD, 9)
-        p.use:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0)), 9)
+        p.use:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -useRight, 9)
+        p.switch:SetPoint("BOTTOMRIGHT", f.page, "BOTTOMRIGHT", -(useRight + FOOTER_USE_W + 8), 9)
         p.use:Show()
         if hasMaximum then p.maximum:Show() else p.maximum:Hide() end
+        if hasSwitch then p.switch:Show() else p.switch:Hide() end
         p.footerRule:Show()
     else
         p.use:Hide()
         p.maximum:Hide()
+        p.switch:Hide()
         p.footerRule:Hide()
     end
 end

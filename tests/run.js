@@ -809,7 +809,7 @@ end
     end
     local tab = key:match("^tab:(.+)$")`, `    local tab = key:match("^tab:(.+)$")`],
   'settings-lock-tabs-live': ['Settings.lua', `            note = names.PROFILE_NOTE[key], enabled = locked == nil,`, `            note = names.PROFILE_NOTE[key], enabled = true,`],
-  'settings-use-wrong-profile': ['Settings.lua', `        ns.profiles.save(profile, true)`, `        ns.profiles.save("everyday", true)`],
+  'settings-use-wrong-profile': ['Settings.lua', `        keepCurrent(profile)`, `        keepCurrent("everyday")`],
   'settings-refresh-missing': ['Settings.lua', `        if signature(context()) ~= lastSignature then draw() end`, `        if false then draw() end`],
   'settings-prints': ['Settings.lua', `        ns.profiles.setProfileValue(profile, pickedCvar, value, true)`, `        ns.profiles.setProfileValue(profile, pickedCvar, value)`],
   'settings-row-shows-raw-name': ['Settings.lua', `        name:SetText(row.name)`, `        name:SetText(row.cvar)`],
@@ -1455,7 +1455,7 @@ end`],
     stack(p.total, view.totalLine)`],
   'settings-max-total-over-buttons': ['Settings.lua', `    local bottom = FOOTER_H + SUMMARY_GAP`, `    local bottom = 20`],
   'settings-max-matters-over-total': ['Settings.lua', `        bottom = bottom + heightOf(fs, str) + 2`, `        bottom = bottom + 2`],
-  'settings-max-footer-overlap': ['Settings.lua', `-(PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0))`, `-(PAD + (hasMaximum and 0 or 0))`],
+  'settings-max-footer-overlap': ['Settings.lua', `local useRight = PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0)`, `local useRight = PAD + (hasMaximum and 0 or 0)`],
   'settings-max-matters-line-missing': ['Settings.lua', `            worth:SetText("matters: " .. row.mattersWords)`, `            worth:SetText("")`],
   'settings-max-cost-note-missing': ['Settings.lua', `    if onSettings or view.page == "home" then placeText(p.costNote, view.costNote) else hideText(p.costNote) end`, `    hideText(p.costNote)`],
   'settings-max-costs-not-released': ['Settings.lua', `    release(p.costs, true)`, `    local _ = p.costs`],
@@ -1625,10 +1625,10 @@ end`],
   'saveas-anchor': ['Settings.lua', `button:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", SAVE_X, 12 + (#TABS - i)`, `button:SetPoint("TOPLEFT", page, "BOTTOMLEFT", SAVE_X, 12 + (#TABS - i)`],
   'saveas-click-missing': ['Settings.lua', `        button.key = "save:" .. key
         button:SetScript("OnClick", clicked)`, `        button.key = "save:" .. key`],
-  'saveas-saves-to-tab': ['Settings.lua', `local count = ns.profiles.save(saveKey, true)`, `local count = ns.profiles.save(state.tab, true)`],
-  'saveas-loud': ['Settings.lua', `local count = ns.profiles.save(saveKey, true)`, `local count = ns.profiles.save(saveKey)`],
-  'saveas-message-period': ['Settings.lua', `" as " .. TAB_TEXT[saveKey] .. "." end`, `" as " .. TAB_TEXT[saveKey] end`],
-  'saveas-message-profile': ['Settings.lua', `" as " .. TAB_TEXT[saveKey] .. "." end`, `" as " .. TAB_TEXT[state.tab] .. "." end`],
+  'saveas-saves-to-tab': ['Settings.lua', `        keepCurrent(saveKey)`, `        keepCurrent(state.tab)`],
+  'saveas-loud': ['Settings.lua', `local count = ns.profiles.save(name, true)`, `local count = ns.profiles.save(name)`],
+  'saveas-message-period': ['Settings.lua', `" as " .. TAB_TEXT[name] .. "."`, `" as " .. TAB_TEXT[name]`],
+  'saveas-message-profile': ['Settings.lua', `" as " .. TAB_TEXT[name] .. "."`, `" as " .. TAB_TEXT[state.tab] .. "."`],
   'saveas-note-missing': ['Settings.lua', `    if view.saveBar.note then`, `    if false then`],
   'saveas-note-sticky': ['Settings.lua', `    state.saved = nil                        -- so is what a save button said`, `    local _ = state.saved`],
   'saveas-caption-stays': ['Settings.lua', `        p.saveNote:Show()
@@ -1929,6 +1929,43 @@ end
   'sz-enabled-ignores-lock': ['Settings.lua', `safe = risky and SIZE_SAFE or nil, enabled = locked == nil,`, `safe = risky and SIZE_SAFE or nil, enabled = true,`],
   'sz-preflight-size-missing': ['Bench.lua', `    if size and size > 1 then`, `    if false then`],
   'sz-preflight-size-100': ['Bench.lua', `    if size and size > 1 then`, `    if size and size >= 1 then`],
+  // Editing a tab that is not in use: the where line, Switch to <tab>, and what a save replaced (the owner's report of 2026-11-02)
+  'sw-model-switch-missing': ['Settings.lua', `    if st.tab ~= ctx.active and TAB_TEXT[st.tab] then`, `    if false then`],
+  'sw-model-switch-always': ['Settings.lua', `    if st.tab ~= ctx.active and TAB_TEXT[st.tab] then`, `    if TAB_TEXT[st.tab] then`],
+  'sw-model-switch-text': ['Settings.lua', `text = "Switch to " .. TAB_TEXT[st.tab], enabled = locked == nil }`, `text = "Switch", enabled = locked == nil }`],
+  'sw-model-switch-ignores-lock': ['Settings.lua', `text = "Switch to " .. TAB_TEXT[st.tab], enabled = locked == nil }`, `text = "Switch to " .. TAB_TEXT[st.tab], enabled = true }`],
+  'sw-where-in-use': ['Settings.lua', `        if not onTabInUse then
+            local usedLabel`, `        if onTabInUse then
+            local usedLabel`],
+  'sw-where-label': ['Settings.lua', `(ns.profiles and ns.profiles.LABEL or {})[ctx.active] or tostring(ctx.active)`, `(ns.profiles and ns.profiles.LABEL or {})[st.tab] or tostring(ctx.active)`],
+  'sw-where-text': ['Settings.lua', `" and take effect when you switch to " .. tab .. "."`, `" and take effect at once."`],
+  'sw-click-switch-missing': ['Settings.lua', `    if key == "switch" then                  -- Switch to`, `    if key == "switch-off" then                  -- Switch to`],
+  'sw-click-switch-active': ['Settings.lua', `if TAB_TEXT[profile] and profile ~= ctx.active then switchProfile(profile) end`, `if TAB_TEXT[profile] then switchProfile(profile) end`],
+  'sw-click-switch-tab': ['Settings.lua', `if TAB_TEXT[profile] and profile ~= ctx.active then switchProfile(profile) end`, `if TAB_TEXT[profile] and profile ~= ctx.active then switchProfile("crowded") end`],
+  'sw-keep-use-routed': ['Settings.lua', `        keepCurrent(profile)`, `        ns.profiles.save(profile, true) draw()`],
+  'sw-keep-save-routed': ['Settings.lua', `        keepCurrent(saveKey)`, `        local _ = saveKey`],
+  'sw-keep-text-dropped': ['Settings.lua', `if replaced ~= "" then text = text .. " " .. replaced end`, `local _ = replaced`],
+  'sw-keep-swapped': ['Settings.lua', `replacedText(before, db.profiles[name].values)`, `replacedText(db.profiles[name].values, before)`],
+  'sw-keep-before-missing': ['Settings.lua', `for cvar, value in pairs(db and db.profiles[name] and db.profiles[name].values or {}) do before[cvar] = value end`, `local _ = db`],
+  'sw-replaced-unchanged': ['Settings.lua', `if was ~= nil and now ~= nil and not sameValue(was, now) then`, `if was ~= nil and now ~= nil then`],
+  'sw-replaced-no-prior': ['Settings.lua', `if was ~= nil and now ~= nil and not sameValue(was, now) then`, `if now ~= nil and not sameValue(was, now) then`],
+  'sw-replaced-cap': ['Settings.lua', `for i = 1, math.min(3, #lines) do shown[i] = lines[i] end`, `for i = 1, math.min(4, #lines) do shown[i] = lines[i] end`],
+  'sw-replaced-more': ['Settings.lua', `if #lines > 3 then text = text .. "; and " .. (#lines - 3) .. " more" end`, `if #lines > 4 then text = text .. "; and " .. (#lines - 3) .. " more" end`],
+  'sw-replaced-more-count': ['Settings.lua', `"; and " .. (#lines - 3) .. " more"`, `"; and " .. #lines .. " more"`],
+  'sw-replaced-words': ['Settings.lua', `" was " .. ns.names.level(cvar, was) .. ", now " .. ns.names.level(cvar, now)`, `" is " .. ns.names.level(cvar, now)`],
+  'sw-frame-switch-hidden': ['Settings.lua', `        if hasSwitch then p.switch:Show() else p.switch:Hide() end`, `        p.switch:Hide()`],
+  'sw-frame-switch-off-page': ['Settings.lua', `        p.switch:Hide()
+        p.footerRule:Hide()`, `        p.footerRule:Hide()`],
+  'sw-frame-switch-position': ['Settings.lua', `-(useRight + FOOTER_USE_W + 8)`, `-(useRight + FOOTER_USE_W)`],
+  'sw-frame-use-position': ['Settings.lua', `local useRight = PAD + (hasMaximum and (FOOTER_MAX_W + 8) or 0)`, `local useRight = PAD + (hasMaximum and FOOTER_MAX_W or 0)`],
+  'sw-frame-switch-label': ['Settings.lua', `            p.switch:SetLabel(button.text)`, `            local _ = button.text`],
+  'sw-frame-switch-enabled': ['Settings.lua', `            p.switch:SetEnabled(button.enabled)`, `            p.switch:SetEnabled(true)`],
+  'sw-frame-where-missing': ['Settings.lua', `        if size.where then placeText(p.sizeWhere, size.where) else hideText(p.sizeWhere) end`, `        hideText(p.sizeWhere)`],
+  'sw-frame-where-order': ['Settings.lua', `        if size.where then placeText(p.sizeWhere, size.where) else hideText(p.sizeWhere) end
+        if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end`, `        if size.warning then placeText(p.sizeWarn, size.warning) else hideText(p.sizeWarn) end
+        if size.where then placeText(p.sizeWhere, size.where) else hideText(p.sizeWhere) end`],
+  'sw-frame-where-sticky': ['Settings.lua', `        hideText(p.sizeLabel)
+        hideText(p.sizeWhere)`, `        hideText(p.sizeLabel)`],
 };
 
 function main() {

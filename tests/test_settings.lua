@@ -527,7 +527,7 @@ test("S2-5 Switch to Maximum sits between Use and Close, is greyed when locked, 
     local combat = s.model({ tab = "everyday" }, ctxOf(e, { locked = "combat" }))
     local inUse = s.model({ tab = "everyday" }, ctxOf(e, { active = "maximum" }))
     local shape = keys(idle) == "use:true,maximum:true,close:true" and idle.buttons[2].text == "Switch to Maximum"
-        and keys(combat) == "use:false,maximum:false,close:true" and keys(inUse) == "use:true,close:true"
+        and keys(combat) == "use:false,maximum:false,close:true" and keys(inUse) == "use:true,switch:true,close:true"
     local calls = {}
     local real = p.switch
     p.switch = function(name, silent) calls[#calls + 1] = tostring(name) .. ":" .. tostring(silent) return real(name, silent) end
@@ -1366,6 +1366,146 @@ test("S10-4 the model offers the two save buttons on every page, greyed when loc
         and locked.buttons[1].enabled == false and locked.buttons[2].enabled == false
         and busy.buttons[1].enabled == false and busy.buttons[2].enabled == false
         and said.note == "Saved 3 settings as Crowded." and said.buttons[1].enabled == true, tostring(plain and plain.caption)
+end)
+
+-- Editing a tab that is not the profile in use (the owner's report, 2026-11-02: Maximum in use, the Everyday tab edited, then Save as
+-- Everyday copied the game's 100% over the edit): the page says where a change goes, one click switches, and a save says what it replaced.
+test("S11-1 the model offers Switch to <tab> when the tab shown is not the profile in use, greyed when locked", function()
+    local e, s = boot()
+    local function buttons(st, over)
+        local list = {}
+        for _, b in ipairs(s.model(st, ctxOf(e, over)).buttons) do list[b.key] = b end
+        return list
+    end
+    local inUse = buttons({ tab = "everyday" }, {})
+    local other = buttons({ tab = "crowded" }, {})
+    local maximum = buttons({ tab = "everyday" }, { active = "maximum" })
+    local original = buttons({ tab = "crowded" }, { active = "original" })
+    local locked = buttons({ tab = "crowded" }, { locked = "combat" })
+    return inUse.switch == nil and other.switch ~= nil and other.switch.text == "Switch to Crowded" and other.switch.enabled == true
+        and maximum.switch ~= nil and maximum.switch.text == "Switch to Everyday" and maximum.maximum == nil
+        and original.switch ~= nil and original.switch.text == "Switch to Crowded"
+        and locked.switch ~= nil and locked.switch.enabled == false,
+        tostring(other.switch and other.switch.text) .. tostring(maximum.switch and maximum.switch.text)
+end)
+
+test("S11-2 the size block says where a change goes when the tab shown is not the profile in use, and says nothing when it is", function()
+    local e, s = boot()
+    local function where(st, over)
+        over.size = { live = 100 }
+        return s.model(st, ctxOf(e, over)).size.where
+    end
+    return where({ tab = "everyday" }, { active = "maximum" })
+            == "The game is using Maximum. Changes here are stored in Everyday and take effect when you switch to Everyday."
+        and where({ tab = "everyday" }, { active = "original" })
+            == "The game is using Original. Changes here are stored in Everyday and take effect when you switch to Everyday."
+        and where({ tab = "crowded" }, {})
+            == "The game is using Everyday. Changes here are stored in Crowded and take effect when you switch to Crowded."
+        and where({ tab = "everyday" }, {}) == nil
+end)
+
+test("S11-3 with Maximum in use the page says where the change goes, and Switch to Everyday puts the profile in use and the size in the game", function()
+    local e, s, db = bootWith(fullEntry(), { active = "maximum" })
+    s.open("size")
+    local f = window()
+    local WHERE = "The game is using Maximum. Changes here are stored in Everyday and take effect when you switch to Everyday."
+    local switch = byKey(f, "switch")
+    local first = hasText(f, WHERE) and switch ~= nil and switch._text == "Switch to Everyday" and switch.enabled == true
+    drag(f, 150)
+    local stored = db.profiles.everyday.values.RenderScale == "1.5" and CVARS.RenderScale == "1" and hasText(f, WHERE)
+    s.click("page:light")
+    local leaves = not hasText(window(), WHERE)
+    s.click("page:size")
+    stored = stored and leaves and hasText(window(), WHERE)
+    COMBAT = true
+    s.open("size")
+    local greyed = byKey(window(), "switch").enabled == false
+    s.click("switch")
+    local stays = db.active == "maximum"
+    COMBAT = false
+    s.open("size")
+    byKey(window(), "switch"):Click()
+    f = window()
+    local switched = db.active == "everyday" and CVARS.RenderScale == "1.5" and not hasText(f, WHERE) and byKey(f, "switch") == nil
+        and byKey(f, "size")._value == 150 and hasText(f, "Picture sharpness right now: 150%") and #OUT == 0
+    return first and stored and greyed and stays and switched, tostring(first) .. tostring(stored) .. tostring(greyed) .. tostring(stays)
+        .. tostring(switched)
+end)
+
+test("S11-4 Save as and Use what I have in the game now say what they replace: the setting, what the profile held and what it holds now", function()
+    local e, s, db = bootWith(fullEntry(), { active = "maximum" })
+    local n = managedPresent(e)
+    s.open("size")
+    drag(window(), 150)
+    byKey(window(), "save:everyday"):Click()
+    local a = hasText(window(), savedLine(n, "Everyday")) and hasText(window(), "Picture sharpness was 150%, now 100%.")
+        and db.profiles.everyday.values.RenderScale == "1"
+    drag(window(), 175)
+    byKey(window(), "use"):Click()
+    local b = hasText(window(), savedLine(n, "Everyday")) and hasText(window(), "Picture sharpness was 175%, now 100%.") and #OUT == 0
+    local e2, s2, db2 = bootWith(fullEntry())
+    s2.open("size")
+    drag(window(), 150)
+    byKey(window(), "save:everyday"):Click()
+    local quiet = hasText(window(), savedLine(managedPresent(e2), "Everyday")) and not hasText(window(), "was ")
+    local e3, s3, db3 = bootWith(fullEntry(), { active = "maximum" })
+    db3.profiles.everyday.values = { graphicsShadowQuality = "0", graphicsSSAO = "0", groundEffectDensity = "48", RenderScale = "0.5" }
+    s3.open("light")
+    byKey(window(), "save:everyday"):Click()
+    local capped = hasText(window(), "Shadow detail was 0, now 2; Soft corner shadows was 0, now 1; Grass and plants (exact amount) was 48, now 64; and 1 more.")
+    return a and b and quiet and capped, tostring(a) .. tostring(b) .. tostring(quiet) .. tostring(capped)
+end)
+
+test("S11-5 with Maximum in use (the longest banner) the size block with its where line still stands above the summary, in order", function()
+    local e, s = bootWith(fullEntry(), { active = "maximum" })
+    s.open("size")
+    drag(window(), 150)                                    -- stored in Everyday: the warning and the Shift line show as well
+    STRINGHEIGHT = function(fs)
+        local text = fs._text or ""
+        local perLine = math.max(1, math.floor((fs._width or 520) / 9))
+        return 14 * math.max(1, math.ceil(#text / perLine))
+    end
+    s.open("size")
+    local f = window()
+    local where = fontStringWith(f, "The game is using Maximum. Changes here are stored in Everyday and take effect when you switch to Everyday.")
+    local warn, safe = fontStringWith(f, SIZE_WARNING), fontStringWith(f, SIZE_SAFE)
+    local note = fontStringWith(f, "Kept in Everyday: used when you switch to Everyday.")
+    local slider, switch, use = byKey(f, "size"), byKey(f, "switch"), byKey(f, "use")
+    local your
+    walk(f, function(frame)
+        for _, fs in ipairs(frame.fontStrings) do
+            if fs.shown and fs._text and fs._text:find("Everything at the highest", 1, true) then your = fs end
+        end
+    end)
+    local function top(item) return -item._point[5] end
+    local ok = where ~= nil and warn ~= nil and safe ~= nil and note ~= nil and slider ~= nil and switch ~= nil and use ~= nil
+        and top(where) >= top(slider) + 16 and top(warn) >= top(where) + STRINGHEIGHT(where) and top(safe) >= top(warn) + STRINGHEIGHT(warn)
+        and top(note) >= top(safe) + STRINGHEIGHT(safe)
+        and switch._point[1] == "BOTTOMRIGHT" and switch._point[4] == -(16 + 230 + 8) and use._point[4] == -16 and byKey(f, "maximum") == nil
+    local fits = your == nil or 8 + top(note) + STRINGHEIGHT(note) <= 522 - (your._point[5] + STRINGHEIGHT(your))
+    STRINGHEIGHT = nil
+    return ok and fits, tostring(ok) .. tostring(fits) .. " " .. tostring(where and top(where)) .. " " .. tostring(note and top(note))
+end)
+
+test("S11-6 with Everyday in use and the Crowded tab shown the footer has three buttons, Switch to Crowded labelled and placed left of Use, hidden off the settings pages, and a second click does nothing", function()
+    local e, s, db, p = bootWith(fullEntry())
+    local calls = {}
+    local real = p.switch
+    p.switch = function(name, silent) calls[#calls + 1] = tostring(name) return real(name, silent) end
+    s.open("light")
+    s.click("tab:crowded")
+    local f = window()
+    local switch, use, maximum = byKey(f, "switch"), byKey(f, "use"), byKey(f, "maximum")
+    local placed = switch ~= nil and use ~= nil and maximum ~= nil and switch._text == "Switch to Crowded"
+        and maximum._point[4] == -16 and use._point[4] == -(16 + 160 + 8) and switch._point[4] == -(16 + 160 + 8 + 230 + 8)
+    s.click("page:home")
+    local hidden = byKey(window(), "switch") == nil
+    s.click("page:light")
+    s.click("switch")
+    local once = #calls == 1 and calls[1] == "crowded" and db.active == "crowded" and byKey(window(), "switch") == nil
+    s.click("switch")
+    local twice = #calls == 1
+    return placed and hidden and once and twice, tostring(placed) .. tostring(hidden) .. tostring(once) .. tostring(twice)
 end)
 
 -- The Home page (spec 2026-11-02-flat-hub-window-design.md section 5).
