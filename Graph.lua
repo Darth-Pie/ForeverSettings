@@ -194,9 +194,14 @@ function graph.new(parent)
                 end
                 if p.current then
                     mark(rings, "ring", item.x, item.y, nil, COLORS.ring)
-                    say("now", item.x - 20, item.y - TAG_RISE, 40, COLORS.ring)
                 end
-                if p.picked then
+                -- One tag over a point (a picked point is never the recommended one, and the recommended one is never the level
+                -- in use): the level in use picked again says both in one place.
+                if p.current and p.picked then
+                    say("now, your pick", item.x - 45, item.y - TAG_RISE, 90, pickedColor)
+                elseif p.current then
+                    say("now", item.x - 20, item.y - TAG_RISE, 40, COLORS.ring)
+                elseif p.picked then
                     say("your pick", item.x - 35, item.y - TAG_RISE, 70, pickedColor)
                 elseif p.recommended then
                     say("recommended", item.x - 35, item.y - TAG_RISE, 70, COLORS.recommended)

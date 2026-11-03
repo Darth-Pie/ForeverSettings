@@ -882,6 +882,11 @@ local function unchanged(e, before)
     return same(before[1], now[1]) and same(before[2], now[2]) and same(before[3], now[3]) and same(before[4], now[4])
         and before[5] == now[5] and before[6] == now[6]
 end
+-- A picked setting's row is drawn in the colour of the profile it will be saved to (its name stays as it is, on one line).
+local function rowPicked(e, row)
+    local c, everyday, crowded = row.label._textColor, e.ns.graph.COLORS.picked, e.ns.graph.COLORS.pickedCrowd
+    return c ~= nil and ((near(c[1], everyday[1]) and near(c[2], everyday[2])) or (near(c[1], crowded[1]) and near(c[2], crowded[2])))
+end
 local function marksOf(f, role)
     local list = {}
     walk(f, function(frame) if frame ~= f and frame.graphMark == role and frame.shown then list[#list + 1] = frame end end)
@@ -908,7 +913,8 @@ test("R-PK-1 a click on a point stages that level: nothing is written, the estim
     local staged = unchanged(e, before) and hasText(f, "These 2 changes should take you from about 250 fps to about 417 fps (an estimate).")
         and hasText(f, "With these changes: about 417 fps (estimate)")
         and hasText(f, "Checked before your changes: about 323 fps. Run the test again to measure your picks.")
-        and rowsOf(f)[1].label._text == "Shadow detail (your pick)" and findButton(f, RESET) ~= nil
+        and rowsOf(f)[1].label._text == "Shadow detail" and rowPicked(e, rowsOf(f)[1]) and not rowPicked(e, rowsOf(f)[2])
+        and rowsOf(f)[1].label._wordWrap == false and findButton(f, RESET) ~= nil
         and #marksOf(f, "picked") == 1 and countExact(f, "your pick") == 1
     return noReset and staged and outText() == "", allText(f)
 end)
@@ -921,7 +927,7 @@ test("R-PK-2 clicking the recommended level again takes the pick back; Back to t
     pointButtons(f)[1]:Click()                             -- pick 0
     pointButtons(f)[2]:Click()                             -- the recommended 1: no pick
     local undone = findButton(f, RESET) == nil and hasText(f, "These 2 changes should take you from about 250 fps to about 333 fps.")
-        and rowsOf(f)[1].label._text == "Shadow detail"
+        and rowsOf(f)[1].label._text == "Shadow detail" and not rowPicked(e, rowsOf(f)[1])
     pointButtons(f)[1]:Click()
     rowsOf(f)[2]:Click()
     pointButtons(f)[3]:Click()                             -- Soft corner shadows kept at 2
@@ -983,12 +989,37 @@ test("R-PK-8 in combat the points do not react and Save is greyed; the picks sta
     hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
     local inert = pointButtons(f)[2].scripts.OnClick == nil and findButton(f, SAVE_E):IsEnabled() == false
     r.pick("graphicsShadowQuality", "1")                   -- a click that still arrives is refused
-    local kept = rowsOf(f)[1].label._text == "Shadow detail (your pick)"
+    local kept = rowPicked(e, rowsOf(f)[1])
     COMBAT = false
     hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
     pointButtons(f)[2]:Click()
-    local again = rowsOf(f)[1].label._text == "Shadow detail" and findButton(f, SAVE_E):IsEnabled() == true
+    local again = not rowPicked(e, rowsOf(f)[1]) and findButton(f, SAVE_E):IsEnabled() == true
     return inert and kept and again, tostring(inert) .. tostring(kept) .. tostring(again)
+end)
+
+-- The fresh review of 2026-11-03, finding 1: a pick back to the tested level in use while the game holds another level now.
+test("R-PK-10 Save keeps a picked level even when it is the level the test ran at and the game holds another one now", function()
+    local e, r = boot({ graphicsShadowQuality = "1", graphicsSSAO = "3", RenderScale = "1" })
+    emptyEveryday(e)
+    r.show(T1(), 250)                                      -- the test ran at Shadow detail 2; the game holds 1 now
+    local f = window()
+    pointButtons(f)[3]:Click()                             -- Shadow detail 2, the level in use when tested
+    findButton(f, SAVE_E):Click()
+    local held = e.ns.db().profiles.everyday.values.graphicsShadowQuality
+    return held == "2" and countExact(f, APPLIED) == 1, tostring(held) .. " " .. allText(f)
+end)
+
+-- The fresh review of 2026-11-03, finding 2: Back to the recommendation after a Save.
+test("R-PK-11 Back to the recommendation after a Save offers Save again and drops the Saved line", function()
+    local e, r = boot()
+    emptyEveryday(e)
+    e.ns.profiles.adopt = function() return true, {} end
+    r.show(T1(), 250)
+    local f = window()
+    pointButtons(f)[1]:Click()
+    findButton(f, SAVE_E):Click()
+    findButton(f, RESET):Click()
+    return findButton(f, SAVE_E) ~= nil and countExact(f, APPLIED) == 0, allText(f)
 end)
 
 test("R-PK-9 Close ends the offer and shows the saved results again; the window stays open", function()

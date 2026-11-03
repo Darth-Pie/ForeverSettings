@@ -700,8 +700,10 @@ function guide.refresh()
     if not state or state.view ~= "running" then return end
     if ns.bench and not ns.bench.active() then
         state = nil
+        draw()                                   -- the run is over: the whole window again, no longer locked
+        return
     end
-    draw()
+    if host and host:IsShown() then guide.renderPage(host) end       -- only this page while the test measures
 end
 
 -- Draws the window again (the page draws only while it is on screen).

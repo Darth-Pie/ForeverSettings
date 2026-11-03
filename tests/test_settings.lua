@@ -1676,6 +1676,27 @@ test("P-RUN-1 while a test runs the window stays on Find my settings: the other 
         table.concat(pages, ",") .. " " .. tostring(onTest) .. tostring(stayed) .. tostring(greyed) .. tostring(free)
 end)
 
+-- The fresh review of 2026-11-03, finding 3: the greyed pill has to look greyed.
+test("P-RUN-3 while a test runs the pill's name and dot are in the disabled colour; afterwards they are back", function()
+    local e, s = bootWith(fullEntry())
+    local running = true
+    e.ns.guide.running = function() return running end
+    s.open("test")
+    local pill = byKey(window(), "pill")
+    local dr = e.ns.skin.color("textDisabled")
+    local function dotRed()
+        for _, tex in ipairs(pill.dot.textures) do
+            if tex._texture then return tex._vertex[1] end
+        end
+    end
+    local greyed = pill.label._textColor[1] == dr and dotRed() == dr
+    running = false
+    s.open("test")
+    local br = e.ns.skin.color("bright")
+    local back = pill.label._textColor[1] == br and dotRed() == e.ns.skin.color("profileEveryday")
+    return greyed and back, tostring(greyed) .. tostring(back)
+end)
+
 test("P-RUN-2 while a test runs the close button, Escape and closing from code do nothing; afterwards they close the window again", function()
     local e, s = bootWith(fullEntry())
     local running = true

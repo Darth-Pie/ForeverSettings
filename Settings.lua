@@ -933,9 +933,14 @@ local function build()
         sinceRefresh = sinceRefresh + elapsed
         if sinceRefresh < REFRESH then return end
         sinceRefresh = 0
-        -- A running test redraws its progress, and notices a run that ended elsewhere. Combat and a test starting or ending are
-        -- in the signature, so the results' Save button and graph points follow them through the redraw below.
-        if ns.guide and ns.guide.refresh then guarded(ns.guide.refresh) end
+        -- While a test runs only its page is redrawn (its progress, or the end of a run that ended elsewhere): the whole window
+        -- would work its costs out again in the middle of the test's measurements, and the settings it changes as it goes would
+        -- redraw it at every step. Otherwise combat and a test starting or ending are in the signature, so the results' Save
+        -- button and graph points follow them through the redraw below.
+        if ns.guide and ns.guide.running and ns.guide.running() then
+            if ns.guide.refresh then guarded(ns.guide.refresh) end
+            return
+        end
         if signature(context()) ~= lastSignature then draw() end
     end)
     -- While a test runs the window cannot be put away (the close button, Escape, code): it comes straight back. Closing it at any
@@ -946,6 +951,8 @@ local function build()
             return
         end
         if ns.results and ns.results.endOffer then ns.results.endOffer() end
+        -- A test start (its tick box is a promise for that test) or a finished view does not wait for the next opening.
+        if ns.guide and ns.guide.hide then ns.guide.hide() end
     end)
     frame, parts = f, p
     return f
@@ -995,7 +1002,10 @@ function settings.render()
         p.saveNote:Hide()
     end
     p.pill.label:SetText(view.profile.text)
-    p.pill.dot:SetColorName(view.profile.color)
+    -- While a test runs the pill does nothing, and looks it.
+    local pillOn = view.profile.enabled ~= false
+    p.pill.label:SetTextColor(skin.color(pillOn and "bright" or "textDisabled"))
+    p.pill.dot:SetColorName(pillOn and view.profile.color or "textDisabled")
 
     local y = TITLE_H
     local function placeText(fs, str, x)

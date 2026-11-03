@@ -325,6 +325,23 @@ test("SK-10 the four profile colours are in the palette, and a dot is an 8 pixel
         tostring(colours) .. tostring(corners) .. tostring(tinted) .. tostring(recoloured)
 end)
 
+-- The fresh review of 2026-11-03, finding 3: a page row that cannot be used (a test running) has to look it.
+test("SK-13 a disabled page row shows its label in the disabled colour and does not light up on hover; enabled again it looks as before", function()
+    local _, skin = boot()
+    local parent = skin.window("SkinTestWindow13", 400, 300, "t")
+    local row = skin.navItem(parent, "Home", 150, 28)
+    row:SetEnabled(false)
+    local dim = colorIs(row.label._textColor, "5d6170")
+    row.scripts.OnEnter(row)
+    local noHover = row.bg._color[4] == 0
+    row.scripts.OnLeave(row)
+    row:SetEnabled(true)
+    local back = colorIs(row.label._textColor, "d8dbe3")
+    row.scripts.OnEnter(row)
+    local hover = colorIs(row.bg._color, "1b1e28")
+    return dim and noHover and back and hover, tostring(dim) .. tostring(noHover) .. tostring(back) .. tostring(hover)
+end)
+
 -- The addon's gauge in the title bar, left of the title (owner request 2026-11-03).
 test("SK-12 a window's header shows the gauge icon at 20 pixels at its left, with the title to its right and the version label after the title", function()
     local _, skin = boot()

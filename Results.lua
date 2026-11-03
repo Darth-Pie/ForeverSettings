@@ -109,6 +109,7 @@ local function makeRow(parent)
     row.bg:SetAllPoints()
     row.label = skin.text(row, "normal", "bright", LIST_WIDTH - 16)
     row.label:SetPoint("LEFT", row, "LEFT", 12, 0)
+    row.label:SetWordWrap(false)                 -- one line in the 18 pixel row, whatever the name
     row.dot = row:CreateTexture(nil, "ARTWORK")
     row.dot:SetSize(6, 6)
     row.dot:SetColorTexture(COLORS.target[1], COLORS.target[2], COLORS.target[3], COLORS.target[4])
@@ -286,8 +287,10 @@ local function draw()
         local item = list[i]
         local row = take(p.rows)
         row.key, row.cvar = "setting:" .. item.cvar, item.cvar
-        row.label:SetText(item.name .. (item.picked and " (your pick)" or ""))
-        row.label:SetTextColor(skin.color(item.graph and "bright" or "dim"))
+        -- A picked setting is drawn in the colour of the profile it will be saved to, as its point on the graph.
+        row.label:SetText(item.name)
+        local profileColor = profileOf(current.result) == "crowded" and "profileCrowded" or "profileEveryday"
+        row.label:SetTextColor(skin.color(item.picked and profileColor or (item.graph and "bright" or "dim")))
         if item.changed then row.dot:Show() else row.dot:Hide() end
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", f, "TOPLEFT", LIST_X, -(panelY + (i - 1) * ROW_HEIGHT))
@@ -471,6 +474,7 @@ function results.click(key)
     end
     if key == "reset" then
         current.picks = {}
+        current.saved, current.notice = nil, nil
         recompute()
         redraw()
         return
@@ -484,6 +488,11 @@ function results.click(key)
     local values = {}
     if current.model.saveKind == "changes" then
         for _, change in ipairs(current.view.changes) do values[change.cvar] = change.to end
+    end
+    -- A level picked on the graph is saved as shown, also when it is the level the test ran at and the game holds another one
+    -- now (adopt fills every setting it is not given from the game).
+    for _, s in ipairs(current.view.settings or {}) do
+        if s.picked then values[s.cvar] = s.chosen end
     end
     local profile = profileOf(current.result)
     local ok, info = ns.profiles.adopt(profile, values, true)

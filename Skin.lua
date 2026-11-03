@@ -187,11 +187,15 @@ function skin.button(parent, text, width, height)
     return b
 end
 
--- A row of the page list: no edge, its label at the left; the selected row has the selected fill and a two pixel accent bar.
+-- A row of the page list: no edge, its label at the left; the selected row has the selected fill and a two pixel accent bar; a
+-- disabled row (a test running) shows its label in the disabled colour and does not light up.
 local function paintRow(row)
     local state = row.skinState
     local fillName, alpha, text = "fill", 0, "text"
-    if state.pressed then
+    if row.IsEnabled and not row:IsEnabled() then
+        if state.selected then fillName, alpha = "selected", 1 end
+        text = "textDisabled"
+    elseif state.pressed then
         fillName, alpha = "pressed", 1
     elseif state.selected then
         fillName, alpha, text = "selected", 1, "accentLight"
@@ -232,6 +236,11 @@ function skin.navItem(parent, text, width, height)
     row:SetScript("OnMouseUp", function(self) self.skinState.pressed = false paintRow(self) end)
     function row:SetSelected(on)
         self.skinState.selected = on and true or false
+        paintRow(self)
+    end
+    local setEnabled = row.SetEnabled
+    function row:SetEnabled(on)
+        setEnabled(self, on)
         paintRow(self)
     end
     function row:SetLabel(text2) self:SetText(text2) end

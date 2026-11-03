@@ -1608,6 +1608,40 @@ test("GP-2 Cancel and Close bring back Find my settings' two test buttons, and t
     return chooser and intro, tostring(chooser) .. tostring(intro)
 end)
 
+-- The fresh review of 2026-11-03: a full redraw of My settings every half second (its costs and saved results worked out again)
+-- is Lua work in the middle of the test's measurements; while a test runs only its page is redrawn.
+test("GP-4 while a test runs the refresh redraws only the test's page, never the whole window, and the progress still follows", function()
+    local e, g, b = newRun()
+    startVia(g, "run")
+    local w = hubFrame()
+    local renders = 0
+    local real = e.ns.settings.render
+    e.ns.settings.render = function(...) renders = renders + 1 return real(...) end
+    local step = 2
+    b.progress = function() return { phase = "sweep", label = "Shadows", done = step, total = 9 } end
+    CVARS.graphicsShadowQuality = "1"                      -- the test changes settings as it goes
+    w.scripts.OnUpdate(w, 0.6)
+    local first = hasText(guideFrame(), "Step 2 of about 9")
+    step = 3
+    CVARS.graphicsShadowQuality = "3"
+    w.scripts.OnUpdate(w, 0.6)
+    w.scripts.OnUpdate(w, 0.6)
+    e.ns.settings.render = real
+    return renders == 0 and first and hasText(guideFrame(), "Step 3 of about 9") and g.running(), tostring(renders)
+end)
+
+-- The fresh review of 2026-11-03: a promise ticked once (stay still, other programs closed) is not carried over to a later test.
+test("GP-5 closing the window drops a test start or result that is not running: the page opens on its two test buttons next time", function()
+    local e, g = newRun()
+    g.open("setup")
+    g.setTicked(true)
+    local w = hubFrame()
+    w.close:Click()
+    e.ns.settings.open("test")
+    local w2 = hubFrame()
+    return g.state() == nil and pageButton(w2, "run:setup") ~= nil and not guideFrame():IsShown(), tostring(g.state() and g.state().ticked)
+end)
+
 test("GP-3 a real run locks the window to its page; Stop lifts the lock, and so does a run that ends elsewhere", function()
     local e, g, b = newRun()
     startVia(g, "run")

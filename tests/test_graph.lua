@@ -397,6 +397,16 @@ test("GR-14 each point's button is 20 pixels and a click calls onPick with that 
         table.concat(got, ",") .. " " .. tostring(buttons[1]._width)
 end)
 
+-- The fresh review of 2026-11-03, finding 4: picking the level in use put two tags on one spot.
+test("GR-16 a pick of the level in use carries one tag, now, your pick, instead of two over each other", function()
+    local _, graph, r = boot()
+    local m = r.chartModel(r.withPicks(r.choose(T1(), 250), { graphicsShadowQuality = "2" }))
+    local parent = newParent()
+    graph.new(parent):draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis, { pickColor = "everyday" })
+    return countExact(parent, "now, your pick") == 1 and countExact(parent, "now") == 0 and countExact(parent, "your pick") == 0
+        and countExact(parent, "recommended") == 1, table.concat(texts(parent), ",")
+end)
+
 test("GR-15 a redraw without onPick takes the click away from a button that had one", function()
     local _, graph, r = boot()
     local m = modelOf(r)

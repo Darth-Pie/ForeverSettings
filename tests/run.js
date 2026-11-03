@@ -1415,7 +1415,6 @@ end`],
         fill = "pressed"`],
   'skin-state-pressed': ['Skin.lua', `fill, edge = "pressed", "accent"`, `fill, edge = "pressed", "control"`],
   'skin-state-selected': ['Skin.lua', `fill, edge, text = "selected", "accent", "bright"`, `fill, edge, text = "selected", "accent", "text"`],
-  'skin-state-disabled': ['Skin.lua', `        text = "textDisabled"`, `        text = "text"`],
   'skin-disabled-hover': ['Skin.lua', `    if not b:IsEnabled() then`, `    if false then`],
   'skin-set-enabled-unpainted': ['Skin.lua', `        setEnabled(self, on)
         paint(self)`, `        setEnabled(self, on)`],
@@ -1838,7 +1837,6 @@ end
     if not profile then return end`, `    local profile = TAB_TEXT[ctx.active] and ctx.active or "everyday"
     if not profile then return end`],
   'ed-frame-pill-label': ['Settings.lua', `p.pill.label:SetText(view.profile.text)`, `p.pill.label:SetText("Everyday")`],
-  'ed-frame-pill-dot': ['Settings.lua', `p.pill.dot:SetColorName(view.profile.color)`, `p.pill.dot:SetColorName("profileEveryday")`],
   'ed-frame-read-only-on-home': ['Settings.lua', `    if onSettings and view.readOnly then
         placeText(p.readOnly`, `    if view.readOnly then
         placeText(p.readOnly`],
@@ -2014,14 +2012,6 @@ end
   'pg-host-width': ['Settings.lua', `        host:SetSize(AREA_W, PAGE_H - TOP - SUMMARY_BOTTOM)`, `        host:SetSize(AREA_W + 3, PAGE_H - TOP - SUMMARY_BOTTOM)`],
   // The guided test as a page of My settings (spec 2026-11-03-tests-and-results-in-my-settings-design.md M2); the first five
   // re-anchor older rows on the page code
-  'ui-refresh-off': ['Settings.lua', `        if ns.guide and ns.guide.refresh then guarded(ns.guide.refresh) end`, `        local _ = ns.guide`],
-  'ui-refresh-every-frame': ['Settings.lua', `        if sinceRefresh < REFRESH then return end
-        sinceRefresh = 0
-        -- A running test`, `        sinceRefresh = 0
-        -- A running test`],
-  'ui-foreign-running-stays': ['Guide.lua', `    if ns.bench and not ns.bench.active() then
-        state = nil
-    end`, `    local _ = ns.bench`],
   'ui-box-click-ignored': ['Guide.lua', `p.box:SetScript("OnClick", function(self) guide.setTicked(self:GetChecked() and true or false) end)`, `p.box:SetScript("OnClick", function() end)`],
   'ui-box-state-not-pushed': ['Guide.lua', `        p.box:SetChecked(view.checkbox.checked)`, `        local _ = view.checkbox.checked`],
   'ui-hide-ignored': ['Guide.lua', `local function dismiss()
@@ -2042,10 +2032,6 @@ end
   'gp-stock-target': ['Guide.lua', `        local button = skin.button(into, tostring(n), TARGET_W, ROW_H)`, `        local button = CreateFrame("Button", nil, into, "UIPanelButtonTemplate")
         button:SetText(tostring(n))
         button.SetSelected, button.SetLabel = function() end, function(self, t) self:SetText(t) end`],
-  'gp-refresh-not-redrawing': ['Guide.lua', `        state = nil
-    end
-    draw()`, `        state = nil
-    end`],
   'gp-running-any-view': ['Guide.lua', `function guide.running()
     return state ~= nil and state.view == "running"`, `function guide.running()
     return state ~= nil`],
@@ -2059,13 +2045,11 @@ end
     current = nil`, `function results.endOffer()
     local _ = current`],
   'after-bar-ignores-measured': ['Results.lua', `    current.model = ns.recommend.chartModel(current.view, current.verify)`, `    current.model = ns.recommend.chartModel(current.view)`],
-  'results-text-raw': ['Results.lua', `row.label:SetText(item.name .. (item.picked and " (your pick)" or ""))`, `row.label:SetText(item.cvar)`],
   'results-third-button-missing': ['Results.lua', `    for i = 1, 4 do
         local button = skin.button(into, "", 120, 26)`, `    for i = 1, 2 do
         local button = skin.button(into, "", 120, 26)`],
   'results-w2-scroll-back': ['Results.lua', `    p.panel = CreateFrame("Frame", nil, into)`, `    p.panel = CreateFrame("ScrollFrame", nil, into)`],
   'results-w2-list-reversed': ['Results.lua', `        list[#list + 1] = { cvar = g.cvar, name = g.name, changed = g.changed, graph = g, picked = picked }`, `        table.insert(list, 1, { cvar = g.cvar, name = g.name, changed = g.changed, graph = g, picked = picked })`],
-  'results-w2-list-unmeasured-white': ['Results.lua', `row.label:SetTextColor(skin.color(item.graph and "bright" or "dim"))`, `row.label:SetTextColor(skin.color("bright"))`],
   'results-w2-list-name-from-label': ['Results.lua', `        list[#list + 1] = { cvar = g.cvar, name = g.name, changed = g.changed, graph = g, picked = picked }`, `        list[#list + 1] = { cvar = g.cvar, name = g.cvar, changed = g.changed, graph = g, picked = picked }`],
   'results-w2-select-default-missing': ['Results.lua', `    current.selected = current.model.selected or (first and (first.cvar or first.setting)) or nil`, `    current.selected = (first and (first.cvar or first.setting)) or nil`],
   'results-w2-select-nodata-default-missing': ['Results.lua', `    current.selected = current.model.selected or (first and (first.cvar or first.setting)) or nil`, `    current.selected = current.model.selected`],
@@ -2091,7 +2075,6 @@ end
   'rp-reset-shown-always': ['Results.lua', `if (m.picked or 0) > 0 then specs[#specs + 1] = { key = "reset"`, `if true then specs[#specs + 1] = { key = "reset"`],
   'rp-onpick-in-combat': ['Results.lua', `local onPick = refusal() == nil and function(value) results.pick(cvar, value) end or nil`, `local onPick = function(value) results.pick(cvar, value) end`],
   'rp-pick-colour-ignored': ['Results.lua', `pickColor = profileOf(current.result) == "crowded" and "crowded" or "everyday" })`, `pickColor = "everyday" })`],
-  'rp-your-pick-missing': ['Results.lua', `(item.picked and " (your pick)" or "")`, `""`],
   'rp-save-ignores-picks': ['Results.lua', `for _, change in ipairs(current.view.changes) do values[change.cvar] = change.to end`, `for _, change in ipairs(current.result.changes) do values[change.cvar] = change.to end`],
   'rp-show-not-opening': ['Results.lua', `        if ns.settings and ns.settings.open then ns.settings.open("results") end`, `        local _ = ns.settings`],
   'rp-close-keeps-offer': ['Results.lua', `function results.hide()
@@ -2103,6 +2086,46 @@ end
     return current ~= nil`, `function results.hasOffer()
     return true`],
   'rp-picks-not-applied': ['Results.lua', `    current.view = ns.recommend.withPicks(current.result, current.picks)`, `    current.view = ns.recommend.withPicks(current.result, {})`],
+  // The fix pass after the fresh review of the pages; the first nine re-anchor rows on lines the fixes changed
+  'skin-state-disabled': ['Skin.lua', `    if not b:IsEnabled() then
+        text = "textDisabled"`, `    if not b:IsEnabled() then
+        text = "text"`],
+  'ed-frame-pill-dot': ['Settings.lua', `p.pill.dot:SetColorName(pillOn and view.profile.color or "textDisabled")`, `p.pill.dot:SetColorName(pillOn and "profileEveryday" or "textDisabled")`],
+  'ui-refresh-off': ['Settings.lua', `            if ns.guide.refresh then guarded(ns.guide.refresh) end`, `            local _ = ns.guide`],
+  'ui-refresh-every-frame': ['Settings.lua', `        if sinceRefresh < REFRESH then return end
+        sinceRefresh = 0
+        -- While a test runs`, `        sinceRefresh = 0
+        -- While a test runs`],
+  'ui-foreign-running-stays': ['Guide.lua', `    if ns.bench and not ns.bench.active() then
+        state = nil
+        draw()`, `    if false then
+        state = nil
+        draw()`],
+  'gp-refresh-not-redrawing': ['Guide.lua', `    if host and host:IsShown() then guide.renderPage(host) end       -- only this page while the test measures`, `    local _ = host`],
+  'results-text-raw': ['Results.lua', `        row.label:SetText(item.name)
+        local profileColor`, `        row.label:SetText(item.cvar)
+        local profileColor`],
+  'results-w2-list-unmeasured-white': ['Results.lua', `(item.graph and "bright" or "dim")`, `"bright"`],
+  'rp-pick-row-colour': ['Results.lua', `item.picked and profileColor or (item.graph and "bright" or "dim")`, `(item.graph and "bright" or "dim")`],
+  'fx-save-picked-missing': ['Results.lua', `        if s.picked then values[s.cvar] = s.chosen end`, `        local _ = s`],
+  'fx-reset-keeps-saved': ['Results.lua', `        current.picks = {}
+        current.saved, current.notice = nil, nil`, `        current.picks = {}`],
+  'fx-row-wraps': ['Results.lua', `    row.label:SetWordWrap(false)`, `    local _ = row`],
+  'fx-tag-overlap': ['Graph.lua', `                if p.current and p.picked then
+                    say("now, your pick"`, `                if false then
+                    say("now, your pick"`],
+  'fx-row-disabled-look': ['Skin.lua', `    if row.IsEnabled and not row:IsEnabled() then`, `    if false then`],
+  'fx-row-enable-repaint': ['Skin.lua', `        setEnabled(self, on)
+        paintRow(self)
+    end`, `        setEnabled(self, on)
+    end`],
+  'fx-pill-label-lit': ['Settings.lua', `p.pill.label:SetTextColor(skin.color(pillOn and "bright" or "textDisabled"))`, `p.pill.label:SetTextColor(skin.color("bright"))`],
+  'fx-running-full-redraw': ['Settings.lua', `        if ns.guide and ns.guide.running and ns.guide.running() then
+            if ns.guide.refresh then guarded(ns.guide.refresh) end
+            return
+        end`, `        if ns.guide and ns.guide.refresh then guarded(ns.guide.refresh) end`],
+  'fx-refresh-full-draw': ['Guide.lua', `    if host and host:IsShown() then guide.renderPage(host) end       -- only this page while the test measures`, `    draw()`],
+  'fx-close-keeps-view': ['Settings.lua', `        if ns.guide and ns.guide.hide then ns.guide.hide() end`, `        local _ = ns.guide`],
 };
 
 function main() {
