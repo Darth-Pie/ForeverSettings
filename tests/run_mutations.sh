@@ -461,7 +461,6 @@ progress-cvar-missing|test_crowd|BH-4|killed
 progress-start-has-cvar|test_crowd|BH-4|killed
 progress-sweep-value-missing|test_crowd|BH-4|killed
 progress-after-cvar-missing|test_crowd|BH-4|killed
-progress-control-cvar-missing|test_crowd|BH-4|killed
 crowd-progress-sweep-value-missing|test_crowd|BH-4|killed
 guide-progress-raw-label|test_guide|G11-1,G11-2|killed
 guide-progress-ignores-cvar|test_guide|G11-1|killed
@@ -1290,6 +1289,19 @@ ig-labels-stay-centred|test_graph|GR-18|killed
 ig-check-blames-alt-tab|test_guide|G1-1|killed
 ig-hint-missing|test_results|R-PK-12|killed
 ig-hint-in-combat|test_results|R-PK-12|killed
+ctl-renderscale-only|test_bench|B6-7,B6-14,B7-23|killed
+ctl-renderscale-unchanged|test_bench|B6-7|killed
+ctl-empty-not-nil|test_bench|B6-7|killed
+ctl-not-restored|test_bench|B7-23|killed
+ctl-refusal-stops|test_bench|B7-5|killed
+ctl-refused-left-set|test_bench|B7-24|killed
+ctl-check-words|test_bench|B6-14|killed
+gd-recommended-not-marked|test_recommend|W-1|killed
+gd-recommended-not-marked-page|test_results|R-PK-2|killed
+gd-recommended-counted|test_recommend|W-1|killed
+gd-recommended-counted-page|test_results|R-PK-2|killed
+gd-tag-not-pick-colour|test_graph|GR-19|killed
+gd-tag-says-your-pick|test_graph|GR-19|killed
 control-comment|test_bench||survive
 control-missing|test_bench||error
 control-syntax|test_bench||error'

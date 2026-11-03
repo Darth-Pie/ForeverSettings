@@ -393,7 +393,7 @@ test("BH-4 progress carries the setting and level of a sweep window, the setting
         sampleOf(crowdSamples, "baseline", "start")
     return entry and entry.valid and sweep and sweep.cvar ~= nil and sweep.value ~= nil and sweep.label == sweep.label
         and after and after.cvar == sweep.cvar and after.value == nil and start and start.cvar == nil and start.value == nil
-        and control and control.cvar == "RenderScale" and control.value == nil
+        and control and control.cvar == nil and control.value == nil
         and crowdSweep and crowdSweep.cvar ~= nil and crowdSweep.value ~= nil and crowdAfter and crowdAfter.cvar == crowdSweep.cvar
         and crowdAfter.value == nil and crowdStart and crowdStart.cvar == nil,
         tostring(sweep and sweep.cvar) .. " " .. tostring(after and after.cvar) .. " " .. tostring(control and control.cvar)

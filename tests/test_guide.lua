@@ -25,9 +25,9 @@ local ROWS = {
     { "no frames", "The game stopped drawing frames, so the test stopped.", "Keep the game window in front, then try again." },
     { "stopped", "You stopped the test.", "You can start again any time." },
     { "control did not respond", "Graphics settings make no difference to the frame rate here.",
-        "In this spot the processor sets the pace, not the graphics card, so the test can't measure anything. Try a spot with a "
-            .. "wide, open view (out over a landscape, not at a wall), and check that no frame-rate limit is on. Switching to "
-            .. "another window (alt-tab) does this too." },
+        "Even with every setting at its lowest the frame rate stayed the same, so something else holds it back: a frame-rate "
+            .. "limit, another program, or the processor. Check that no frame-rate limit is on, close other programs, and try "
+            .. "again. Switching to another window (alt-tab) does this too." },
     { "control rejected", "The game would not accept a settings change.", "Close the graphics settings and try again." },
     { "panel:settings", "You opened the game's settings, so the test stopped.", "Leave it closed while the test runs, then try again." },
     { "panel:menu", "You opened the game menu, so the test stopped.", "Leave it closed while the test runs, then try again." },
@@ -473,7 +473,12 @@ local REAL = {
     { "no frames", nil, function(e) e.advance(6) end },
     { "stopped", nil, function(e, g) e.pump(0.3, runCost); g.click("stop"); e.pump(2, runCost) end },
     { "control did not respond", nil, function(e) e.pump(60, function() return 0.008 end) end },
-    { "control rejected", function() SETFAIL.RenderScale = "clamp" end, function(e) e.pump(60, runCost) end },
+    -- The control leaves out a change the game refuses; it stops only when the game refuses all of them.
+    { "control rejected", function(e, g, b)
+        local currents = {}
+        for _, entry in ipairs(b.resolve()) do currents[entry.cvar] = GetCVar(entry.cvar) end
+        for _, c in ipairs(b.pickControl(b.resolve(), currents).changes) do SETFAIL[c.cvar] = "clamp" end
+    end, function(e) e.pump(60, runCost) end },
     { "panel:map", nil, function(e) e.pump(0.3, runCost); setFrames({ WorldMapFrame = true }); e.pump(5, runCost); setFrames({}) end },
 }
 test("G5-8 every real stop reaches the window with its literal reason and its words, and leaves nothing behind", function()

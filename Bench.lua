@@ -708,26 +708,47 @@ local function cheaperTier(entry, currentValue)
     return best
 end
 
--- The setting whose change must visibly cut the frame time: render scale at current x K.CONTROL_FACTOR, else the
--- cheapest tier of shadows, else of lighting. `current` maps a CVar name to its value. Returns {cvar, value, label}.
+-- The change that must visibly cut the frame time: every measured setting at once, render scale at current x
+-- K.CONTROL_FACTOR and every other setting at its cheapest tier below the one in use. Lowering the picture size alone
+-- misses a PC whose processor sets the pace, where shadows still cost (owner's report 2026-11-03). `current` maps a CVar
+-- name to its value. Returns {label, changes = {{cvar, value}...}}, or nil when nothing can go cheaper.
 function bench.pickControl(resolved, current)
-    local byKey = {}
-    for _, entry in ipairs(resolved) do byKey[entry.key] = entry end
-    local scale = byKey.renderscale
-    if scale then
-        local now = tonumber(current[scale.cvar])
-        if now then
-            return { cvar = scale.cvar, value = string.format("%.4g", now * K.CONTROL_FACTOR), label = scale.label }
+    local changes = {}
+    for _, entry in ipairs(resolved) do
+        local value
+        if entry.key == "renderscale" then
+            local now = tonumber(current[entry.cvar])
+            if now then value = string.format("%.4g", now * K.CONTROL_FACTOR) end
+        else
+            value = cheaperTier(entry, current[entry.cvar])
+        end
+        if value then changes[#changes + 1] = { cvar = entry.cvar, value = value } end
+    end
+    if #changes == 0 then return nil end
+    return { label = "every setting at its cheapest", changes = changes }
+end
+
+-- Sets every change of a control. A change the game does not accept is put back and left out, as the sweep leaves out a
+-- level the game refuses. Returns the values the accepted ones had before and the list of refused changes; nil (and the
+-- refused list) when the game accepted none.
+local function applyControl(control)
+    local before, refused = {}, {}
+    for _, c in ipairs(control.changes) do
+        local was = GetCVar(c.cvar)
+        pcall(SetCVar, c.cvar, c.value)
+        if sameValue(GetCVar(c.cvar), c.value) then
+            before[#before + 1] = { cvar = c.cvar, value = was }
+        else
+            pcall(SetCVar, c.cvar, was)
+            refused[#refused + 1] = c
         end
     end
-    for _, key in ipairs({ "shadows", "lighting" }) do
-        local entry = byKey[key]
-        if entry then
-            local value = cheaperTier(entry, current[entry.cvar])
-            if value then return { cvar = entry.cvar, value = value, label = entry.label } end
-        end
-    end
-    return nil
+    if #before == 0 then return nil, refused end
+    return before, refused
+end
+
+local function restoreControl(before)
+    for i = #before, 1, -1 do pcall(SetCVar, before[i].cvar, before[i].value) end
 end
 
 local function currentsOf(resolved)
@@ -756,7 +777,9 @@ end
 local function snapshotNames(resolved, control)
     local names = {}
     for _, entry in ipairs(resolved) do names[#names + 1] = entry.cvar end
-    if control then names[#names + 1] = control.cvar end
+    if control then
+        for _, c in ipairs(control.changes) do names[#names + 1] = c.cvar end
+    end
     return names
 end
 
@@ -855,11 +878,11 @@ function bench.check(onDone)
                 .. "try a quieter spot or raise MEASURE in Bench.lua", K.NOISE * 100))
         end
         if responded then
-            ns.say(string.format("control %s = %s: frame time dropped %.1f%%: ok", control.label, control.value, drop * 100))
+            ns.say(string.format("control (%s): frame time dropped %.1f%%: ok", control.label, drop * 100))
             ns.say("check passed: this spot is valid for benchmarking")
         else
-            ns.say(string.format("control %s = %s: frame time dropped only %.1f%%: did not respond, so you are capped or CPU-bound here",
-                control.label, control.value, drop * 100))
+            ns.say(string.format("control (%s): frame time dropped only %.1f%%: did not respond, so a frame-rate limit, "
+                .. "another program or the processor sets the pace here", control.label, drop * 100))
             ns.say("check failed")
         end
         finishRun(originals, {
@@ -868,12 +891,11 @@ function bench.check(onDone)
         }, onDone)
     end
     local function controlWindow()
-        pcall(SetCVar, control.cvar, control.value)
-        local now = GetCVar(control.cvar)
-        if not sameValue(now, control.value) then
-            ns.say("the game did not accept the control " .. control.cvar .. " = " .. control.value .. " (it kept " .. tostring(now) .. ")")
-            return stop({ reason = "control rejected" })
+        local before, refused = applyControl(control)
+        for _, c in ipairs(refused) do
+            ns.say("the game did not accept the control " .. c.cvar .. " = " .. c.value .. " (it kept " .. tostring(GetCVar(c.cvar)) .. ")")
         end
+        if not before then return stop({ reason = "control rejected" }) end
         bench.runWindow(safe(function(r)
             if not r.ok then return stop(r) end
             conclude(r)
@@ -1155,22 +1177,17 @@ function bench.run(onDone, opts)
     -- The control: a window at the starting settings, then one with the control cheaper. If frame time does not
     -- follow, the run is capped or CPU-bound and stops.
     local function controlStage(after)
-        nextInfo = { cvar = control.cvar }
         window("control", control.label, function(c0)
             if not c0.ok then return abort(c0.reason) end
-            local before = GetCVar(control.cvar)
-            pcall(SetCVar, control.cvar, control.value)
-            if not sameValue(GetCVar(control.cvar), control.value) then
-                pcall(SetCVar, control.cvar, before)
-                say("the game did not accept the control " .. control.cvar .. " = " .. control.value)
-                return abort("control rejected")
-            end
-            nextInfo = { cvar = control.cvar }
+            local before, refused = applyControl(control)
+            for _, c in ipairs(refused) do say("the game did not accept the control " .. c.cvar .. " = " .. c.value) end
+            if not before then return abort("control rejected") end
             window("control", control.label, function(c1)
-                pcall(SetCVar, control.cvar, before)
+                restoreControl(before)
                 if not c1.ok then return abort(c1.reason) end
                 if not guard.responds(c0.summary.meanMs, c1.summary.meanMs) then
-                    say("the control did not cut the frame time: you are capped or CPU-bound here")
+                    say("even every setting at its cheapest did not cut the frame time: a frame-rate limit, another program "
+                        .. "or the processor sets the pace here")
                     return abort("control did not respond")
                 end
                 after()

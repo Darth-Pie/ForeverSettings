@@ -782,8 +782,6 @@ end
   'progress-sweep-value-missing': ['Bench.lua', `nextInfo = { cvar = setting.cvar, value = value }`, `nextInfo = { cvar = setting.cvar }`],
   'progress-after-cvar-missing': ['Bench.lua', `                nextInfo = { cvar = setting.cvar }
                 baselineWindow("after " .. setting.label, function(b)`, `                baselineWindow("after " .. setting.label, function(b)`],
-  'progress-control-cvar-missing': ['Bench.lua', `        nextInfo = { cvar = control.cvar }
-        window("control", control.label, function(c0)`, `        window("control", control.label, function(c0)`],
   'crowd-progress-sweep-value-missing': ['Bench.lua', `nextInfo = { cvar = item.cvar, value = item.lowValue }`, `nextInfo = { cvar = item.cvar }`],
 
   // Plain words in the guided window (words and menu, Task 5)
@@ -2120,7 +2118,7 @@ end
   'graph-draw-tag-wrong-point': ['Graph.lua', `                elseif p.recommended then
                     tag("recommended"`, `                elseif p.current then
                     tag("recommended"`],
-  'graph-draw-tag-too-high': ['Graph.lua', `tag("recommended", item.x, item.y - TAG_RISE, rect, COLORS.recommended)`, `tag("recommended", item.x, item.y - 28, rect, COLORS.recommended)`],
+  'graph-draw-tag-too-high': ['Graph.lua', `tag("recommended", item.x, item.y - TAG_RISE, rect, p.picked and pickedColor or COLORS.recommended)`, `tag("recommended", item.x, item.y - 28, rect, p.picked and pickedColor or COLORS.recommended)`],
   'graph-draw-now-tag-too-high': ['Graph.lua', `tag("now", item.x, item.y - TAG_RISE, rect, COLORS.ring)`, `tag("now", item.x, item.y - 28, rect, COLORS.ring)`],
   'gr-pick-tag-missing': ['Graph.lua', `tag("your pick", item.x, item.y - TAG_RISE, rect, pickedColor)`, `local _ = pickedColor`],
   'fx-tag-overlap': ['Graph.lua', `                if p.current and p.picked then
@@ -2135,6 +2133,23 @@ end
   'ig-check-blames-alt-tab': ['Guide.lua', `["control did not respond"] = { "Graphics settings make no difference to the frame rate here.",`, `["control did not respond"] = { "The test could not tell the settings apart here.",`],
   'ig-hint-missing': ['Results.lua', `        if onPick then put(p.fsPanel, PICK_HINT, 0, sy, PANEL_WIDTH) end`, `        local _ = PICK_HINT`],
   'ig-hint-in-combat': ['Results.lua', `        if onPick then put(p.fsPanel, PICK_HINT, 0, sy, PANEL_WIDTH) end`, `        put(p.fsPanel, PICK_HINT, 0, sy, PANEL_WIDTH)`],
+  // The opening check lowers every measured setting at once (owner's report 2026-11-03)
+  'ctl-renderscale-only': ['Bench.lua', `            value = cheaperTier(entry, current[entry.cvar])`, `            value = nil`],
+  'ctl-renderscale-unchanged': ['Bench.lua', `if now then value = string.format("%.4g", now * K.CONTROL_FACTOR) end`, `if now then value = string.format("%.4g", now) end`],
+  'ctl-empty-not-nil': ['Bench.lua', `    if #changes == 0 then return nil end`, `    if false then return nil end`],
+  'ctl-not-restored': ['Bench.lua', `                restoreControl(before)`, ``],
+  'ctl-refusal-stops': ['Bench.lua', `    if #before == 0 then return nil, refused end`, `    if #refused > 0 then return nil, refused end`],
+  'ctl-refused-left-set': ['Bench.lua', `            pcall(SetCVar, c.cvar, was)`, ``],
+  'ctl-check-words': ['Bench.lua', `ns.say(string.format("control (%s): frame time dropped %.1f%%: ok", control.label, drop * 100))`, `ns.say(string.format("control: frame time dropped %.1f%%: ok", drop * 100))`],
+  // A click on the recommended point marks it (owner's look 2026-11-03)
+  'gd-recommended-not-marked': ['Recommend.lua', `copy.chosen, copy.picked = copy.recommended, true`, `copy.chosen = copy.recommended`],
+  'gd-recommended-not-marked-page': ['Recommend.lua', `copy.chosen, copy.picked = copy.recommended, true`, `copy.chosen = copy.recommended`],
+  'gd-recommended-counted': ['Recommend.lua', `copy.chosen, copy.picked = copy.recommended, true`, `copy.chosen, copy.picked = copy.recommended, true; view.picked = view.picked + 1`],
+  'gd-recommended-counted-page': ['Recommend.lua', `copy.chosen, copy.picked = copy.recommended, true`, `copy.chosen, copy.picked = copy.recommended, true; view.picked = view.picked + 1`],
+  'gd-tag-not-pick-colour': ['Graph.lua', `rect, p.picked and pickedColor or COLORS.recommended)`, `rect, COLORS.recommended)`],
+  'gd-tag-says-your-pick': ['Graph.lua', `                elseif p.recommended then
+                    tag("recommended"`, `                elseif p.recommended and not p.picked then
+                    tag("recommended"`],
 };
 
 function main() {

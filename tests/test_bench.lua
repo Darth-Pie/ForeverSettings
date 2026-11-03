@@ -647,18 +647,31 @@ test("B6-5 vsync and an FPS cap each add a warning and do not refuse", function(
         and okM and wM:find("frame-rate limit", 1, true) ~= nil and okOff and wOff == "" and okNone and wNone == ""
 end)
 
-test("B6-7 pickControl: render scale times 0.75, else the cheapest shadow tier, else lighting, else nothing", function()
+-- The control is every measured setting at once (owner's report 2026-11-03: in Eastern Plaguelands the picture size alone
+-- barely moved the frame time while shadows moved it by about 15%, so a picture-size control stopped every test there).
+test("B6-7 pickControl: every setting at its cheapest level below the one in use, render scale at 0.75 of it; nothing cheaper gives nothing", function()
     local _, b = newBench({})
     local rs = { key = "renderscale", label = "Render scale", cvar = "RenderScale", tiers = { "0.5", "1" } }
     local sh = { key = "shadows", label = "Shadows", cvar = "graphicsShadowQuality", tiers = { "0", "1", "2" } }
-    local li = { key = "lighting", label = "Secondary lighting", cvar = "giQuality", tiers = { "0", "1" } }
-    local c1 = b.pickControl({ rs, sh }, { RenderScale = "1.000000", graphicsShadowQuality = "2" })
-    local c2 = b.pickControl({ sh }, { graphicsShadowQuality = "2" })
-    local c3 = b.pickControl({ sh, li }, { graphicsShadowQuality = "0", giQuality = "1" })
-    local c4 = b.pickControl({ sh }, { graphicsShadowQuality = "0" })
-    return c1.cvar == "RenderScale" and c1.value == "0.75" and c1.label == "Render scale"
-        and c2.cvar == "graphicsShadowQuality" and c2.value == "0"
-        and c3.cvar == "giQuality" and c3.value == "0" and c4 == nil
+    local ss = { key = "ssao", label = "SSAO", cvar = "graphicsSSAO", tiers = { "0", "1", "2" } }
+    local li = { key = "lighting", label = "Secondary lighting", cvar = "giQuality", tiers = { "1", "2", "3" } }
+    local c1 = b.pickControl({ rs, sh, ss, li }, { RenderScale = "1.000000", graphicsShadowQuality = "2", graphicsSSAO = "0", giQuality = "3" })
+    local c2 = b.pickControl({ sh, ss }, { graphicsShadowQuality = "0", graphicsSSAO = "0" })
+    local by, count = {}, 0
+    for _, c in ipairs(c1 and c1.changes or {}) do by[c.cvar], count = c.value, count + 1 end
+    return c1 ~= nil and count == 3 and by.RenderScale == "0.75" and by.graphicsShadowQuality == "0" and by.graphicsSSAO == nil
+        and by.giQuality == "1" and type(c1.label) == "string" and c2 == nil
+end)
+
+-- Shadows cost 0.5 ms a level; the picture size costs nothing (the processor sets the pace for everything else).
+local function shadowsOnlyCost(cv) return 0.006 + 0.0005 * tonumber(cv.graphicsShadowQuality) end
+
+test("B6-14 the check passes where the picture size changes nothing but another setting does, and puts every setting back", function()
+    local e, b = newBench(checkCvars())
+    b.state().tiers.graphicsShadowQuality = { "0", "1", "2" }
+    local r = runCheck(e, b, shadowsOnlyCost)[1]
+    return r ~= nil and r.ok == true and r.drop > 0.10 and has("control (every setting at its cheapest)") and has("check passed")
+        and CVARS.RenderScale == "1" and CVARS.graphicsShadowQuality == "2" and pendingOf(b) == nil, outText()
 end)
 
 test("B6-1 check: baseline and spread printed, the control responds, everything is put back", function()
@@ -837,6 +850,24 @@ test("B7-2 baseline drift reruns each setting once, then its rows are inconclusi
             and row.reason:find("baseline drifted", 1, true) ~= nil
     end
     return entry ~= nil and allBad and entry.reruns == 4, outText()
+end)
+
+test("B7-23 a run where the picture size changes nothing but shadows do gets past the control, starts from the settings in use and measures the shadows", function()
+    local e, b = newRun()
+    local entry = doRun(e, b, shadowsOnlyCost)[1]
+    local rows = entry and rowsOf(entry, "graphicsShadowQuality") or {}
+    local zero = rows[1]
+    return entry ~= nil and entry.valid == true and entry.reason == nil and near(entry.baselineMs, 7.0, 0.05)
+        and zero ~= nil and zero.value == "0" and near(zero.deltaMs, -1.0, 0.05)
+        and CVARS.RenderScale == "1" and CVARS.graphicsShadowQuality == "2" and CVARS.graphicsSSAO == "1", outText()
+end)
+
+test("B7-24 a control change the game turns into another value is put back at once, so the run starts from the settings in use", function()
+    local e, b = newRun()
+    SETFAIL.graphicsShadowQuality = { ask = "0", to = "1" }   -- the control's shadows 0 lands on 1
+    local entry = doRun(e, b)[1]
+    return entry ~= nil and entry.valid == true and near(entry.baselineMs, 7.0, 0.05) and CVARS.graphicsShadowQuality == "2"
+        and has("did not accept the control graphicsShadowQuality = 0"), outText()
 end)
 
 test("B7-21 a rerun adds its windows to the progress total, so the count never passes the total and ends equal to it", function()
@@ -1805,13 +1836,14 @@ end)
 
 test("BQ-6 the progress total of a quick run is the quick window count, not the full one", function()
     local e, b = newRun()
-    b.run(nil, { levels = "quick" })
-    e.pump(0.3, runCost)
-    local p = b.progress()
+    -- The settings in use before the run: during the control they are all lowered.
     local resolved = b.resolve()
     local currents = {}
     for _, entry in ipairs(resolved) do currents[entry.cvar] = GetCVar(entry.cvar) end
     local quick, full = b.countWindows(resolved, currents, "quick"), b.countWindows(resolved, currents, "all")
+    b.run(nil, { levels = "quick" })
+    e.pump(0.3, runCost)
+    local p = b.progress()
     e.pump(60, runCost)
     return p ~= nil and p.total == quick and quick < full, tostring(p and p.total) .. " / " .. quick .. " / " .. full
 end)

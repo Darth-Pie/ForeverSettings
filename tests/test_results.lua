@@ -935,15 +935,16 @@ test("R-PK-1 a click on a point stages that level: nothing is written, the estim
     return noReset and staged and outText() == "", allText(f)
 end)
 
-test("R-PK-2 clicking the recommended level again takes the pick back; Back to the recommendation clears every pick", function()
+test("R-PK-2 clicking the recommended level again takes the pick back and marks that point as picked; Back to the recommendation clears every pick", function()
     local e, r = boot()
     emptyEveryday(e)
     r.show(T1(), 250)
     local f = window()
     pointButtons(f)[1]:Click()                             -- pick 0
-    pointButtons(f)[2]:Click()                             -- the recommended 1: no pick
+    pointButtons(f)[2]:Click()                             -- the recommended 1: no change, but shown as picked (owner 2026-11-03)
     local undone = findButton(f, RESET) == nil and hasText(f, "These 2 changes should take you from about 250 fps to about 333 fps.")
-        and rowsOf(f)[1].label._text == "Shadow detail" and not rowPicked(e, rowsOf(f)[1])
+        and rowsOf(f)[1].label._text == "Shadow detail" and rowPicked(e, rowsOf(f)[1]) and #marksOf(f, "picked") == 1
+        and hasText(f, "With these changes: about 333 fps") and not hasText(f, "(estimate)")
     pointButtons(f)[1]:Click()
     rowsOf(f)[2]:Click()
     pointButtons(f)[3]:Click()                             -- Soft corner shadows kept at 2
@@ -1008,8 +1009,8 @@ test("R-PK-8 in combat the points do not react and Save is greyed; the picks sta
     local kept = rowPicked(e, rowsOf(f)[1])
     COMBAT = false
     hubFrame().scripts.OnUpdate(hubFrame(), 0.6)
-    pointButtons(f)[2]:Click()
-    local again = not rowPicked(e, rowsOf(f)[1]) and findButton(f, SAVE_E):IsEnabled() == true
+    pointButtons(f)[2]:Click()                             -- the recommended level: the change is taken back, the point marked
+    local again = findButton(f, RESET) == nil and #marksOf(f, "picked") == 1 and findButton(f, SAVE_E):IsEnabled() == true
     return inert and kept and again, tostring(inert) .. tostring(kept) .. tostring(again)
 end)
 

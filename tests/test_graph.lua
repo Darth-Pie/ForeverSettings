@@ -382,6 +382,24 @@ test("GR-13 a picked point is drawn in the colour of the profile it will be save
         and GameTooltip.lines[2] == "about 333 fps if only this setting changes (your pick)", tostring(GameTooltip.lines[2])
 end)
 
+-- Owner's look 2026-11-03: a click on the recommended point showed nothing; it now takes the pick colour and keeps its own tag.
+test("GR-19 a click on the recommended point draws it in the pick colour with its tag, recommended, in that colour", function()
+    local _, graph, r = boot()
+    local m = r.chartModel(r.withPicks(r.choose(T1(), 250), { graphicsShadowQuality = "1" }))
+    local parent = newParent()
+    graph.new(parent):draw(RECT, graphOf(m, "graphicsShadowQuality"), m.axis, { pickColor = "everyday" })
+    local picked = marks(parent, "picked")[1]
+    local tagColor
+    walk(parent, function(frame)
+        for _, fs in ipairs(frame.fontStrings) do
+            if fs.shown and fs._text == "recommended" then tagColor = fs._textColor end
+        end
+    end)
+    return picked ~= nil and sameColor(picked.box.fill._color, graph.COLORS.picked) and #marks(parent, "recommended") == 0
+        and countExact(parent, "recommended") == 1 and countExact(parent, "your pick") == 0
+        and sameColor(tagColor, graph.COLORS.picked), tostring(#marks(parent, "picked")) .. " " .. table.concat(texts(parent), ",")
+end)
+
 test("GR-14 each point's button is 20 pixels and a click calls onPick with that level; without onPick a click does nothing", function()
     local _, graph, r = boot()
     local m = modelOf(r)

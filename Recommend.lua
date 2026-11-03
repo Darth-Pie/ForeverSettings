@@ -642,9 +642,10 @@ end
 
 -- A result of `choose` with the levels the player clicked on the graph ({cvar = level}): a new table, the result itself is not
 -- changed. Every setting gets `recommended` (the level `choose` picked, or the level in use when nothing was recommended),
--- `chosen` (the pick when it is a measured level of that setting, else the recommended one) and `picked`. The changes, the
--- estimate and the status follow the chosen levels as in `choose`; `picked` counts the picked settings. With no picks the
--- result keeps its own status, sentence and estimate.
+-- `chosen` (the pick when it is a measured level of that setting, else the recommended one) and `picked` (a measured level was
+-- clicked, the recommended one too: the graph marks it, owner's look 2026-11-03). The changes, the estimate and the status
+-- follow the chosen levels as in `choose`; `picked` counts the settings picked away from the recommendation. With none of those
+-- the result keeps its own status, sentence and estimate.
 function recommend.withPicks(result, picks)
     picks = picks or {}
     local view = {}
@@ -666,7 +667,7 @@ function recommend.withPicks(result, picks)
                     view.picked = view.picked + 1
                     break
                 elseif level.counted and sameValue(level.value, pick) then
-                    copy.chosen = copy.recommended
+                    copy.chosen, copy.picked = copy.recommended, true
                     break
                 end
             end

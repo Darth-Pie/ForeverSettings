@@ -259,7 +259,9 @@ function H.boot(cvars, opts)
             end
         end
         if CVARS[key] == nil then error("Unknown CVar") end
-        CVARS[key] = tostring(v)
+        -- SETFAIL[n] = { ask = a, to = b }: asked for a, the client keeps b instead (a clamp that moves the value).
+        local moved = type(SETFAIL[n]) == "table" and tostring(v) == SETFAIL[n].ask
+        CVARS[key] = moved and SETFAIL[n].to or tostring(v)
         local derive = DERIVED[key]
         if derive then derive(CVARS[key], CVARS) end
         return true

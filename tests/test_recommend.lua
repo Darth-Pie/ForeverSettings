@@ -1199,11 +1199,14 @@ test("W-1 no picks: the recommendation as it is, every setting marked not picked
     local v = r.withPicks(res, {})
     local by = byCvar(v.changes)
     local s = settingOf(v, "graphicsShadowQuality")
-    local same = r.withPicks(res, { graphicsShadowQuality = "1" })            -- picking the recommended level is no pick
+    -- Picking the recommended level marks the setting as picked (the graph shows it) but changes nothing and counts as no pick.
+    local same = r.withPicks(res, { graphicsShadowQuality = "1" })
+    local sameS = settingOf(same, "graphicsShadowQuality")
     return v ~= res and v.status == "change" and #v.changes == 2 and by.graphicsShadowQuality.to == "1" and by.graphicsSSAO.to == "0"
         and near(v.afterMs, 3.0) and v.picked == 0 and s.picked == false and s.recommended == "1" and s.chosen == "1"
-        and settingOf(v, "graphicsSSAO").picked == false and same.picked == 0 and settingOf(same, "graphicsShadowQuality").picked == false,
-        tostring(v.status) .. " " .. tostring(v.picked) .. " " .. tostring(same.picked)
+        and settingOf(v, "graphicsSSAO").picked == false and same.picked == 0 and sameS.picked == true and sameS.chosen == "1"
+        and near(same.afterMs, 3.0) and same.status == "change",
+        tostring(v.status) .. " " .. tostring(v.picked) .. " " .. tostring(same.picked) .. " " .. tostring(sameS.picked)
 end)
 
 test("W-2 a pick of another measured level changes that setting to it and the estimate adds the measured levels, never changing the original", function()
