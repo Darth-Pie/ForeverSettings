@@ -324,6 +324,7 @@ function H.boot(cvars, opts)
     _G.GameTooltip = { lines = {}, shown = false }
     function GameTooltip:SetOwner(owner) self.owner = owner; self.lines = {} end
     function GameTooltip:AddLine(text) self.lines[#self.lines + 1] = text end
+    function GameTooltip:SetText(text) self.lines = { text } end
     function GameTooltip:Show() self.shown = true end
     function GameTooltip:Hide() self.shown = false end
     _G.MENUCALLS = { items = {}, levels = {} }
@@ -340,6 +341,7 @@ function H.boot(cvars, opts)
                 list[#list + 1] = entry
                 local element = {}
                 function element:SetEnabled(on) entry.disabled = not on end
+                function element:SetTooltip(fn) entry.tooltip = fn end
                 return element
             end
             function n:CreateButton(text, fn)
@@ -347,6 +349,7 @@ function H.boot(cvars, opts)
                 list[#list + 1] = entry
                 local child = node(entry.children)
                 function child:SetEnabled(on) entry.disabled = not on end
+                function child:SetTooltip(tip) entry.tooltip = tip end
                 return child
             end
             return n

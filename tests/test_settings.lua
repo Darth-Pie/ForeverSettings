@@ -2251,4 +2251,184 @@ test("S5-4 a click on a page changes the page and writes nothing, even in combat
     return moved and locked and ignored and #SETLOG == 0 and #OUT == 0, tostring(moved) .. tostring(locked) .. tostring(ignored)
 end)
 
+-- The Advanced pages and the title-bar switch (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A2, A3, A5).
+local ADV_WARNING = "These settings go beyond the game's own menu. They are finicky: some can make the game look wrong, run badly or crash. "
+    .. "Change them only if you know what they do. Return to Original puts every setting back."
+local RISKY_NOTE = "Risky: put back to a safe value when you log out; hold Shift while entering the world to skip it."
+-- A game with some Advanced settings, Advanced turned on and accepted.
+local function advBoot(over)
+    local e, s, db, p = boot(over)
+    CVARS.ffxGlow, CVARS.ffxDeath, CVARS.sunshafts, CVARS.farclip, CVARS.groundEffectDist = "1", "1", "0", "1000", "70"
+    CVARS.shadowTextureSize = "1024"
+    db.advanced, db.advancedAccepted = true, true
+    return e, s, db, p
+end
+local function pageKeys(view)
+    local list = {}
+    for _, page in ipairs(view.pages) do list[#list + 1] = page.key end
+    return table.concat(list, ",")
+end
+
+test("AD-1 the model: with Advanced off no Advanced page is listed and one asked for falls back to Home; on, the three stand before About", function()
+    local e, s, db = advBoot()
+    local entries = e.ns.advanced.available()
+    local off = s.model({ page = "adv-effects" }, ctxOf(e, { advanced = { on = false, entries = entries } }))
+    local on = s.model({ page = "adv-effects" }, ctxOf(e, { advanced = { on = true, entries = entries } }))
+    return pageKeys(off) == "home,light,effects,world,size,test,results,about" and off.page == "home"
+        and pageKeys(on) == "home,light,effects,world,size,test,results,adv-effects,adv-distance,adv-shadows,about" and on.page == "adv-effects",
+        pageKeys(off) .. " / " .. pageKeys(on)
+end)
+
+test("AD-2 Advanced: effects opens with the warning in the warning colour, a card per setting the client has with its level words and the game's level lit, and no costs", function()
+    local e, s = advBoot()
+    s.open("adv-effects")
+    local f = window()
+    local warning = fontStringWith(f, ADV_WARNING)
+    local wr = e.ns.skin.color("warning")
+    local glowOn, glowOff = byKey(f, "level:ffxGlow:1"), byKey(f, "level:ffxGlow:0")
+    local sun = byKey(f, "level:sunshafts:2")
+    return warning ~= nil and warning._textColor[1] == wr and byKey(f, "keep:ffxGlow") ~= nil and byKey(f, "keep:ffxDeath") ~= nil
+        and byKey(f, "keep:WeatherDensity") == nil                            -- the client lacks it: no card
+        and glowOn ~= nil and glowOn._text == "On" and glowOn.skinState.selected == true and glowOff.skinState.selected == false
+        and sun ~= nil and sun._text == "High" and hasText(f, "Glow") and hasText(f, "Sun rays")
+        and not hasText(f, " fps") and byKey(f, "keep:farclip") == nil and not hasText(f, RISKY_NOTE),
+        tostring(warning) .. " " .. tostring(glowOn and glowOn._text) .. " " .. keysShown(f, "level:")
+end)
+
+test("AD-3 a level click on an Advanced card keeps it in the profile in use and applies it at once, silently; the tick takes it back", function()
+    local e, s, db = advBoot()
+    s.open("adv-effects")
+    OUT = {}
+    byKey(window(), "level:sunshafts:2"):Click()
+    local kept = db.profiles.everyday.values.sunshafts == "2" and CVARS.sunshafts == "2" and db.original.values.sunshafts == "0" and #OUT == 0
+        and byKey(window(), "keep:sunshafts"):GetChecked() == true
+    byKey(window(), "keep:sunshafts"):Click()
+    local unkept = db.profiles.everyday.values.sunshafts == nil and byKey(window(), "keep:sunshafts"):GetChecked() == false
+    return kept and unkept, tostring(db.profiles.everyday.values.sunshafts) .. " " .. table.concat(OUT, " | ")
+end)
+
+test("AD-4 a risky card says so and its page carries the risky line under the warning", function()
+    local e, s = advBoot()
+    s.open("adv-distance")
+    local f = window()
+    local risky, colour = 0, nil
+    walk(f, function(frame)
+        for _, fs in ipairs(frame.fontStrings) do
+            if fs.shown and fs._text == "risky" then risky, colour = risky + 1, fs._textColor end
+        end
+    end)
+    return byKey(f, "keep:farclip") ~= nil and byKey(f, "keep:groundEffectDist") ~= nil and risky == 1 and hasText(f, RISKY_NOTE)
+        and hasText(f, ADV_WARNING) and colour ~= nil and colour[1] == e.ns.skin.color("warning") and byKey(f, "adv:check") == nil,
+        tostring(risky)
+end)
+
+test("AD-5 on Original and Maximum the Advanced cards are read-only with the Everyday and Crowded buttons; in combat and during a test they are greyed", function()
+    local e, s, db = advBoot({ active = "maximum" })
+    s.open("adv-effects")
+    local f = window()
+    local readOnly = byKey(f, "level:ffxGlow:0").enabled == false and byKey(f, "edit:everyday") ~= nil
+    local e2, s2, db2 = advBoot()
+    local running = false
+    e2.ns.guide.running = function() return running end
+    COMBAT = true
+    s2.open("adv-effects")
+    local combat = byKey(window(), "level:ffxGlow:0").enabled == false
+    COMBAT = false
+    s2.redraw()
+    local free = byKey(window(), "level:ffxGlow:0").enabled == true
+    return readOnly and combat and free, tostring(readOnly) .. tostring(combat) .. tostring(free)
+end)
+
+test("AD-6 the tools of the old Advanced menu sit under the effects cards and do what the menu did; the raid tick follows the option", function()
+    local e, s, db = advBoot()
+    local opened, reported = {}, 0
+    e.ns.guide.open = function(kind) opened[#opened + 1] = kind end
+    e.ns.ui.showReport = function() reported = reported + 1 end
+    e.ns.bench.state().history[1] = { kind = "run", ok = true, valid = true, rows = {}, time = 1 }
+    s.open("adv-effects")
+    local f = window()
+    local buttons = byKey(f, "adv:check") ~= nil and byKey(f, "adv:run") ~= nil and byKey(f, "adv:report") ~= nil and byKey(f, "adv:apply") ~= nil
+    byKey(f, "adv:check"):Click()
+    byKey(f, "adv:run"):Click()
+    byKey(f, "adv:report"):Click()
+    local tick = byKey(window(), "adv:raid")
+    local before = tick ~= nil and tick:GetChecked() == false
+    tick:Click()
+    local after = db.raidToo == true and byKey(window(), "adv:raid"):GetChecked() == true
+    byKey(window(), "adv:raid"):Click()
+    after = after and db.raidToo == false
+    return buttons and table.concat(opened, ",") == "check,run" and reported == 1 and before and after
+        and hasText(f, "Also use the Crowded settings in raids and battlegrounds")
+        and hasText(f, "Advanced settings leave the game's raid and battleground graphics alone."),
+        table.concat(opened, ",") .. " " .. reported .. tostring(before) .. tostring(after)
+end)
+
+test("AD-6b under the raid option a note says it needs the game's raid graphics, only while those are switched off", function()
+    local e, s = advBoot()
+    CVARS.RAIDsettingsEnabled = "0"
+    s.open("adv-effects")
+    local off = hasText(window(), "Needs the game's raid graphics turned on.")
+    CVARS.RAIDsettingsEnabled = "1"
+    s.redraw()
+    local on = not hasText(window(), "Needs the game's raid graphics turned on.")
+    return off and on, tostring(off) .. tostring(on)
+end)
+
+test("AD-7 nothing scrolls: on every Advanced page the lowest button stands inside the page", function()
+    local e, s = advBoot()
+    for _, entry in ipairs(e.ns.advanced.CATALOG) do CVARS[entry.cvar] = entry.levels[1] end
+    local bad = {}
+    for _, key in ipairs({ "adv-effects", "adv-distance", "adv-shadows" }) do
+        s.open(key)
+        local lowest = 0
+        walk(window(), function(frame)
+            if frame.shown and frame.key and frame._point and (frame.key:find("^level:") or frame.key:find("^adv:")) then
+                local bottom = -frame._point[5] + (frame._height or 0)
+                if bottom > lowest then lowest = bottom end
+            end
+        end)
+        if 26 + lowest + 8 > PAGE_H then bad[#bad + 1] = key .. "=" .. lowest end
+    end
+    return #bad == 0, table.concat(bad, ",")
+end)
+
+test("SW-1 the Advanced switch is off by default; the first turn on shows the warning with I understand and Cancel, then it switches at once", function()
+    local e, s, db = boot()
+    CVARS.ffxGlow = "1"
+    s.open("light")
+    local f = window()
+    local off = db.advanced ~= true and byKey(f, "advanced") ~= nil and byKey(f, "advanced").skinState.selected == false
+        and byKey(f, "page:adv-effects") == nil
+    byKey(f, "advanced"):Click()
+    local asking = hasText(f, ADV_WARNING) and byKey(f, "advanced:accept") ~= nil and byKey(f, "advanced:cancel") ~= nil
+        and db.advanced ~= true and byKey(f, "keep:graphicsShadowQuality") == nil
+    byKey(f, "advanced:cancel"):Click()
+    local cancelled = db.advanced ~= true and byKey(f, "advanced:accept") == nil and byKey(f, "keep:graphicsShadowQuality") ~= nil
+    byKey(f, "advanced"):Click()
+    byKey(f, "advanced:accept"):Click()
+    local on = db.advanced == true and db.advancedAccepted == true and s.state().page == "adv-effects"
+        and byKey(f, "page:adv-effects") ~= nil and byKey(f, "advanced").skinState.selected == true
+    byKey(f, "page:adv-distance"):Click()
+    on = on and s.state().page == "adv-distance"
+    byKey(f, "advanced"):Click()
+    local offAgain = db.advanced == false and byKey(f, "page:adv-effects") == nil and s.state().page == "home"
+    byKey(f, "advanced"):Click()
+    local direct = db.advanced == true and byKey(f, "advanced:accept") == nil
+    return off and asking and cancelled and on and offAgain and direct,
+        tostring(off) .. tostring(asking) .. tostring(cancelled) .. tostring(on) .. tostring(offAgain) .. tostring(direct)
+end)
+
+-- Review Focus 4: Advanced turned off while values are kept.
+test("SW-2 with Advanced off the kept Advanced values still apply, and Home says how many are kept", function()
+    local e, s, db, p = advBoot()
+    p.setProfileValue("everyday", "sunshafts", "2", true)
+    p.setProfileValue("everyday", "ffxGlow", "0", true)
+    db.advanced = false
+    CVARS.sunshafts = "0"
+    e.fire("PLAYER_ENTERING_WORLD")
+    s.open("home")
+    return CVARS.sunshafts == "2" and hasText(window(), "2 Advanced settings are kept. Turn on Advanced in the title bar to see them."),
+        tostring(CVARS.sunshafts)
+end)
+
 return H.results()

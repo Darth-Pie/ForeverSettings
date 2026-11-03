@@ -109,11 +109,13 @@ end
 
 -- the menu model (pure) -------------------------------------------------------------------------------
 
--- ctx = {profile, raidToo, raidSwitchOff, active, inCombat, progress, saved = {best, crowded}, last, maxFps}; every field
--- may be missing. Returns a list of items {text, kind, disabled, checked, isChecked, done, run, children}; kind is title, button,
--- check, submenu, separator or info. `checked` is the value when the menu was built; a check item's `isChecked()` asks
--- again, because the client keeps its menu open after a click and re-asks which item is selected. `done` marks a finished
--- test (the adapters draw the green check).
+-- ctx = {profile, active, inCombat, progress, saved = {best, crowded}, maxFps}; every field may be missing. Returns a list of
+-- items {text, kind, disabled, checked, isChecked, done, hint, prominent, run, children}; kind is title, button, check, submenu,
+-- separator or info. `checked` is the value when the menu was built; a check item's `isChecked()` asks again, because the client
+-- keeps its menu open after a click and re-asks which item is selected. `done` marks a finished test (the adapters draw the green
+-- check), `hint` is the item's tooltip, `prominent` draws it brighter (Settings).
+-- Since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5): Settings first; the three profiles by name with
+-- their descriptions as hints; the two tests; Return to Original. The raid option and the Advanced tools are on the Advanced page.
 function ui.menuModel(ctx)
     local items = {}
     local function add(item) items[#items + 1] = item end
@@ -134,49 +136,37 @@ function ui.menuModel(ctx)
         end
     end
 
-    add({ text = "ForeverSettings", kind = "title" })
+    add({ text = "Settings", kind = "button", prominent = true, run = function()
+        if ns.settings and ns.settings.open then ns.settings.open() else ns.say("settings module not loaded") end
+    end })
     add({ kind = "separator" })
 
     -- Profiles (spec 2026-10-29-profiles-design.md section 5). The ticks ask again, like the tier ticks: the client
-    -- keeps its menu open after a click.
-    add({ text = "Profile", kind = "title" })
+    -- keeps its menu open after a click. The name is the item; what the profile is for is its hint.
+    local switchOff = locked or (ctx.inCombat and true or false)
     local function profileItem(key)
-        local text = ns.names and ns.names.PROFILE[key] or key
+        local full = ns.names and ns.names.PROFILE[key] or key
+        local name, about = full:match("^([^:]+):%s*(.+)$")
+        name, about = name or full, about or ""
+        local hint = about:sub(1, 1):upper() .. about:sub(2)
         -- Maximum says what the newest quiet-spot test makes of it, when the test measured the highest level of everything.
-        if key == "maximum" and type(ctx.maxFps) == "number" then text = text .. string.format(" (about %.0f fps)", ctx.maxFps) end
-        return { text = text, kind = "check", checked = ((ctx.profile or "original") == key),
+        if key == "maximum" and type(ctx.maxFps) == "number" then hint = hint .. string.format(" (about %.0f fps)", ctx.maxFps) end
+        return { text = name, kind = "check", hint = hint, checked = ((ctx.profile or "original") == key),
             isChecked = function() return ns.profiles ~= nil and ns.profiles.active() == key end,
-            disabled = locked or (ctx.inCombat and true or false), run = command("profile " .. key) }
+            disabled = switchOff, run = command("profile " .. key) }
     end
-    add(profileItem("original"))
     add(profileItem("everyday"))
     add(profileItem("crowded"))
     add(profileItem("maximum"))
-    add({ text = "Save my game's current settings as...", kind = "submenu", children = {
-        { text = "Everyday", kind = "button", disabled = locked, run = command("profile save everyday") },
-        { text = "Crowded", kind = "button", disabled = locked, run = command("profile save crowded") },
-    } })
-    local function raidOn()
-        local db = ns.db()
-        return db ~= nil and db.raidToo == true
-    end
-    add({ text = "Also use the Crowded settings in raids and battlegrounds", kind = "check", checked = ctx.raidToo == true,
-        isChecked = raidOn, disabled = locked or (ctx.inCombat and true or false),
-        run = function() ns.command("profile raid " .. (raidOn() and "off" or "on")) end })
-    if ctx.raidSwitchOff then
-        add({ text = "Needs the game's raid graphics turned on.",
-            kind = "info", disabled = true })
-    end
     add({ kind = "separator" })
 
-    add({ text = "Find my settings", kind = "title" })
     local busy = (ctx.inCombat or ctx.active) and true or false
     local saved = ctx.saved or {}
     add({ text = "Find my best settings", kind = "button", disabled = busy, done = saved.best == true,
         run = function() ui.openSaved("best") end })
     add({ text = "Find my crowded settings", kind = "button", disabled = busy, done = saved.crowded == true,
         run = function() ui.openSaved("crowded") end })
-    add({ text = "Stop", kind = "button", disabled = not ctx.active, run = bench("stop") })
+    if ctx.active then add({ text = "Stop", kind = "button", disabled = false, run = bench("stop") }) end
     local progress = ctx.progress
     if progress then
         add({ text = string.format("A test is running: step %d of %d (%s)", progress.done, progress.total,
@@ -184,16 +174,8 @@ function ui.menuModel(ctx)
     end
     add({ kind = "separator" })
 
-    add({ text = "My settings...", kind = "button", run = function()
-        if ns.settings and ns.settings.open then ns.settings.open() else ns.say("settings module not loaded") end
-    end })
-    add({ text = "Advanced", kind = "submenu", children = {
-        { text = "Check this spot", kind = "button", disabled = busy, run = bench("check") },
-        { text = "Run benchmark", kind = "button", disabled = busy, run = bench("run") },
-        { text = "Show last report", kind = "button", disabled = ctx.last == nil, run = function() ui.showReport(ctx.last) end },
-        { text = "Apply all now", kind = "button", disabled = locked, run = command("apply") },
-        { text = "Put back everything this addon changed", kind = "button", disabled = locked, run = command("reset") },
-    } })
+    add({ text = "Return to Original", kind = "button", hint = "Your own settings, from before the addon changed anything.",
+        disabled = switchOff, run = command("profile original") })
     return items
 end
 
@@ -240,6 +222,21 @@ local function disable(element)
     if element and element.SetEnabled then pcall(element.SetEnabled, element, false) end
 end
 
+-- An item's text as the menus draw it: the green check before a finished test, Settings brighter than the rest (gold).
+local function shownText(item)
+    if item.prominent then return "|cffffd100" .. item.text .. "|r" end
+    return item.done and (CHECK .. item.text) or item.text
+end
+
+-- The newer menu shows a hint through the element's tooltip: the item's name over the hint.
+local function addHint(element, item)
+    if not (item.hint and element and element.SetTooltip) then return end
+    pcall(element.SetTooltip, element, function(tooltip)
+        tooltip:SetText(item.text)
+        tooltip:AddLine(item.hint, 1, 1, 1, true)
+    end)
+end
+
 local function openNew(owner, model)
     local function build(parent, items)
         for _, item in ipairs(items) do
@@ -252,11 +249,13 @@ local function openNew(owner, model)
                 disable(parent:CreateButton(item.text, function() end))
             elseif kind == "check" then
                 local element = parent:CreateCheckbox(item.text, item.isChecked or function() return item.checked end, item.run)
+                addHint(element, item)
                 if item.disabled then disable(element) end
             elseif kind == "submenu" then
                 build(parent:CreateButton(item.text), item.children)
             else
-                local element = parent:CreateButton(item.done and (CHECK .. item.text) or item.text, item.run)
+                local element = parent:CreateButton(shownText(item), item.run)
+                addHint(element, item)
                 if item.disabled then disable(element) end
             end
         end
@@ -274,7 +273,8 @@ local function openOld(owner, model)
                 if UIDropDownMenu_AddSeparator then UIDropDownMenu_AddSeparator(level) end
             else
                 local info = UIDropDownMenu_CreateInfo()
-                info.text = item.done and (CHECK .. item.text) or item.text
+                info.text = shownText(item)
+                if item.hint then info.tooltipTitle, info.tooltipText, info.tooltipOnButton = item.text, item.hint, true end
                 info.notCheckable = item.kind ~= "check"
                 info.isTitle = item.kind == "title"
                 info.disabled = (item.disabled or item.kind == "title" or item.kind == "info") and true or false

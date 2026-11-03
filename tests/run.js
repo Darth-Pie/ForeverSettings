@@ -85,7 +85,6 @@ const MUTATIONS = {
 
   // UI.lua (Task 10) and the hooks that reach it.
   'ui-combat-enabled': ['UI.lua', `    local busy = (ctx.inCombat or ctx.active) and true or false`, `    local busy = false`],
-  'ui-stop-always': ['UI.lua', `    add({ text = "Stop", kind = "button", disabled = not ctx.active, run = bench("stop") })`, `    add({ text = "Stop", kind = "button", disabled = false, run = bench("stop") })`],
   'ui-report-no-escape': ['UI.lua', `    tinsert(UISpecialFrames, REPORT_NAME)`, `    local _ = REPORT_NAME`],
   'ui-autoreport-ignores-flag': ['UI.lua', `    if entry.valid and not (st and st.autoReport == false) then ui.showReport(entry) end`, `    if entry.valid then ui.showReport(entry) end`],
   'ui-autoreport-invalid': ['UI.lua', `    if entry.valid and not (st and st.autoReport == false) then ui.showReport(entry) end`, `    if not (st and st.autoReport == false) then ui.showReport(entry) end`],
@@ -163,7 +162,6 @@ const MUTATIONS = {
   'recapture-drops-extras': ['Profiles.lua', `        for k in pairs(db.original.values) do names[#names + 1] = k end`, `        local _ = names`],
   'raid-saves-before-refusal': ['Profiles.lua', `    if db.active == "crowded" and (InCombatLockdown() or busy()) then`, `    if false then`],
   'raid-guard-any-profile': ['Profiles.lua', `    if db.active == "crowded" and (InCombatLockdown() or busy()) then`, `    if (InCombatLockdown() or busy()) then`],
-  'ui-raid-enabled-in-combat': ['UI.lua', `        isChecked = raidOn, disabled = locked or (ctx.inCombat and true or false),`, `        isChecked = raidOn, disabled = locked,`],
   'switch-no-readback': ['Profiles.lua', `        if sameValue(now, plan.writes[cvar]) then`, `        if true then`],
   'switch-want-all': ['Profiles.lua', `    db.want = plan.want`, `    db.want = plan.writes`],
   'switch-no-raid-return': ['Profiles.lua', `    local plan = profiles.plan(name)`, `    local plan = profiles.plan(name)\n    if name ~= "crowded" then for _, raid in pairs(profiles.RAID_OF) do plan.writes[raid] = nil end end`],
@@ -191,12 +189,7 @@ const MUTATIONS = {
   'applyall-writes-orig': ['ForeverSettings.lua', `            local ok, result = pcall(SetCVar, name, value)`, `            db.orig = db.orig or {}; db.orig[name] = current\n            local ok, result = pcall(SetCVar, name, value)`],
   // Profiles (Task 7)
   'ui-profile-tick-static': ['UI.lua', `            isChecked = function() return ns.profiles ~= nil and ns.profiles.active() == key end,`, `            isChecked = function() return (ctx.profile or "original") == key end,`],
-  'ui-profile-enabled-in-combat': ['UI.lua', `            disabled = locked or (ctx.inCombat and true or false), run = command("profile " .. key) }`, `            disabled = locked, run = command("profile " .. key) }`],
-  'ui-profile-run-wrong': ['UI.lua', `run = command("profile save everyday")`, `run = command("profile save crowded")`],
-  'ui-raid-static': ['UI.lua', `        isChecked = raidOn, disabled = locked or (ctx.inCombat and true or false),`, `        isChecked = function() return ctx.raidToo == true end, disabled = locked or (ctx.inCombat and true or false),`],
   'ui-tooltip-profile-off': ['UI.lua', `    GameTooltip:AddLine("Profile: " .. ((ns.profiles and ns.profiles.LABEL[key]) or key))`, `    local _ = key`],
-  'ui-raid-note-always': ['UI.lua', `    if ctx.raidSwitchOff then`, `    if true then`],
-  'ui-raid-note-long': ['UI.lua', `        add({ text = "Needs the game's raid graphics turned on.",`, `        add({ text = "The game's raid graphics are switched off, so this has no effect until you turn them on.",`],
   // Profiles (Task 8)
   'history-profile-off': ['Bench.lua', `    entry.profile = entry.profile or (ns.db() and ns.db().active)`, `    local _ = entry`],
   // Profiles (Task 9)
@@ -811,7 +804,6 @@ end
   'menu-order-wrong': ['UI.lua', `    add(profileItem("everyday"))
     add(profileItem("crowded"))`, `    add(profileItem("crowded"))
     add(profileItem("everyday"))`],
-  'menu-profile-text-raw': ['UI.lua', `local text = ns.names and ns.names.PROFILE[key] or key`, `local text = key`],
   'menu-done-always': ['UI.lua', `kind = "button", disabled = busy, done = saved.best == true,`, `kind = "button", disabled = busy, done = true,`],
   'menu-done-never': ['UI.lua', `kind = "button", disabled = busy, done = saved.crowded == true,`, `kind = "button", disabled = busy, done = false,`],
   'menu-done-swapped': ['UI.lua', `kind = "button", disabled = busy, done = saved.best == true,`, `kind = "button", disabled = busy, done = saved.crowded == true,`],
@@ -867,16 +859,9 @@ end
         add({ text = string.format("A test is running: step`, `    if progress and not ctx.active then
         add({ text = string.format("A test is running: step`],
   'menu-status-raw-label': ['UI.lua', `ns.names and ns.names.progress(progress) or tostring(progress.label)), kind = "info"`, `tostring(progress.label)), kind = "info"`],
-  'menu-advanced-missing-item': ['UI.lua', `        { text = "Apply all now", kind = "button", disabled = locked, run = command("apply") },
-`, ``],
-  'menu-advanced-report-enabled-always': ['UI.lua', `kind = "button", disabled = ctx.last == nil,`, `kind = "button", disabled = false,`],
   'menu-raw-name': ['UI.lua', `    add({ text = "Find my best settings", kind = "button"`, `    add({ text = "Find my best settings (graphicsShadowQuality)", kind = "button"`],
   'menu-settings-without-module-silent': ['UI.lua', `if ns.settings and ns.settings.open then ns.settings.open() else ns.say("settings module not loaded") end`, `if ns.settings and ns.settings.open then ns.settings.open() end`],
   'menu-settings-never-opens': ['UI.lua', `if ns.settings and ns.settings.open then ns.settings.open() else ns.say("settings module not loaded") end`, `if ns.settings and ns.settings.open then local _ = ns.settings.open else ns.say("settings module not loaded") end`],
-  'menu-adapter-check-missing': ['UI.lua', `                local element = parent:CreateButton(item.done and (CHECK .. item.text) or item.text, item.run)`, `                local element = parent:CreateButton(item.text, item.run)`],
-  'menu-adapter-check-on-all': ['UI.lua', `                local element = parent:CreateButton(item.done and (CHECK .. item.text) or item.text, item.run)`, `                local element = parent:CreateButton(CHECK .. item.text, item.run)`],
-  'menu-adapter-old-check-missing': ['UI.lua', `                info.text = item.done and (CHECK .. item.text) or item.text`, `                info.text = item.text`],
-  'menu-adapter-old-check-on-all': ['UI.lua', `                info.text = item.done and (CHECK .. item.text) or item.text`, `                info.text = CHECK .. item.text`],
   'menu-tooltip-progress-raw': ['UI.lua', `        ns.names and ns.names.progress(p) or tostring(p.label)) or "no test running")`, `        tostring(p.label)) or "no test running")`],
 
   // Fix pass after the fresh review of the whole build (words and menu, Task 8)
@@ -1275,12 +1260,6 @@ end`],
   'menu-max-estimate-truncates': ['UI.lua', `return math.floor(estimate.fps + 0.5)`, `return math.floor(estimate.fps)`],
   'menu-max-estimate-unguarded': ['UI.lua', `local ok, estimate = pcall(ns.recommend.estimateFps, ns.guide.findQuiet(), values)`, `local ok, estimate = true, ns.recommend.estimateFps(ns.guide.findQuiet(), values)`],
   'menu-max-module-guard-missing': ['UI.lua', `    if not (ns.profiles and ns.guide and ns.recommend) then return nil end`, `    local _ = ns`],
-  'menu-max-enabled-in-combat': ['UI.lua', `            isChecked = function() return ns.profiles ~= nil and ns.profiles.active() == key end,
-            disabled = locked or (ctx.inCombat and true or false), run = command("profile " .. key) }`, `            isChecked = function() return ns.profiles ~= nil and ns.profiles.active() == key end,
-            disabled = locked or (key ~= "maximum" and ctx.inCombat and true or false), run = command("profile " .. key) }`],
-  'menu-max-enabled-while-running': ['UI.lua', `            isChecked = function() return ns.profiles ~= nil and ns.profiles.active() == key end,
-            disabled = locked or (ctx.inCombat and true or false), run = command("profile " .. key) }`, `            isChecked = function() return ns.profiles ~= nil and ns.profiles.active() == key end,
-            disabled = (key ~= "maximum" and locked) or (ctx.inCombat and true or false), run = command("profile " .. key) }`],
   'menu-max-wrong-command': ['UI.lua', `run = command("profile " .. key) }`, `run = command("profile " .. (key == "maximum" and "crowded" or key)) }`],
   'menu-max-not-ticked': ['UI.lua', `checked = ((ctx.profile or "original") == key),`, `checked = (key ~= "maximum" and (ctx.profile or "original") == key),`],
   'menu-max-ischecked-wrong': ['UI.lua', `isChecked = function() return ns.profiles ~= nil and ns.profiles.active() == key end,`, `isChecked = function() return ns.profiles ~= nil and ns.profiles.active() == (key == "maximum" and "crowded" or key) end,`],
@@ -1348,7 +1327,7 @@ end`],
     stack(p.your, view.yourLine)`, `    stack(p.your, view.yourLine)
     stack(p.total, view.totalLine)`],
   'settings-max-matters-over-total': ['Settings.lua', `        bottom = bottom + heightOf(fs, str) + 2`, `        bottom = bottom + 2`],
-  'settings-max-matters-line-missing': ['Settings.lua', `            worth:SetText("matters: " .. row.mattersWords)`, `            worth:SetText("")`],
+  'settings-max-matters-line-missing': ['Settings.lua', `            worth:SetText(row.tag or ("matters: " .. row.mattersWords))`, `            worth:SetText(row.tag or "")`],
   'settings-max-cost-note-missing': ['Settings.lua', `    if onSettings or view.page == "home" then placeText(p.costNote, view.costNote) else hideText(p.costNote) end`, `    hideText(p.costNote)`],
   'settings-max-costs-not-released': ['Settings.lua', `    release(p.costs, true)`, `    local _ = p.costs`],
 
@@ -1488,7 +1467,7 @@ end`],
   'hub-window-size': ['Settings.lua', `local WIDTH, HEIGHT = 860, 560`, `local WIDTH, HEIGHT = 860, 540`],
   'hub-nav-click-missing': ['Settings.lua', `        item:SetScript("OnClick", clicked)`, `        local _ = clicked`],
   'hub-nav-gap': ['Settings.lua', `-(10 + (i - 1) * 30 + gap)`, `-(10 + (i - 1) * 30)`],
-  'hub-nav-selected-unmarked': ['Settings.lua', `p.nav[i]:SetSelected(entry.selected)`, `p.nav[i]:SetSelected(false)`],
+  'hub-nav-selected-unmarked': ['Settings.lua', `item:SetSelected(entry.selected)`, `item:SetSelected(false)`],
   'hub-card-tick-unchecked': ['Settings.lua', `box:SetChecked(row.kept)`, `box:SetChecked(false)`],
   'hub-card-tick-never-greyed': ['Settings.lua', `box:SetEnabled(row.enabled)`, `box:SetEnabled(true)`],
   'hub-card-name-missing': ['Settings.lua', `name:SetText(row.name)`, `name:SetText("")`],
@@ -1779,10 +1758,10 @@ end
   'live-tab-name': ['Settings.lua', `TAB_TEXT[editing], est.fps)`, `"Everyday", est.fps)`],
   'live-context-dropped': ['Settings.lua', `ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(`, `ctx.costs, ctx.maximum = costsAndMaximum(`],
   'home-inuse-label': ['Settings.lua', `view.home = { inUse = labels[ctx.active] or tostring(ctx.active)`, `view.home = { inUse = tostring(ctx.active)`],
-  'page-open-ignores-page': ['Settings.lua', `    elseif PAGE_KEYS[which] then
+  'page-open-ignores-page': ['Settings.lua', `    elseif PAGE_KEYS[which] or ADVANCED_PAGE[which] then      -- an Advanced page shows only while Advanced is on (the model decides)
         state.page = which
     end`, `    end`],
-  'page-open-bogus': ['Settings.lua', `    elseif PAGE_KEYS[which] then`, `    elseif which then`],
+  'page-open-bogus': ['Settings.lua', `    elseif PAGE_KEYS[which] or ADVANCED_PAGE[which] then`, `    elseif which then`],
   'sz-percent-rounding': ['Settings.lua', `math.floor(tonumber(keptSize) * 100 + 0.5)`, `math.floor(tonumber(keptSize) * 100)`],
   'sz-label-in-use': ['Settings.lua', `label = settings.sizeLabel(percent), note = note`, `label = settings.sizeLabel(keptPercent or percent), note = note`],
   'sz-note-none': ['Settings.lua', `            if keptSize == nil then
@@ -1837,10 +1816,10 @@ end
   'ed-click-read-only-guard': ['Settings.lua', `    local profile = TAB_TEXT[ctx.active] and ctx.active or nil
     if not profile then return end`, `    local profile = TAB_TEXT[ctx.active] and ctx.active or "everyday"
     if not profile then return end`],
-  'ed-frame-read-only-on-home': ['Settings.lua', `    if onSettings and view.readOnly then
+  'ed-frame-read-only-on-home': ['Settings.lua', `    if (onSettings or onAdvanced) and view.readOnly then
         placeText(p.readOnly`, `    if view.readOnly then
         placeText(p.readOnly`],
-  'ed-frame-read-only-never': ['Settings.lua', `    if onSettings and view.readOnly then
+  'ed-frame-read-only-never': ['Settings.lua', `    if (onSettings or onAdvanced) and view.readOnly then
         placeText(p.readOnly`, `    if false and view.readOnly then
         placeText(p.readOnly`],
   'ed-frame-edit-spacing': ['Settings.lua', `(i - 1) * (EDIT_W + 8), -y)`, `(i - 1) * EDIT_W, -y)`],
@@ -1951,23 +1930,23 @@ end
   'page-selected-wrong': ['Settings.lua', `selected = page.key == view.page,
             enabled = not running`, `selected = false,
             enabled = not running`],
-  'page-default-wrong': ['Settings.lua', `(PAGE_KEYS[st.page] and st.page or "home")`, `(PAGE_KEYS[st.page] and st.page or "light")`],
-  'page-bogus-accepted': ['Settings.lua', `(PAGE_KEYS[st.page] and st.page or "home")`, `(st.page or "home")`],
-  'page-click-ignored': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if false then`],
-  'page-click-bogus': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if pageKey and not (running and pageKey ~= "test") then`],
-  'page-click-locked': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if PAGE_KEYS[pageKey] and not InCombatLockdown() and not (running and pageKey ~= "test") then`],
+  'page-default-wrong': ['Settings.lua', `(known and st.page or "home")`, `(known and st.page or "light")`],
+  'page-bogus-accepted': ['Settings.lua', `local known = PAGE_KEYS[st.page] or (advancedOn and ADVANCED_PAGE[st.page])`, `local known = st.page`],
+  'page-click-ignored': ['Settings.lua', `        if known and not (running and pageKey ~= "test") then`, `        if false then`],
+  'page-click-bogus': ['Settings.lua', `local known = PAGE_KEYS[pageKey] or (ADVANCED_PAGE[pageKey] and fsdb and fsdb.advanced == true)`, `local known = pageKey`],
+  'page-click-locked': ['Settings.lua', `        if known and not (running and pageKey ~= "test") then`, `        if known and not InCombatLockdown() and not (running and pageKey ~= "test") then`],
   'ed-pill-colour': ['Settings.lua', `color = PROFILE_COLOR[ctx.active] or "dim" }`, `color = "dim" }`],
   'ed-frame-edit-enabled': ['Settings.lua', `            button:SetEnabled(spec.enabled)
             button:ClearAllPoints()
             button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (EDIT_W`, `            button:SetEnabled(true)
             button:ClearAllPoints()
             button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (EDIT_W`],
-  'pg-running-not-forced': ['Settings.lua', `view.page = running and "test" or (PAGE_KEYS[st.page] and st.page or "home")`, `view.page = PAGE_KEYS[st.page] and st.page or "home"`],
+  'pg-running-not-forced': ['Settings.lua', `view.page = running and "test" or (known and st.page or "home")`, `view.page = known and st.page or "home"`],
   'pg-running-pages-live': ['Settings.lua', `enabled = not running or page.key == "test" }`, `enabled = true }`],
   'pg-running-savebar-live': ['Settings.lua', `            enabled = locked == nil and not running }
     end`, `            enabled = locked == nil }
     end`],
-  'pg-running-click-moves': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if PAGE_KEYS[pageKey] then`],
+  'pg-running-click-moves': ['Settings.lua', `        if known and not (running and pageKey ~= "test") then`, `        if known then`],
   'pg-open-not-kept': ['Settings.lua', `    if ns.guide and ns.guide.running and ns.guide.running() then state.page = "test" end`, `    local _ = ns.guide`],
   'pg-escape-kept': ['Settings.lua', `    if not view.running then tinsert(UISpecialFrames, FRAME_NAME) end`, `    tinsert(UISpecialFrames, FRAME_NAME)`],
   'pg-escape-not-restored': ['Settings.lua', `    if not view.running then tinsert(UISpecialFrames, FRAME_NAME) end`, `    local _ = view.running`],
@@ -2167,8 +2146,7 @@ end
   't2-256-missing': ['Bench.lua', `tiers = { "48", "64", "128", "256" }`, `tiers = { "48", "64", "128" }`],
   't2-filtering-tiers': ['Bench.lua', `tiers = { "0", "1", "2", "3", "4", "5" }, confirmed = true },`, `tiers = { "0", "1", "2", "3", "4" }, confirmed = true },`],
   't2-view-row-missing': ['Bench.lua', `    { key = "viewdistance", label = "View distance", cvars = { "graphicsViewDistance" }, confirmed = true },`, ``],
-  't2-guard-msaa': ['Bench.lua', `"pbr", "antialias", "msaa",`, `"pbr", "antialias",`],
-  't2-guard-antialias': ['Bench.lua', `"pbr", "antialias", "msaa",`, `"pbr", "msaa",`],
+  't2-guard-msaa': ['Bench.lua', `"pbr", "msaa",`, `"pbr",`],
   't2-known-raw': ['ForeverSettings.lua', `    "textureFilteringMode", "ffxAntiAliasingMode", "MSAAQuality",`, `    "textureFilteringMode", "ffxAntiAliasingMode",`],
   't2-raid-view': ['Profiles.lua', `    graphicsViewDistance = "raidGraphicsViewDistance",`, ``],
   't2-managed': ['Profiles.lua', `    "graphicsSpellDensity", "graphicsDepthEffects", "graphicsOutlineMode", "textureFilteringMode", "ffxAntiAliasingMode",`, `    "graphicsSpellDensity", "graphicsDepthEffects", "graphicsOutlineMode", "textureFilteringMode",`],
@@ -2198,6 +2176,61 @@ end
   'shift-risky-said-each': ['ForeverSettings.lua', `            if not riskySaid then`, `            if true then`],
   'orig-other-not-recorded': ['Profiles.lua', `    -- As setValue does: a setting Original has no value for (an Advanced one) is recorded there first.
     if db.original.values[cvar] == nil then`, `    if false then`],
+  // The Advanced pages and the title-bar switch (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A2, A3)
+  'adv-pages-always': ['Settings.lua', `        if page.key == "about" and advancedOn then`, `        if page.key == "about" then`],
+  'adv-page-not-known': ['Settings.lua', `local known = PAGE_KEYS[st.page] or (advancedOn and ADVANCED_PAGE[st.page])`, `local known = PAGE_KEYS[st.page] or ADVANCED_PAGE[st.page]`],
+  'adv-accept-skipped': ['Settings.lua', `        else
+            state.accepting = true
+        end`, `        else
+            fsdb.advanced = true
+        end`],
+  'adv-cancel-turns-on': ['Settings.lua', `        if key == "advanced:cancel" then
+            state.accepting = nil`, `        if key == "advanced:cancel" then
+            state.accepting, fsdb.advanced = nil, true`],
+  'adv-accept-not-saved': ['Settings.lua', `            fsdb.advancedAccepted, fsdb.advanced = true, true`, `            fsdb.advanced = true`],
+  'adv-off-keeps-page': ['Settings.lua', `            if ADVANCED_PAGE[state.page] then state.page = "home" end`, ``],
+  'adv-switch-not-lit': ['Settings.lua', `    p.advanced:SetSelected(view.advancedSwitch.on)`, `    p.advanced:SetSelected(false)`],
+  'adv-tag-missing': ['Settings.lua', `tag = entry.risky and "risky" or nil, levels = {} }`, `tag = nil, levels = {} }`],
+  'adv-tag-colour': ['Settings.lua', `            worth:SetTextColor(skin.color(row.tag and "warning" or "dim"))`, `            worth:SetTextColor(skin.color("dim"))`],
+  'adv-warning-missing': ['Settings.lua', `        placeText(p.advWarning, view.advanced.warning)`, `        hideText(p.advWarning)`],
+  'adv-risky-everywhere': ['Settings.lua', `        if view.advanced.risky[view.page] then placeText(p.advRisky, view.advanced.riskyNote) else hideText(p.advRisky) end`, `        placeText(p.advRisky, view.advanced.riskyNote)`],
+  'adv-readonly-off': ['Settings.lua', `    if (onSettings or onAdvanced) and view.readOnly then`, `    if onSettings and view.readOnly then`],
+  'adv-cards-enabled': ['Settings.lua', `            enabled = locked == nil and editing ~= nil, noCosts = true,`, `            enabled = true, noCosts = true,`],
+  'adv-level-word': ['Settings.lua', `            local text = ns.advanced.levelText(entry, value)`, `            local text = value`],
+  'adv-tools-everywhere': ['Settings.lua', `    if view.page == (settings.ADVANCED_PAGES[1] and settings.ADVANCED_PAGES[1].key) then`, `    if onAdvanced then`],
+  'adv-raid-always-on': ['Settings.lua', `ns.command("profile raid " .. ((fsdb and fsdb.raidToo) and "off" or "on"))`, `ns.command("profile raid on")`],
+  'adv-home-kept-missing': ['Settings.lua', `        if n > 0 then
+            view.home.advancedKept`, `        if false then
+            view.home.advancedKept`],
+  'adv-open-advanced': ['Settings.lua', `    elseif PAGE_KEYS[which] or ADVANCED_PAGE[which] then`, `    elseif PAGE_KEYS[which] then`],
+  'adv-page-click': ['Settings.lua', `local known = PAGE_KEYS[pageKey] or (ADVANCED_PAGE[pageKey] and fsdb and fsdb.advanced == true)`, `local known = PAGE_KEYS[pageKey]`],
+  'adv-check-not-opened': ['Settings.lua', `        if ns.guide and ns.guide.open then ns.guide.open(key:sub(5)) end`, ``],
+  'adv-report-not-shown': ['Settings.lua', `        if last and ns.ui and ns.ui.showReport then ns.ui.showReport(last) end`, ``],
+  // The minimap menu since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5)
+  'mn-stop-always': ['UI.lua', `    if ctx.active then add({ text = "Stop"`, `    if true then add({ text = "Stop"`],
+  'mn-stop-never': ['UI.lua', `    if ctx.active then add({ text = "Stop"`, `    if false then add({ text = "Stop"`],
+  'mn-profile-enabled-in-combat': ['UI.lua', `    local switchOff = locked or (ctx.inCombat and true or false)`, `    local switchOff = locked`],
+  'mn-profile-enabled-while-running': ['UI.lua', `    local switchOff = locked or (ctx.inCombat and true or false)`, `    local switchOff = ctx.inCombat and true or false`],
+  'mn-profile-run-wrong': ['UI.lua', `            disabled = switchOff, run = command("profile " .. key) }`, `            disabled = switchOff, run = command("profile everyday") }`],
+  'mn-profile-text-raw': ['UI.lua', `        local full = ns.names and ns.names.PROFILE[key] or key`, `        local full = key`],
+  'mn-name-full': ['UI.lua', `        return { text = name, kind = "check", hint = hint,`, `        return { text = full, kind = "check", hint = hint,`],
+  'mn-hint-not-capitalised': ['UI.lua', `        local hint = about:sub(1, 1):upper() .. about:sub(2)`, `        local hint = about`],
+  'mn-max-estimate-missing': ['UI.lua', `if key == "maximum" and type(ctx.maxFps) == "number" then hint = hint .. string.format(" (about %.0f fps)", ctx.maxFps) end`, ``],
+  'mn-settings-not-prominent': ['UI.lua', `    add({ text = "Settings", kind = "button", prominent = true, run = function()`, `    add({ text = "Settings", kind = "button", prominent = false, run = function()`],
+  'mn-prominent-colour': ['UI.lua', `    if item.prominent then return "|cffffd100" .. item.text .. "|r" end`, ``],
+  'mn-check-missing': ['UI.lua', `    return item.done and (CHECK .. item.text) or item.text`, `    return item.text`],
+  'mn-check-on-all': ['UI.lua', `    return item.done and (CHECK .. item.text) or item.text`, `    return CHECK .. item.text`],
+  'mn-return-hint-missing': ['UI.lua', `hint = "Your own settings, from before the addon changed anything.",`, `hint = nil,`],
+  'mn-return-command': ['UI.lua', `        disabled = switchOff, run = command("profile original") })`, `        disabled = switchOff, run = command("reset") })`],
+  'mn-new-check-hint-missing': ['UI.lua', `                addHint(element, item)
+                if item.disabled then disable(element) end
+            elseif kind == "submenu" then`, `                if item.disabled then disable(element) end
+            elseif kind == "submenu" then`],
+  'mn-new-button-hint-missing': ['UI.lua', `                local element = parent:CreateButton(shownText(item), item.run)
+                addHint(element, item)`, `                local element = parent:CreateButton(shownText(item), item.run)`],
+  'mn-new-hint-title': ['UI.lua', `        tooltip:SetText(item.text)`, `        tooltip:SetText("")`],
+  'mn-old-hint-missing': ['UI.lua', `                if item.hint then info.tooltipTitle, info.tooltipText, info.tooltipOnButton = item.text, item.hint, true end`, ``],
+  'adv-raid-note-always': ['Settings.lua', `        if tools.raidOff then placeText(p.advRaidOff, tools.raidOff, 22) else hideText(p.advRaidOff) end`, `        placeText(p.advRaidOff, RAID_SWITCH_OFF, 22)`],
 };
 
 function main() {

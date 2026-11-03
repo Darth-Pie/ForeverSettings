@@ -388,7 +388,7 @@ bench.restore = restore
 local GUARDED = {
     "graphics", "raidgraphics", "ground", "shadow", "ssao", "giquality", "light", "liquid", "water", "texture",
     "view", "lod", "horizon", "farclip", "sun", "particle", "weather", "spell", "render", "fps", "vsync", "bloom",
-    "depth", "compute", "outline", "projected", "refraction", "ripple", "reflection", "pbr", "antialias", "msaa",
+    "depth", "compute", "outline", "projected", "refraction", "ripple", "reflection", "pbr", "msaa",
     "ffx", "fog", "resample",
 }
 

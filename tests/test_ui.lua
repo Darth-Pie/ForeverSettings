@@ -45,11 +45,12 @@ local function baseCtx(over)
     for k, v in pairs(over or {}) do ctx[k] = v end
     return ctx
 end
--- The plain texts of the menu (spec 2026-10-30-words-and-menu-design.md section 3.2).
-local P_ORIGINAL, P_EVERYDAY, P_CROWDED = "Original: my own settings, hands off", "Everyday: normal play", "Crowded: raids and busy cities"
-local P_MAXIMUM = "Maximum: everything at its highest"
-local SAVE_LABEL = "Save my game's current settings as..."
-local RAID_LABEL = "Also use the Crowded settings in raids and battlegrounds"
+-- The plain texts of the menu since 0.11 (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5): the profiles by name,
+-- their descriptions as hints, Settings at the top and Return to Original at the bottom.
+local P_EVERYDAY, P_CROWDED, P_MAXIMUM = "Everyday", "Crowded", "Maximum"
+local H_EVERYDAY, H_CROWDED, H_MAXIMUM = "Normal play", "Raids and busy cities", "Everything at its highest"
+local SETTINGS, PROMINENT = "Settings", "|cffffd100Settings|r"
+local RETURN, H_RETURN = "Return to Original", "Your own settings, from before the addon changed anything."
 local CHECK = "|TInterface/RaidFrame/ReadyCheck-Ready:14|t "
 local RAW_NAMES = { "graphicsShadowQuality", "graphicsSSAO", "groundEffectDensity", "RenderScale", "graphicsComputeEffects",
     "Ground clutter (raw)", "Render scale", "Compute effects", "Tiers", "Forced settings" }
@@ -73,35 +74,29 @@ local function rawIn(items)
 end
 
 -- The menu model (pure)
-test("B10-1 the idle model lists its groups in order: Profile, Find my settings, My settings, Advanced", function()
+test("B10-1 the idle model: Settings, the three profiles, the two tests and Return to Original, with dividers between and no titles", function()
     local _, ui = newUi()
     local model = ui.menuModel(baseCtx({}))
-    local want = table.concat({ "ForeverSettings", "-", "Profile", P_ORIGINAL, P_EVERYDAY, P_CROWDED, P_MAXIMUM, SAVE_LABEL, RAID_LABEL, "-",
-        "Find my settings", "Find my best settings", "Find my crowded settings", "Stop", "-", "My settings...", "Advanced" }, "|")
-    return titlesOf(model) == "ForeverSettings,Profile,Find my settings" and topTexts(model) == want, topTexts(model)
+    local want = table.concat({ SETTINGS, "-", P_EVERYDAY, P_CROWDED, P_MAXIMUM, "-", "Find my best settings", "Find my crowded settings",
+        "-", RETURN }, "|")
+    local settings = find(model, SETTINGS)
+    return topTexts(model) == want and titlesOf(model) == "" and settings.kind == "button" and settings.prominent == true
+        and find(model, RETURN).kind == "button" and find(model, RETURN).hint == H_RETURN, topTexts(model)
 end)
 
-test("B10-3 the two Find items follow combat and a running test, Stop only a running one, and Advanced holds the developer items", function()
+test("B10-3 the Find items follow combat and a running test; Stop comes only with a running test; the old Advanced items are gone", function()
     local _, ui = newUi()
-    local function states(over)
-        local model = ui.menuModel(baseCtx(over))
-        return { best = find(model, "Find my best settings").disabled, crowded = find(model, "Find my crowded settings").disabled,
-                 check = find(model, "Check this spot").disabled, run = find(model, "Run benchmark").disabled,
-                 stop = find(model, "Stop").disabled, report = find(model, "Show last report").disabled,
-                 apply = find(model, "Apply all now").disabled, back = find(model, "Put back everything this addon changed").disabled }
+    local idle, combat, active = ui.menuModel(baseCtx({})), ui.menuModel(baseCtx({ inCombat = true })), ui.menuModel(baseCtx({ active = true }))
+    local gone = true
+    for _, text in ipairs({ "Advanced", "Check this spot", "Run benchmark", "Show last report", "Apply all now",
+        "Put back everything this addon changed", "My settings...", "Profile", "Original: my own settings, hands off",
+        "Save my game's current settings as...", "Also use the Crowded settings in raids and battlegrounds" }) do
+        if find(idle, text) or find(active, text) then gone = false end
     end
-    local idle = states({})
-    local combat = states({ inCombat = true })
-    local active = states({ active = true })
-    local withLast = states({ last = { valid = true, rows = {} } })
-    local advanced = find(ui.menuModel(baseCtx({})), "Advanced")
-    return idle.best == false and idle.crowded == false and idle.check == false and idle.run == false and idle.stop == true
-        and idle.report == true and idle.apply == false and idle.back == false
-        and combat.best == true and combat.crowded == true and combat.check == true and combat.run == true and combat.stop == true
-        and combat.apply == false
-        and active.best == true and active.crowded == true and active.check == true and active.run == true and active.stop == false
-        and active.apply == true and active.back == true and withLast.report == false
-        and advanced.kind == "submenu" and #advanced.children == 5, topTexts(advanced.children)
+    return find(idle, "Find my best settings").disabled == false and find(idle, "Find my crowded settings").disabled == false
+        and find(idle, "Stop") == nil and find(combat, "Find my best settings").disabled == true
+        and find(combat, "Find my crowded settings").disabled == true and find(active, "Find my best settings").disabled == true
+        and find(active, "Stop") ~= nil and find(active, "Stop").disabled == false and gone, topTexts(active)
 end)
 
 test("B10-4 the status line says a test is running, with its step and what it is doing, and is absent otherwise", function()
@@ -130,11 +125,11 @@ test("B10-6 every item's action reaches the function its slash command uses", fu
     b.stop = function() calls[#calls + 1] = "stop" end
     ui.showReport = function(entry) calls[#calls + 1] = "report:" .. tostring(entry.label) end
     local model = ui.menuModel(baseCtx({ active = true, last = { label = "last", valid = true, rows = {} } }))
-    for _, text in ipairs({ "Apply all now", "Put back everything this addon changed", "Find my best settings",
-                            "Find my crowded settings", "Run benchmark", "Check this spot", "Stop", "Show last report", "My settings..." }) do
+    for _, text in ipairs({ SETTINGS, P_EVERYDAY, P_CROWDED, P_MAXIMUM, "Find my best settings", "Find my crowded settings", "Stop", RETURN }) do
         find(model, text).run()
     end
-    return table.concat(calls, ",") == "cmd:apply,cmd:reset,guide:setup,guide:crowd,guide:run,guide:check,stop,report:last,settings",
+    return table.concat(calls, ",")
+        == "settings,cmd:profile everyday,cmd:profile crowded,cmd:profile maximum,guide:setup,guide:crowd,stop,cmd:profile original",
         table.concat(calls, ",")
 end)
 
@@ -169,20 +164,27 @@ test("UC-1 a crowd entry is never the last report", function()
 end)
 
 -- The client-menu adapters
-test("B10-8 the new menu API gets titles, dividers, buttons, checkboxes and nested submenus", function()
+-- The tooltip an item of the new menu shows: the lines its tooltip function writes.
+local function tooltipOf(item)
+    GameTooltip.lines = {}
+    if item and item.tooltip then item.tooltip(GameTooltip) end
+    return table.concat(GameTooltip.lines, "|")
+end
+
+test("B10-8 the new menu API gets dividers, buttons and checkboxes, Settings first and brighter, and each hint as its item's tooltip", function()
     local e, ui, b = newUi(nil, { menu = "new" })
-    local calls = {}
-    e.ns.guide.open = function(kind) calls[#calls + 1] = "guide:" .. kind end
+    local opened = 0
+    e.ns.settings.open = function() opened = opened + 1 end
     local owner = {}
     ui.openMenu(owner)
     local items = MENUCALLS.items
-    local runItem = find(items, "Run benchmark")
-    local advanced = find(items, "Advanced")
-    local checked = find(items, P_EVERYDAY)
-    runItem.fn()
-    return MENUCALLS.owner == owner and titlesOf(items) == "ForeverSettings,Profile,Find my settings"
-        and runItem.kind == "button" and advanced.kind == "submenu" and find(advanced.children, "Check this spot") ~= nil
-        and checked.kind == "check" and checked.isSelected() == true and table.concat(calls) == "guide:run", outText()
+    local settings, everyday, back = items[1], find(items, P_EVERYDAY), find(items, RETURN)
+    settings.fn()
+    return MENUCALLS.owner == owner and titlesOf(items) == "" and settings.kind == "button" and settings.text == PROMINENT and opened == 1
+        and items[2].kind == "divider" and everyday.kind == "check" and everyday.isSelected() == true
+        and tooltipOf(everyday) == P_EVERYDAY .. "|" .. H_EVERYDAY and tooltipOf(find(items, P_CROWDED)) == P_CROWDED .. "|" .. H_CROWDED
+        and back.kind == "button" and tooltipOf(back) == RETURN .. "|" .. H_RETURN and tooltipOf(settings) == "",
+        tooltipOf(everyday) .. " / " .. tooltipOf(back)
 end)
 
 test("B10-8c the Find items are disabled in the new menu while a run is active", function()
@@ -200,28 +202,25 @@ test("B10-8b disabled items are disabled in the new menu", function()
     local e, ui = newUi(nil, { menu = "new" })
     COMBAT = true
     ui.openMenu({})
-    local runItem = find(MENUCALLS.items, "Run benchmark")
-    local stopItem = find(MENUCALLS.items, "Stop")
-    return runItem.disabled == true and stopItem.disabled == true
+    return find(MENUCALLS.items, "Find my best settings").disabled == true and find(MENUCALLS.items, P_EVERYDAY).disabled == true
+        and find(MENUCALLS.items, RETURN).disabled == true
 end)
 
-test("B10-9 the older dropdown functions get the same entries, with submenus on a second level", function()
+test("B10-9 the older dropdown functions get the same entries on one level, Settings brighter, and the hints as tooltips", function()
     local e, ui, b = newUi(nil, { menu = "old" })
-    local calls = {}
-    e.ns.guide.open = function(kind) calls[#calls + 1] = "guide:" .. kind end
+    local opened = 0
+    e.ns.settings.open = function() opened = opened + 1 end
     local owner = {}
     ui.openMenu(owner)
     local level1, level2 = MENUCALLS.levels[1], MENUCALLS.levels[2]
     local function infoByText(list, text)
         for _, info in ipairs(list) do if info.text == text then return info end end
     end
-    local advanced = infoByText(level1, "Advanced")
-    local run = infoByText(level2, "Run benchmark")
-    local title = infoByText(level1, "ForeverSettings")
-    run.func()
-    return MENUCALLS.anchor == owner and advanced ~= nil and advanced.hasArrow == true and run ~= nil and run.disabled == false
-        and infoByText(level1, "Find my best settings") ~= nil and title.isTitle == true and title.disabled == true
-        and table.concat(calls) == "guide:run", outText()
+    local settings, everyday, back = level1[1], infoByText(level1, P_EVERYDAY), infoByText(level1, RETURN)
+    settings.func()
+    return MENUCALLS.anchor == owner and #level2 == 0 and settings.text == PROMINENT and opened == 1 and settings.tooltipText == nil
+        and everyday.tooltipTitle == P_EVERYDAY and everyday.tooltipText == H_EVERYDAY and everyday.tooltipOnButton == true
+        and back.tooltipText == H_RETURN and back.notCheckable == true and infoByText(level1, "Find my best settings") ~= nil, outText()
 end)
 
 test("B10-10 with no menu API the click prints a one-line help and nothing breaks", function()
@@ -406,18 +405,6 @@ test("B10-15b check prints the UI environment lines", function()
 end)
 
 -- Task 7: the Profile section and the tooltip line
-test("P7-1 the Profile section follows the title: the profile items, a save submenu and the raid checkbox", function()
-    local _, ui = newUi()
-    local model = ui.menuModel(baseCtx({ profile = "everyday" }))
-    local original, everyday, crowded = find(model, P_ORIGINAL), find(model, P_EVERYDAY), find(model, P_CROWDED)
-    local save = find(model, SAVE_LABEL)
-    return titlesOf(model) == "ForeverSettings,Profile,Find my settings"
-        and original.kind == "check" and everyday.kind == "check" and crowded.kind == "check"
-        and everyday.checked == true and original.checked == false and crowded.checked == false
-        and save.kind == "submenu" and find(save.children, "Everyday").kind == "button"
-        and find(model, RAID_LABEL).kind == "check", titlesOf(model)
-end)
-
 test("P7-2 in the new menu the profile ticks follow a click without reopening the menu", function()
     local _, ui = newUi(nil, { menu = "new" })
     ui.openMenu({})
@@ -427,47 +414,27 @@ test("P7-2 in the new menu the profile ticks follow a click without reopening th
     return before and crowded.isSelected() == true and everyday.isSelected() == false, outText()
 end)
 
-test("P7-3 the profile items are disabled in combat and during a benchmark; the save buttons only during a benchmark", function()
+test("P7-3 the profile items and Return to Original are disabled in combat and during a benchmark", function()
     local _, ui = newUi()
     local function states(over)
         local model = ui.menuModel(baseCtx(over))
-        local save = find(model, SAVE_LABEL)
-        return { profile = find(model, P_CROWDED).disabled, original = find(model, P_ORIGINAL).disabled,
-            save = find(save.children, "Crowded").disabled }
+        return { profile = find(model, P_CROWDED).disabled, back = find(model, RETURN).disabled }
     end
     local idle, combat, running = states({}), states({ inCombat = true }), states({ active = true })
-    return idle.profile == false and idle.original == false and idle.save == false
-        and combat.profile == true and combat.original == true and combat.save == false
-        and running.profile == true and running.original == true and running.save == true
+    return idle.profile == false and idle.back == false and combat.profile == true and combat.back == true
+        and running.profile == true and running.back == true
 end)
 
-test("P7-4 each item sends exactly its command, and the raid checkbox sends the opposite of the saved option", function()
+test("P7-4 each profile item and Return to Original sends exactly its command", function()
     local e, ui = newUi()
     local sent = {}
     e.ns.command = function(msg) sent[#sent + 1] = msg end
-    local model = ui.menuModel(baseCtx({ raidToo = false }))
-    find(model, P_ORIGINAL).run()
+    local model = ui.menuModel(baseCtx({}))
     find(model, P_EVERYDAY).run()
     find(model, P_CROWDED).run()
-    local save = find(model, SAVE_LABEL)
-    find(save.children, "Everyday").run()
-    find(save.children, "Crowded").run()
-    find(model, RAID_LABEL).run()
-    e.ns.db().raidToo = true
-    find(model, RAID_LABEL).run()
-    return table.concat(sent, "|") == "profile original|profile everyday|profile crowded|profile save everyday|profile save crowded|profile raid on|profile raid off",
-        table.concat(sent, "|")
-end)
-
-test("P7-5 the raid checkbox ticks from the saved option, live", function()
-    local _, ui = newUi(nil, { menu = "new" })
-    ui.openMenu({})
-    local box = find(MENUCALLS.items, RAID_LABEL)
-    local off = box.isSelected() == false
-    box.fn()
-    local on = box.isSelected() == true
-    box.fn()
-    return off and on and box.isSelected() == false, outText()
+    find(model, P_MAXIMUM).run()
+    find(model, RETURN).run()
+    return table.concat(sent, "|") == "profile everyday|profile crowded|profile maximum|profile original", table.concat(sent, "|")
 end)
 
 test("P7-6 the tooltip names the active profile", function()
@@ -483,37 +450,8 @@ test("P7-6 the tooltip names the active profile", function()
     return first:find("Profile: Everyday", 1, true) ~= nil and second:find("Profile: Crowded", 1, true) ~= nil, first .. " // " .. second
 end)
 
-local RAID_NOTE = "Needs the game's raid graphics turned on."
-
-test("P7-7 a note appears only when the game's raid settings are switched off", function()
-    local _, ui = newUi()
-    local function noteFor(value)
-        CVARS.RAIDsettingsEnabled = value
-        return find(ui.menuModel(ui.buildContext()), RAID_NOTE) ~= nil
-    end
-    return noteFor("0") == true and noteFor("1") == false and noteFor(nil) == false
-end)
-
-test("P7-7b the raid note is short enough not to make the menu wider than its own longest item", function()
-    local _, ui = newUi()
-    CVARS.RAIDsettingsEnabled = "0"
-    local model = ui.menuModel(ui.buildContext())
-    local note = find(model, RAID_NOTE)
-    local widest = 0
-    for _, item in ipairs(model) do
-        if item.text and item ~= note and item.kind ~= "info" and #item.text > widest then widest = #item.text end
-    end
-    return note ~= nil and note.kind == "info" and #RAID_NOTE <= widest, tostring(#RAID_NOTE) .. " against " .. tostring(widest)
-end)
-
-test("P7-8 the raid checkbox is disabled in combat and during a benchmark, as the other profile items are (F4)", function()
-    local _, ui = newUi()
-    local function disabled(over) return find(ui.menuModel(baseCtx(over)), RAID_LABEL).disabled end
-    return disabled({}) == false and disabled({ inCombat = true }) == true and disabled({ active = true }) == true
-end)
-
--- Recommender, Task 8: the menu item (plan 2026-10-29-recommender.md)
-test("T8-2 the menu's Find my best settings opens the guide in kind setup when there is no saved result, and Check this spot sits in Advanced", function()
+-- Recommender, Task 8: the menu item (plan 2026-10-29-recommender.md); Check this spot is on the Advanced page since 0.11.
+test("T8-2 the menu's Find my best settings opens the guide in kind setup when there is no saved result, and Check this spot is not in the menu", function()
     local e, ui = newUi()
     local calls = {}
     e.ns.guide.open = function(kind) calls[#calls + 1] = kind end
@@ -522,8 +460,8 @@ test("T8-2 the menu's Find my best settings opens the guide in kind setup when t
     for i, item in ipairs(model) do at[item.text or ""] = i end
     local item = find(model, "Find my best settings")
     item.run()
-    return item.kind == "button" and at["Find my best settings"] ~= nil and at["Check this spot"] == nil
-        and find(find(model, "Advanced").children, "Check this spot") ~= nil and table.concat(calls, ",") == "setup", table.concat(calls, ",")
+    return item.kind == "button" and at["Find my best settings"] ~= nil and find(model, "Check this spot") == nil
+        and table.concat(calls, ",") == "setup", table.concat(calls, ",")
 end)
 
 test("T41-1 the menu's Find my crowded settings comes right after Find my best settings and opens the guide in kind crowd", function()
@@ -688,14 +626,14 @@ test("M1-10 nothing in the menu, however deep, is a raw setting name", function(
     return rawIn(model) == nil, tostring(rawIn(model))
 end)
 
-test("M1-11 My settings... opens the window, and without the module says so", function()
+test("M1-11 Settings opens the window, and without the module says so", function()
     local e, ui = newUi()
     local opened = 0
     e.ns.settings.open = function() opened = opened + 1 end
-    find(ui.menuModel(baseCtx({})), "My settings...").run()
+    find(ui.menuModel(baseCtx({})), SETTINGS).run()
     local e2, ui2 = newUi(nil, { settings = false })
     OUT = {}
-    find(ui2.menuModel(baseCtx({})), "My settings...").run()
+    find(ui2.menuModel(baseCtx({})), SETTINGS).run()
     return opened == 1 and has("settings module not loaded"), outText()
 end)
 
@@ -720,7 +658,7 @@ test("M1-12 both menu adapters draw the green check before a finished test and b
     end
     local level1 = MENUCALLS.levels[1]
     local oldOk = infoByText(level1, CHECK .. "Find my best settings") ~= nil and infoByText(level1, "Find my crowded settings") ~= nil
-        and infoByText(level1, "Find my best settings") == nil and infoByText(level1, "Stop") ~= nil
+        and infoByText(level1, "Find my best settings") == nil and infoByText(level1, RETURN) ~= nil
     return newOk and oldOk, tostring(newOk) .. tostring(oldOk)
 end)
 
@@ -785,31 +723,26 @@ local function maxMenu(entry, opts, cvars)
     return e, ui, b
 end
 
-test("UM-1 the Profile group lists Original, Everyday, Crowded and Maximum in order, ticked and live", function()
+test("UM-1 the profile items are Everyday, Crowded and Maximum by name, right after Settings, ticked and live; Original is not one of them", function()
     local e, ui = maxMenu(nil)
     local model = ui.menuModel(baseCtx({ profile = "maximum" }))
     local list = {}
-    for i, item in ipairs(model) do
-        if item.text == "Profile" then
-            for j = i + 1, i + 4 do list[#list + 1] = model[j].text .. ":" .. model[j].kind .. ":" .. tostring(model[j].checked) end
-        end
-    end
+    for i = 3, 5 do list[#list + 1] = model[i].text .. ":" .. model[i].kind .. ":" .. tostring(model[i].checked) end
     local everyday = find(ui.menuModel(baseCtx({ profile = "everyday" })), P_MAXIMUM)
     local first = find(model, P_MAXIMUM)
     e.slash("profile maximum")
-    return table.concat(list, "|") == P_ORIGINAL .. ":check:false|" .. P_EVERYDAY .. ":check:false|" .. P_CROWDED .. ":check:false|"
-        .. P_MAXIMUM .. ":check:true" and everyday.checked == false and first.isChecked() == true
-        and find(model, P_EVERYDAY).isChecked() == false, table.concat(list, "|") .. " " .. outText()
+    return table.concat(list, "|") == "Everyday:check:false|Crowded:check:false|Maximum:check:true" and everyday.checked == false
+        and first.isChecked() == true and find(model, P_EVERYDAY).isChecked() == false and find(model, "Original") == nil,
+        table.concat(list, "|") .. " " .. outText()
 end)
 
-test("UM-2 the Maximum text carries the estimate when there is one, and nothing else does", function()
+test("UM-2 the Maximum hint carries the estimate when there is one; every profile has its hint, and no name carries a number", function()
     local _, ui = newUi()
     local with = ui.menuModel(baseCtx({ maxFps = 92 }))
     local without = ui.menuModel(baseCtx({}))
-    local others = find(with, P_ORIGINAL) ~= nil and find(with, P_EVERYDAY) ~= nil and find(with, P_CROWDED) ~= nil
-    local estimates = select(2, topTexts(with):gsub("about", ""))
-    return find(with, P_MAXIMUM .. " (about 92 fps)") ~= nil and find(with, P_MAXIMUM) == nil and find(without, P_MAXIMUM) ~= nil
-        and others and estimates == 1 and topTexts(without):find("about", 1, true) == nil, topTexts(with)
+    return find(with, P_MAXIMUM).hint == H_MAXIMUM .. " (about 92 fps)" and find(without, P_MAXIMUM).hint == H_MAXIMUM
+        and find(with, P_EVERYDAY).hint == H_EVERYDAY and find(with, P_CROWDED).hint == H_CROWDED
+        and topTexts(with):find("about", 1, true) == nil, tostring(find(with, P_MAXIMUM).hint)
 end)
 
 test("UM-3 buildContext estimates Maximum from a Thorough quiet-spot test and from nothing else", function()
@@ -861,12 +794,12 @@ test("UM-4 the Maximum tick is disabled in combat and while a test runs, enabled
     return idle == false and combat == true and running == true and table.concat(sent, "|") == "profile maximum", table.concat(sent, "|")
 end)
 
-test("UM-5 both menu adapters draw Maximum, with its estimate, as a check item that follows the live profile", function()
-    local text = P_MAXIMUM .. " (about 172 fps)"
+test("UM-5 both menu adapters draw Maximum as a check item that follows the live profile, with its estimate in the hint", function()
+    local hint = H_MAXIMUM .. " (about 172 fps)"
     local e, ui = maxMenu(thoroughQuiet(), { menu = "new" })
     ui.openMenu({})
-    local item = find(MENUCALLS.items, text)
-    local before = item ~= nil and item.kind == "check" and item.isSelected() == false
+    local item = find(MENUCALLS.items, P_MAXIMUM)
+    local before = item ~= nil and item.kind == "check" and item.isSelected() == false and tooltipOf(item) == P_MAXIMUM .. "|" .. hint
     item.fn()
     local newOk = before and item.isSelected() == true and e.ns.profiles.active() == "maximum"
     local e2, ui2 = maxMenu(thoroughQuiet(), { menu = "old" })
@@ -874,8 +807,8 @@ test("UM-5 both menu adapters draw Maximum, with its estimate, as a check item t
     local function infoByText(list, t)
         for _, info in ipairs(list) do if info.text == t then return info end end
     end
-    local info = infoByText(MENUCALLS.levels[1], text)
-    local oldOk = info ~= nil and info.notCheckable == false and info.checked == false and info.disabled == false
+    local info = infoByText(MENUCALLS.levels[1], P_MAXIMUM)
+    local oldOk = info ~= nil and info.notCheckable == false and info.checked == false and info.disabled == false and info.tooltipText == hint
     info.func()
     return newOk and oldOk and e2.ns.profiles.active() == "maximum", tostring(newOk) .. tostring(oldOk)
 end)

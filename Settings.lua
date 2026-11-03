@@ -41,6 +41,17 @@ local PROFILE_KEYS = { "original", "everyday", "crowded", "maximum" }
 local TESTS_INTRO = "The test measures what each graphics setting costs on this PC. Run it in a quiet spot first, then in a busy place."
 local RESULTS_INTRO = "The results of your tests. Show one to see what each setting costs and to save its settings."
 local NO_RESULTS = "No results yet: run Find my best settings first."
+-- The Advanced pages (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A2, A3).
+local ADV_WARNING = "These settings go beyond the game's own menu. They are finicky: some can make the game look wrong, run badly or crash. "
+    .. "Change them only if you know what they do. Return to Original puts every setting back."
+local RISKY_NOTE = "Risky: put back to a safe value when you log out; hold Shift while entering the world to skip it."
+local RAID_TEXT = "Also use the Crowded settings in raids and battlegrounds"
+local RAID_SWITCH_OFF = "Needs the game's raid graphics turned on."
+local ADV_RAID_NOTE = "Advanced settings leave the game's raid and battleground graphics alone."
+local ADV_TOOLS = {
+    { key = "adv:check", text = "Check this spot" }, { key = "adv:run", text = "Run benchmark" },
+    { key = "adv:report", text = "Show last report" }, { key = "adv:apply", text = "Apply all now" },
+}
 local ABOUT_LINES = {
     "ForeverSettings finds the graphics settings that fit your PC: it measures what each one costs, keeps the levels you choose in "
         .. "profiles, and puts them back at every loading screen.",
@@ -73,8 +84,14 @@ settings.PAGES = {
 }
 -- The two pages the guided test and the results draw into (Guide.lua and Results.lua), each in a host frame of its own.
 local HOSTED = { test = "guide", results = "results" }
-local PAGE_KEYS = {}
+-- The Advanced pages stand before About while Advanced is on (Advanced.lua names them).
+settings.ADVANCED_PAGES = {}
+for _, page in ipairs(ns.advanced and ns.advanced.PAGES or {}) do
+    settings.ADVANCED_PAGES[#settings.ADVANCED_PAGES + 1] = { key = page.key, text = page.text }
+end
+local PAGE_KEYS, ADVANCED_PAGE = {}, {}
 for _, page in ipairs(settings.PAGES) do PAGE_KEYS[page.key] = true end
+for _, page in ipairs(settings.ADVANCED_PAGES) do ADVANCED_PAGE[page.key] = true end
 settings.PAGE_OF = {
     graphicsshadowquality = "light", graphicsssao = "light", graphicscomputeeffects = "light", giquality = "light",
     graphicslightmode = "light", graphicsgroundclutter = "world", groundeffectdensity = "world", graphicsliquiddetail = "world",
@@ -171,12 +188,24 @@ function settings.model(st, ctx)
     -- While a test runs the window stays on Find my settings (spec 2026-11-03 M2): the other pages are greyed.
     local running = ctx.running == true
     view.running = running
-    view.page = running and "test" or (PAGE_KEYS[st.page] and st.page or "home")
+    local adv = ctx.advanced or {}
+    local advancedOn = adv.on == true
+    local known = PAGE_KEYS[st.page] or (advancedOn and ADVANCED_PAGE[st.page])
+    view.page = running and "test" or (known and st.page or "home")
+    -- The first turn on of Advanced: the warning and its two buttons stand in the page area instead of a page (spec A3).
+    if st.accepting and not running then view.page = "accept" end
     view.pages = {}
-    for _, page in ipairs(settings.PAGES) do
+    local function listPage(page)
         view.pages[#view.pages + 1] = { key = page.key, text = page.text, selected = page.key == view.page,
             enabled = not running or page.key == "test" }
     end
+    for _, page in ipairs(settings.PAGES) do
+        if page.key == "about" and advancedOn then
+            for _, advPage in ipairs(settings.ADVANCED_PAGES) do listPage(advPage) end
+        end
+        listPage(page)
+    end
+    view.advancedSwitch = { on = advancedOn }
     -- The settings pages edit the profile in use (spec 2026-11-02-edit-the-profile-in-use-design.md P1). Original and Maximum cannot
     -- be edited: their pages are read-only and offer Everyday and Crowded (P2).
     local editing = TAB_TEXT[ctx.active] and ctx.active or nil
@@ -341,6 +370,41 @@ function settings.model(st, ctx)
         { key = "best", text = "Find my best settings", enabled = locked == nil, done = saved.best == true },
         { key = "crowded", text = "Find my crowded settings", enabled = locked == nil, done = saved.crowded == true },
     }
+    -- The Advanced pages (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A2): a card for each setting the client has,
+    -- on its page, edited like the other cards but with no costs; the warning, the risky line, and under the effects cards the tools
+    -- the minimap menu had. ctx.advanced = {on, entries = ns.advanced.available(), raidToo, raidSwitchOff, hasReport}.
+    local held = editing and ((ctx.saved or {})[editing] or {}) or (ctx.want or {})
+    view.advanced = { warning = ADV_WARNING, riskyNote = RISKY_NOTE, cards = {}, risky = {} }
+    for _, entry in ipairs(adv.entries or {}) do
+        local live = ctx.live(entry.cvar)
+        local card = { cvar = entry.cvar, name = entry.name, line = entry.line, kept = held[entry.cvar] ~= nil, page = entry.page,
+            enabled = locked == nil and editing ~= nil, noCosts = true, tag = entry.risky and "risky" or nil, levels = {} }
+        for _, value in ipairs(entry.levels) do
+            local text = ns.advanced.levelText(entry, value)
+            card.levels[#card.levels + 1] = { value = value, text = text, short = text, selected = live ~= nil and sameValue(live, value) }
+        end
+        if entry.risky then view.advanced.risky[entry.page] = true end
+        view.advanced.cards[#view.advanced.cards + 1] = card
+    end
+    view.advanced.tools = { raid = { text = RAID_TEXT, checked = adv.raidToo == true, enabled = locked == nil },
+        raidOff = adv.raidSwitchOff and RAID_SWITCH_OFF or nil, note = ADV_RAID_NOTE, buttons = {} }
+    for _, tool in ipairs(ADV_TOOLS) do
+        local enabled = locked == nil
+        if tool.key == "adv:report" then enabled = adv.hasReport == true end
+        view.advanced.tools.buttons[#view.advanced.tools.buttons + 1] = { key = tool.key, text = tool.text, enabled = enabled }
+    end
+    view.accept = { text = ADV_WARNING, buttons = { { key = "advanced:accept", text = "I understand" }, { key = "advanced:cancel", text = "Cancel" } } }
+    -- Advanced off while the profile in use keeps Advanced values: they still apply, and Home says so (the spec's Review Focus 4).
+    if not advancedOn and editing and ns.advanced then
+        local n = 0
+        for cvar in pairs(held) do
+            if ns.advanced.isAdvanced(cvar) then n = n + 1 end
+        end
+        if n > 0 then
+            view.home.advancedKept = (n == 1 and "1 Advanced setting is kept." or (n .. " Advanced settings are kept."))
+                .. " Turn on Advanced in the title bar to see them."
+        end
+    end
     return view
 end
 
@@ -469,6 +533,13 @@ local function context(withCosts)
         resolved = ns.bench and ns.bench.resolve() or {}, locked = lockReason(), size = sizeContext(),
         dynamicScale = dynamicContext(), running = ns.guide and ns.guide.running and ns.guide.running() == true or false,
     }
+    local fsdb = ns.db and ns.db()
+    local hasReport = false
+    for _, entry in ipairs(ns.bench and ns.bench.history and ns.bench.history() or {}) do
+        if entry.kind ~= "crowd" then hasReport = true end             -- a crowd entry has no rows of its own: it is no report
+    end
+    ctx.advanced = { on = fsdb ~= nil and fsdb.advanced == true, entries = ns.advanced and ns.advanced.available() or {},
+        raidToo = fsdb ~= nil and fsdb.raidToo == true, raidSwitchOff = GetCVar("RAIDsettingsEnabled") == "0", hasReport = hasReport }
     if withCosts then
         -- The costs of the profile in use (Crowded prefers the crowd test); Original and Maximum read the quiet-spot test.
         ctx.costs, ctx.maximum, ctx.estimate = costsAndMaximum(TAB_TEXT[ctx.active] and ctx.active or "everyday")
@@ -511,7 +582,7 @@ end
 function settings.open(which)
     if which == "everyday" or which == "crowded" then
         state.page = "light"
-    elseif PAGE_KEYS[which] then
+    elseif PAGE_KEYS[which] or ADVANCED_PAGE[which] then      -- an Advanced page shows only while Advanced is on (the model decides)
         state.page = which
     end
     if ns.guide and ns.guide.running and ns.guide.running() then state.page = "test" end      -- a running test keeps its page
@@ -582,9 +653,47 @@ function settings.click(key)
         settings.hide()
         return
     end
+    -- The Advanced switch in the header (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A3): off by default; the first
+    -- turn on shows the warning with I understand and Cancel, and only I understand turns it on. Turning it off keeps the values.
+    if key == "advanced" or key == "advanced:accept" or key == "advanced:cancel" then
+        local fsdb = ns.db and ns.db()
+        if not fsdb then return end
+        local first = settings.ADVANCED_PAGES[1] and settings.ADVANCED_PAGES[1].key
+        if key == "advanced:cancel" then
+            state.accepting = nil
+        elseif key == "advanced:accept" then
+            state.accepting = nil
+            fsdb.advancedAccepted, fsdb.advanced = true, true
+            if first and not running then state.page = first end
+        elseif fsdb.advanced then
+            fsdb.advanced = false
+            if ADVANCED_PAGE[state.page] then state.page = "home" end
+        elseif fsdb.advancedAccepted then
+            fsdb.advanced = true
+            if first and not running then state.page = first end
+        else
+            state.accepting = true
+        end
+        draw()
+        return
+    end
+    -- Show last report (the Advanced tools): reading a report is no change, so it works in combat.
+    if key == "adv:report" then
+        local last
+        for _, entry in ipairs(ns.bench and ns.bench.history and ns.bench.history() or {}) do
+            if entry.kind ~= "crowd" then last = entry end
+        end
+        if last and ns.ui and ns.ui.showReport then ns.ui.showReport(last) end
+        return
+    end
     local pageKey = key:match("^page:(.+)$")
-    if pageKey then                         -- turning a page is not a change: it works in combat (a running test keeps its page)
-        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then
+    if pageKey then
+        -- Turning a page is not a change: it works in combat (a running test keeps its page). Another page ends the first
+        -- turn-on's warning, as Cancel does; an Advanced page turns only while Advanced is on.
+        state.accepting = nil
+        local fsdb = ns.db and ns.db()
+        local known = PAGE_KEYS[pageKey] or (ADVANCED_PAGE[pageKey] and fsdb and fsdb.advanced == true)
+        if known and not (running and pageKey ~= "test") then
             state.page = pageKey
             draw()
         end
@@ -598,6 +707,22 @@ function settings.click(key)
         return
     end
     if not ns.profiles then return end
+    -- The Advanced tools (they were the minimap menu's Advanced submenu, spec A5): the raid option and three commands.
+    if key == "adv:raid" then
+        local fsdb = ns.db and ns.db()
+        ns.command("profile raid " .. ((fsdb and fsdb.raidToo) and "off" or "on"))
+        draw()
+        return
+    end
+    if key == "adv:check" or key == "adv:run" then
+        if ns.guide and ns.guide.open then ns.guide.open(key:sub(5)) end
+        return
+    end
+    if key == "adv:apply" then
+        ns.command("apply")
+        draw()
+        return
+    end
     -- The picture size slider: size:<percent> when the mouse button is let go, and Back to 100%; both keep the size like a level button.
     local percent = key:match("^size:(%d+)$")
     if percent then
@@ -685,6 +810,8 @@ local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 50, 22, 3, 14
 local COST_W = LEVEL_W + 8                         -- the cost under a level button is a little wider than the button: "+136 fps"
 local TEST_BTN_W, TEST_BTN_H = 230, 26             -- Find my best settings / Find my crowded settings (Home, Tests and results)
 local ROCKER_W, ROCKER_H = 160, 22                 -- the Everyday | Crowded rocker in the header
+local SWITCH_W = 84                                -- the Advanced switch, left of the rocker
+local ACCEPT_W, ADV_TOOL_W = 150, 150              -- I understand / Cancel; the Advanced tools
 local EDIT_W, EDIT_H = 112, 24                     -- Everyday and Crowded on a read-only page
 local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6       -- the save buttons at the bottom of the page list
 local HOME_CARD_W, HOME_CARD_H = math.floor((AREA_W - CARD_GAP_X) / 2), 56
@@ -773,16 +900,18 @@ local function build()
     f.versionText:SetText(version == "unknown" and "" or "Version " .. version)
 
     -- The page list at the left, with a rule between it and the page area.
+    -- An item for every page, the Advanced ones too; each draw places the ones the model lists and hides the others.
     p.nav = {}
-    local gap = 0                            -- a gap between the settings pages and Find my settings
-    for i, entry in ipairs(settings.PAGES) do
-        if entry.key == "test" then gap = 14 end
-        local item = skin.navItem(page, entry.text, NAV_WIDTH, 28)
-        item.key = "page:" .. entry.key
-        item:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -(10 + (i - 1) * 30 + gap))
-        item:SetScript("OnClick", clicked)
-        p.nav[i] = item
+    for _, list in ipairs({ settings.PAGES, settings.ADVANCED_PAGES }) do
+        for _, entry in ipairs(list) do
+            local item = skin.navItem(page, entry.text, NAV_WIDTH, 28)
+            item.key = "page:" .. entry.key
+            item:SetScript("OnClick", clicked)
+            item:Hide()
+            p.nav[entry.key] = item
+        end
     end
+    p.navPage = page
     -- Under the page list, the last thing in it: Save as Everyday over Save as Crowded, with a line above them (or, for one
     -- draw after a click, what was saved).
     p.saveButtons = {}
@@ -824,6 +953,12 @@ local function build()
     other.label:SetPoint("RIGHT", other.dot, "LEFT", -6, 0)
     other:Hide()
     p.rockerOther = other
+    -- The Advanced switch: selected while Advanced is on; it stands clear of the name beside the rocker.
+    local switch = skin.button(f.header, "Advanced", SWITCH_W, ROCKER_H)
+    switch:SetPoint("RIGHT", rocker, "LEFT", -(8 + 90 + 8), 0)
+    switch.key = "advanced"
+    switch:SetScript("OnClick", clicked)
+    p.advanced = switch
 
     -- The page area: the title, the banner, the read-only line of Original and Maximum, the cards.
     local area = CreateFrame("Frame", nil, page)
@@ -940,6 +1075,34 @@ local function build()
     end
     p.aboutVersion = skin.text(area, "normal", "bright", AREA_W)
     p.aboutText = skin.text(area, "normal", "text", AREA_W)
+    -- The first turn-on of Advanced, then the Advanced pages: the warning, the risky line, and under the effects cards the tools.
+    p.acceptText = skin.text(area, "normal", "warning", AREA_W)
+    p.acceptButtons = {}
+    for i, key in ipairs({ "advanced:accept", "advanced:cancel" }) do
+        local button = skin.button(area, "", ACCEPT_W, TEST_BTN_H)
+        button.key = key
+        button:SetScript("OnClick", clicked)
+        button:Hide()
+        p.acceptButtons[i] = button
+    end
+    p.advWarning = skin.text(area, "small", "warning", AREA_W)
+    p.advRisky = skin.text(area, "small", "dim", AREA_W)
+    p.advRaid = skin.check(area)
+    p.advRaid.key = "adv:raid"
+    p.advRaid:SetScript("OnClick", clicked)
+    p.advRaid:Hide()
+    p.advRaidText = skin.text(area, "small", "text", AREA_W - 24)
+    p.advRaidOff = skin.text(area, "small", "dim", AREA_W)
+    p.advRaidNote = skin.text(area, "small", "dim", AREA_W)
+    p.advTools = {}
+    for i, tool in ipairs(ADV_TOOLS) do
+        local button = skin.button(area, tool.text, ADV_TOOL_W, EDIT_H)
+        button.key = tool.key
+        button:SetScript("OnClick", clicked)
+        button:Hide()
+        p.advTools[i] = button
+    end
+    p.advKept = skin.text(area, "small", "dim", AREA_W)
 
     -- The summary block at the bottom of the page.
     p.your = skin.text(page, "small", "text", AREA_W)
@@ -997,11 +1160,20 @@ function settings.render()
         or (view.page == "results" and owner.hasOffer and owner.hasOffer())) or false
 
     local title = ""
+    for _, item in pairs(p.nav) do item:Hide() end
+    local gap = 0                            -- a gap between the settings pages and Find my settings
     for i, entry in ipairs(view.pages) do
-        p.nav[i]:SetSelected(entry.selected)
-        p.nav[i]:SetEnabled(entry.enabled)
+        local item = p.nav[entry.key]
+        if entry.key == "test" then gap = 14 end
+        item:ClearAllPoints()
+        item:SetPoint("TOPLEFT", p.navPage, "TOPLEFT", 0, -(10 + (i - 1) * 30 + gap))
+        item:SetSelected(entry.selected)
+        item:SetEnabled(entry.enabled)
+        item:Show()
         if entry.selected then title = entry.text end
     end
+    if view.page == "accept" then title = "Turn on Advanced" end
+    p.advanced:SetSelected(view.advancedSwitch.on)
     p.title:SetText(hosted and "" or title)
     local rocker = view.rocker
     p.rocker:SetLit(rocker.lit == "everyday" and "left" or rocker.lit == "crowded" and "right" or nil, PROFILE_COLOR[rocker.lit])
@@ -1049,8 +1221,32 @@ function settings.render()
     if view.locked then notices[#notices + 1] = view.locked end
     if view.refusal then notices[#notices + 1] = view.refusal end
     if #notices > 0 and not hosted then placeText(p.banner, table.concat(notices, "\n")) else hideText(p.banner) end
+    -- An Advanced page opens with the warning, every time, and the risky line where it has a risky card (spec A2).
+    local onAdvanced = ADVANCED_PAGE[view.page] == true
+    if onAdvanced then
+        placeText(p.advWarning, view.advanced.warning)
+        if view.advanced.risky[view.page] then placeText(p.advRisky, view.advanced.riskyNote) else hideText(p.advRisky) end
+    else
+        hideText(p.advWarning)
+        hideText(p.advRisky)
+    end
+    -- The first turn-on of Advanced: the warning and I understand / Cancel, and nothing else (spec A3).
+    if view.page == "accept" then
+        placeText(p.acceptText, view.accept.text)
+        for i, spec in ipairs(view.accept.buttons) do
+            local button = p.acceptButtons[i]
+            button:SetLabel(spec.text)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (ACCEPT_W + 12), -y)
+            button:Show()
+        end
+        y = y + TEST_BTN_H + 8
+    else
+        hideText(p.acceptText)
+        for _, button in ipairs(p.acceptButtons) do button:Hide() end
+    end
     -- Original or Maximum in use: the settings pages are read-only and offer Everyday and Crowded.
-    if onSettings and view.readOnly then
+    if (onSettings or onAdvanced) and view.readOnly then
         placeText(p.readOnly, view.readOnly.text)
         for i, spec in ipairs(view.readOnly.buttons) do
             local button = p.editButtons[i]
@@ -1078,9 +1274,11 @@ function settings.render()
         name:SetWidth(cardW - 22 - 100)
         name:ClearAllPoints()
         name:SetPoint("TOPLEFT", p.area, "TOPLEFT", x + 22, -top)
-        if row.mattersWords then
+        -- The corner of a card: how much it matters to the picture, or on an Advanced card that it is risky.
+        if row.tag or row.mattersWords then
             local worth = take(p.matters)
-            worth:SetText("matters: " .. row.mattersWords)
+            worth:SetText(row.tag or ("matters: " .. row.mattersWords))
+            worth:SetTextColor(skin.color(row.tag and "warning" or "dim"))
             worth:SetWidth(96)
             worth:ClearAllPoints()
             worth:SetPoint("TOPRIGHT", p.area, "TOPLEFT", x + cardW, -(top + 2))
@@ -1094,7 +1292,7 @@ function settings.render()
         help:SetPoint("TOPLEFT", p.area, "TOPLEFT", x, -helpTop)
         local helpH = helpText == "" and 0 or heightOf(help, helpText)
         local levelsTop = helpTop + helpH + 4
-        local lineH = LEVEL_H + COST_H + 2
+        local lineH = LEVEL_H + (row.noCosts and 4 or COST_H + 2)            -- an Advanced card has no costs under its levels
         for i, level in ipairs(row.levels) do
             local button = take(p.levels)
             button.key = "level:" .. row.cvar .. ":" .. level.value
@@ -1118,12 +1316,12 @@ function settings.render()
     end
 
     local rows = {}
-    if onSettings then
-        for _, row in ipairs(view.rows) do
+    if onSettings or onAdvanced then
+        for _, row in ipairs(onAdvanced and view.advanced.cards or view.rows) do
             if row.page == view.page then rows[#rows + 1] = row end
         end
     end
-    if not onSettings then
+    if not (onSettings or onAdvanced) then
         hideText(p.note)
     elseif #rows == 0 then
         placeText(p.note, NONE_TEXT)
@@ -1152,6 +1350,34 @@ function settings.render()
     release(p.helps, true)
     release(p.levels)
     release(p.costs, true)
+
+    -- Under the effects cards: the raid option and the tools that were the minimap menu's Advanced submenu (spec A2, A5).
+    if view.page == (settings.ADVANCED_PAGES[1] and settings.ADVANCED_PAGES[1].key) then
+        local tools = view.advanced.tools
+        y = y + 6
+        p.advRaid:SetChecked(tools.raid.checked)
+        p.advRaid:SetEnabled(tools.raid.enabled)
+        p.advRaid:ClearAllPoints()
+        p.advRaid:SetPoint("TOPLEFT", p.area, "TOPLEFT", 0, -(y + 1))
+        p.advRaid:Show()
+        placeText(p.advRaidText, tools.raid.text, 22)
+        if tools.raidOff then placeText(p.advRaidOff, tools.raidOff, 22) else hideText(p.advRaidOff) end
+        placeText(p.advRaidNote, tools.note)
+        for i, spec in ipairs(tools.buttons) do
+            local button = p.advTools[i]
+            button:SetEnabled(spec.enabled)
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (ADV_TOOL_W + 8), -y)
+            button:Show()
+        end
+        y = y + EDIT_H + 8
+    else
+        p.advRaid:Hide()
+        hideText(p.advRaidText)
+        hideText(p.advRaidOff)
+        hideText(p.advRaidNote)
+        for _, button in ipairs(p.advTools) do button:Hide() end
+    end
 
     -- The two test buttons of Home, in a row at the current height.
     local function placeTestButtons()
@@ -1186,9 +1412,11 @@ function settings.render()
         y = y + 2 * (HOME_CARD_H + 8) + 6
         placeTestButtons()
         placeText(p.testsNote, HOME_TESTS_NOTE)
+        if view.home.advancedKept then placeText(p.advKept, view.home.advancedKept) else hideText(p.advKept) end
     else
         hideText(p.inUse)
         hideText(p.testsNote)
+        hideText(p.advKept)
         for _, card in ipairs(p.profileCards) do card:Hide() end
     end
 

@@ -322,16 +322,15 @@ local function findItem(items, text)
     end
 end
 
-test("G5-1 /fset bench, /fset bench check and the menu items open the Intro and start nothing", function()
+test("G5-1 /fset bench, /fset bench check and the Advanced page's tools open the Intro and start nothing", function()
     local e, g, b = newRun()
     e.slash("bench")
     local run = g.state().view == "intro" and g.state().kind == "run" and not b.active() and b.watch == nil
     e.slash("bench check")
     local check = g.state().view == "intro" and g.state().kind == "check" and not b.active()
-    local model = e.ns.ui.menuModel(e.ns.ui.buildContext())
-    findItem(model, "Run benchmark").run()
+    e.ns.settings.click("adv:run")                         -- the tools left the minimap menu for the Advanced page in 0.11
     local menuRun = g.state().kind == "run" and g.state().view == "intro" and not b.active()
-    findItem(model, "Check this spot").run()
+    e.ns.settings.click("adv:check")
     return run and check and menuRun and g.state().kind == "check" and g.state().view == "intro" and not b.active()
         and #b.history() == 0, outText()
 end)
