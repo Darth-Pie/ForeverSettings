@@ -174,11 +174,14 @@ function settings.model(st, ctx)
             enabled = not running or page.key == "test" }
     end
     -- The settings pages edit the profile in use (spec 2026-11-02-edit-the-profile-in-use-design.md P1). Original and Maximum cannot
-    -- be edited: their pages are read-only and offer Everyday and Crowded (P2). The header pill names the profile in use (P4).
+    -- be edited: their pages are read-only and offer Everyday and Crowded (P2).
     local editing = TAB_TEXT[ctx.active] and ctx.active or nil
     local labels = ns.profiles and ns.profiles.LABEL or {}
-    view.profile = { key = ctx.active, text = labels[ctx.active] or tostring(ctx.active), color = PROFILE_COLOR[ctx.active] or "dim",
-        enabled = not running }
+    view.profile = { key = ctx.active, text = labels[ctx.active] or tostring(ctx.active), color = PROFILE_COLOR[ctx.active] or "dim" }
+    -- The header's Everyday | Crowded rocker (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5): the half in use is
+    -- lit; on Original or Maximum neither is, and that profile's dot and name stand beside it. Greyed in combat and during a test.
+    view.rocker = { lit = editing, enabled = locked == nil and not running }
+    if not editing then view.rocker.other = { text = view.profile.text, color = view.profile.color } end
     if not editing then
         view.readOnly = { text = view.profile.text .. READ_ONLY_TAIL, buttons = {} }
         for _, key in ipairs(TABS) do
@@ -566,7 +569,7 @@ local function keepCurrent(name)
     draw()
 end
 
--- A button or tick of the window, by the keys of the model: page:<page>, pill, profile:<name>, edit:<name>, keep:<cvar>,
+-- A button or tick of the window, by the keys of the model: page:<page>, rocker:<name>, profile:<name>, edit:<name>, keep:<cvar>,
 -- level:<cvar>:<value>, size:<percent>, sizeback, save:<name>, test:<kind>, show:<kind>, close. A refusal is shown in the window
 -- until the next click or redraw.
 function settings.click(key)
@@ -576,18 +579,18 @@ function settings.click(key)
         return
     end
     local pageKey = key:match("^page:(.+)$")
-    if key == "pill" then pageKey = "home" end      -- the profile pill opens Home, where the profile is switched
-    if pageKey then                          -- turning a page is not a change: it works in combat (a running test keeps its page)
+    if pageKey then                         -- turning a page is not a change: it works in combat (a running test keeps its page)
         if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then
             state.page = pageKey
             draw()
         end
         return
     end
+    if running and key:find("^rocker:") then return end          -- a running test owns the settings
     local ctx = context()
     if ctx.locked then
         -- a profile switch says why it was refused (the window may not have caught up with the lock yet)
-        if key:find("^profile:") or key:find("^edit:") then draw() end
+        if key:find("^profile:") or key:find("^edit:") or key:find("^rocker:") then draw() end
         return
     end
     if not ns.profiles then return end
@@ -607,8 +610,9 @@ function settings.click(key)
         switchProfile(profileKey)
         return
     end
-    -- The read-only pages of Original and Maximum: Everyday or Crowded switches to that profile so it can be edited.
-    local editKey = key:match("^edit:(.+)$")
+    -- The read-only pages of Original and Maximum: Everyday or Crowded switches to that profile so it can be edited; so does a half
+    -- of the header's rocker, on every page.
+    local editKey = key:match("^edit:(.+)$") or key:match("^rocker:(.+)$")
     if editKey then
         if TAB_TEXT[editKey] then switchProfile(editKey) end
         return
@@ -676,7 +680,7 @@ local CARD_GAP_X, CARD_GAP_Y = 18, 6
 local LEVEL_W, LEVEL_H, LEVEL_GAP, COST_H = 50, 22, 3, 14
 local COST_W = LEVEL_W + 8                         -- the cost under a level button is a little wider than the button: "+136 fps"
 local TEST_BTN_W, TEST_BTN_H = 230, 26             -- Find my best settings / Find my crowded settings (Home, Tests and results)
-local PILL_W, PILL_H = 104, 22                     -- the profile pill in the header
+local ROCKER_W, ROCKER_H = 160, 22                 -- the Everyday | Crowded rocker in the header
 local EDIT_W, EDIT_H = 112, 24                     -- Everyday and Crowded on a read-only page
 local SAVE_X, SAVE_W, SAVE_H, SAVE_GAP = 12, NAV_WIDTH - 24, 28, 6       -- the save buttons at the bottom of the page list
 local HOME_CARD_W, HOME_CARD_H = math.floor((AREA_W - CARD_GAP_X) / 2), 56
@@ -794,18 +798,26 @@ local function build()
     rule:SetPoint("TOPLEFT", page, "TOPLEFT", NAV_WIDTH, 0)
     rule:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", NAV_WIDTH, 0)
 
-    -- The profile pill in the header, left of the close button: the dot and name of the profile in use; it opens Home.
-    local pill = CreateFrame("Button", nil, f.header)
-    pill:SetSize(PILL_W, PILL_H)
-    pill:SetPoint("RIGHT", f.close, "LEFT", -8, 0)
-    pill.box = skin.box(pill, skin.RADIUS.control, "fill", "control")
-    pill.dot = skin.dot(pill, "dim")
-    pill.dot:SetPoint("LEFT", pill, "LEFT", 10, 0)
-    pill.label = skin.text(pill, "small", "bright", PILL_W - 28)
-    pill.label:SetPoint("LEFT", pill, "LEFT", 24, 0)
-    pill.key = "pill"
-    pill:SetScript("OnClick", clicked)
-    p.pill = pill
+    -- The Everyday | Crowded rocker in the header, left of the close button; on Original or Maximum that profile's dot and name stand
+    -- left of it.
+    local rocker = skin.rocker(f.header, TAB_TEXT.everyday, TAB_TEXT.crowded, ROCKER_W, ROCKER_H)
+    rocker:SetPoint("RIGHT", f.close, "LEFT", -8, 0)
+    rocker.key = "rocker"
+    rocker.left.key, rocker.right.key = "rocker:everyday", "rocker:crowded"
+    rocker.left:SetScript("OnClick", clicked)
+    rocker.right:SetScript("OnClick", clicked)
+    p.rocker = rocker
+    local other = CreateFrame("Frame", nil, f.header)
+    other:SetSize(90, ROCKER_H)
+    other:SetPoint("RIGHT", rocker, "LEFT", -8, 0)
+    other.key = "rocker:other"
+    other.dot = skin.dot(other, "dim")
+    other.dot:SetPoint("RIGHT", other, "RIGHT", 0, 0)
+    other.label = skin.text(other, "small", "bright", 76)
+    other.label:SetJustifyH("RIGHT")
+    other.label:SetPoint("RIGHT", other.dot, "LEFT", -6, 0)
+    other:Hide()
+    p.rockerOther = other
 
     -- The page area: the title, the banner, the read-only line of Original and Maximum, the cards.
     local area = CreateFrame("Frame", nil, page)
@@ -877,7 +889,7 @@ local function build()
         card.note = skin.text(card, "small", "dim", HOME_CARD_W - 16)
         card.note:SetJustifyH("CENTER")
         card.note:SetPoint("CENTER", card, "CENTER", 0, -10)
-        card.dot = skin.dot(card, "dim")                  -- the profile's colour, as on the header pill
+        card.dot = skin.dot(card, "dim")                  -- the profile's colour, as on the header's rocker
         card.dot:SetPoint("TOPLEFT", card, "TOPLEFT", 10, -10)
         p.profileCards[i] = card
     end
@@ -962,7 +974,7 @@ local function ensure()
     return frame or build()
 end
 
--- Draws the model: the page list, the profile pill, the page's title, the banner and the read-only line, then the page: cards for
+-- Draws the model: the page list, the rocker, the page's title, the banner and the read-only line, then the page: cards for
 -- a settings page, the size block on the Picture size page, and the summary block.
 function settings.render()
     local f = ensure()
@@ -985,7 +997,17 @@ function settings.render()
         if entry.selected then title = entry.text end
     end
     p.title:SetText(hosted and "" or title)
-    p.pill:SetEnabled(view.profile.enabled ~= false)
+    local rocker = view.rocker
+    p.rocker:SetLit(rocker.lit == "everyday" and "left" or rocker.lit == "crowded" and "right" or nil, PROFILE_COLOR[rocker.lit])
+    p.rocker:SetEnabled(rocker.enabled)
+    if rocker.other then
+        p.rockerOther.label:SetText(rocker.other.text)
+        p.rockerOther.label:SetTextColor(skin.color(rocker.enabled and "bright" or "textDisabled"))
+        p.rockerOther.dot:SetColorName(rocker.enabled and rocker.other.color or "textDisabled")
+        p.rockerOther:Show()
+    else
+        p.rockerOther:Hide()
+    end
     -- Escape closes the window, except while a test runs (the name is taken out of the list and put back after).
     for i = #UISpecialFrames, 1, -1 do
         if UISpecialFrames[i] == FRAME_NAME then tremove(UISpecialFrames, i) end
@@ -1001,11 +1023,6 @@ function settings.render()
         p.saveCaption:Show()
         p.saveNote:Hide()
     end
-    p.pill.label:SetText(view.profile.text)
-    -- While a test runs the pill does nothing, and looks it.
-    local pillOn = view.profile.enabled ~= false
-    p.pill.label:SetTextColor(skin.color(pillOn and "bright" or "textDisabled"))
-    p.pill.dot:SetColorName(pillOn and view.profile.color or "textDisabled")
 
     local y = TITLE_H
     local function placeText(fs, str, x)

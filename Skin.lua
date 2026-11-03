@@ -248,6 +248,62 @@ function skin.navItem(parent, text, width, height)
     return row
 end
 
+-- The Everyday | Crowded rocker of a window's header (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5): two
+-- halves side by side, each a button with its name centred. The lit half has the fill of its colour and dark text, the other the
+-- control fill and dim text, lighter on hover; disabled, both names are in the disabled colour. rocker:SetLit(side, colorName)
+-- lights "left", "right" or neither (nil); rocker:SetEnabled(on) enables both halves.
+function skin.rocker(parent, leftText, rightText, width, height)
+    local rocker = CreateFrame("Frame", nil, parent)
+    rocker:SetSize(width, height)
+    rocker.enabled = true
+    local function paintHalves()
+        for _, b in ipairs({ rocker.left, rocker.right }) do
+            local fill, text = "control", "dim"
+            if rocker.lit == b.side then
+                fill, text = rocker.litColor or "accent", "fill"
+            elseif rocker.enabled and b.hover then
+                fill = "border"
+            end
+            if not rocker.enabled then text = "textDisabled" end
+            b.box.fill:SetColorTexture(skin.color(fill))
+            b.label:SetTextColor(skin.color(text))
+        end
+    end
+    local function half(text, side)
+        local b = CreateFrame("Button", nil, rocker)
+        b:SetSize(width / 2, height)
+        b:SetPoint(side == "left" and "LEFT" or "RIGHT", rocker, side == "left" and "LEFT" or "RIGHT", 0, 0)
+        b.side = side
+        b.box = skin.box(b, skin.RADIUS.control, "control")
+        local label = b:CreateFontString(nil, "OVERLAY", FONTS.small)
+        label:SetPoint("CENTER", b, "CENTER", 0, 0)
+        label:SetWidth(width / 2 - 8)
+        label:SetJustifyH("CENTER")
+        label:SetJustifyV("MIDDLE")
+        label:SetWordWrap(false)
+        b.label = label
+        b:SetFontString(label)
+        b:SetText(text)
+        label:SetText(text)
+        b:SetScript("OnEnter", function(self) self.hover = true paintHalves() end)
+        b:SetScript("OnLeave", function(self) self.hover = false paintHalves() end)
+        return b
+    end
+    rocker.left, rocker.right = half(leftText, "left"), half(rightText, "right")
+    function rocker:SetLit(side, colorName)
+        self.lit, self.litColor = side, colorName
+        paintHalves()
+    end
+    function rocker:SetEnabled(on)
+        self.enabled = on and true or false
+        self.left:SetEnabled(self.enabled)
+        self.right:SetEnabled(self.enabled)
+        paintHalves()
+    end
+    paintHalves()
+    return rocker
+end
+
 -- A check box: a 16 pixel rounded square with an accent mark when ticked, a dim mark when ticked but disabled, and no hover
 -- while disabled.
 function skin.check(parent)

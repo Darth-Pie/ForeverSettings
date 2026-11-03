@@ -1396,8 +1396,12 @@ end`],
   'skin-border-missing': ['Skin.lua', `            strip(frame, "BORDER", { "TOPRIGHT", 0, -r }, { "BOTTOMRIGHT", 0, r }, 1, nil),`, `            -- no right edge`],
   'skin-border-thick': ['Skin.lua', `{ "TOPLEFT", r, 0 }, { "TOPRIGHT", -r, 0 }, nil, 1),`, `{ "TOPLEFT", r, 0 }, { "TOPRIGHT", -r, 0 }, nil, 2),`],
   'skin-no-fill': ['Skin.lua', `box.fill:SetColorTexture(skin.color(fillName))`, `box.fill:SetColorTexture(skin.color("border"))`],
-  'skin-label-not-centred': ['Skin.lua', `label:SetPoint("CENTER", b, "CENTER", 0, 0)`, `label:SetPoint("LEFT", b, "LEFT", 4, 0)`],
-  'skin-justify-h': ['Skin.lua', `label:SetJustifyH("CENTER")`, `label:SetJustifyH("LEFT")`],
+  'skin-label-not-centred': ['Skin.lua', `label:SetPoint("CENTER", b, "CENTER", 0, 0)
+    label:SetWidth(width - 8)`, `label:SetPoint("LEFT", b, "LEFT", 4, 0)
+    label:SetWidth(width - 8)`],
+  'skin-justify-h': ['Skin.lua', `    label:SetWidth(width - 8)
+    label:SetJustifyH("CENTER")`, `    label:SetWidth(width - 8)
+    label:SetJustifyH("LEFT")`],
   'skin-justify-v': ['Skin.lua', `    label:SetJustifyV("MIDDLE")
     label:SetWordWrap(false)
     b.label = label`, `    label:SetJustifyV("TOP")
@@ -1758,7 +1762,7 @@ end
   // My settings edits the profile in use (spec 2026-11-02-edit-the-profile-in-use-design.md): rows re-anchored on the new code
   'settings-lock-not-checked': ['Settings.lua', `    if ctx.locked then
         -- a profile switch says why it was refused (the window may not have caught up with the lock yet)
-        if key:find("^profile:") or key:find("^edit:") then draw() end
+        if key:find("^profile:") or key:find("^edit:") or key:find("^rocker:") then draw() end
         return
     end
 `, `    local _ = ctx.locked
@@ -1827,13 +1831,10 @@ end
         view.notice = MAXIMUM_NOTE`],
   'ed-yourline-needs-saved': ['Settings.lua', `if editing and next(saved) ~= nil and costs`, `if editing and costs`],
   'ed-yourline-read-only': ['Settings.lua', `if editing and next(saved) ~= nil and costs`, `if next(saved) ~= nil and costs`],
-  'ed-pill-click': ['Settings.lua', `if key == "pill" then pageKey = "home" end`, `if key == "pill" then pageKey = "light" end`],
-  'ed-pill-not-in-combat': ['Settings.lua', `if key == "pill" then pageKey = "home" end`, `if key == "pill" and not InCombatLockdown() then pageKey = "home" end`],
   'ed-edit-switches': ['Settings.lua', `if TAB_TEXT[editKey] then switchProfile(editKey) end`, `if TAB_TEXT[editKey] then switchProfile("everyday") end`],
   'ed-click-read-only-guard': ['Settings.lua', `    local profile = TAB_TEXT[ctx.active] and ctx.active or nil
     if not profile then return end`, `    local profile = TAB_TEXT[ctx.active] and ctx.active or "everyday"
     if not profile then return end`],
-  'ed-frame-pill-label': ['Settings.lua', `p.pill.label:SetText(view.profile.text)`, `p.pill.label:SetText("Everyday")`],
   'ed-frame-read-only-on-home': ['Settings.lua', `    if onSettings and view.readOnly then
         placeText(p.readOnly`, `    if view.readOnly then
         placeText(p.readOnly`],
@@ -1847,11 +1848,7 @@ end
     else
         hideText(p.readOnly)`],
   'ed-frame-edit-left-shown': ['Settings.lua', `for _, button in ipairs(p.editButtons) do button:Hide() end`, `local _ = p.editButtons`],
-  'ed-frame-pill-size': ['Settings.lua', `local PILL_W, PILL_H = 104, 22`, `local PILL_W, PILL_H = 100, 22`],
   'ed-frame-edit-size': ['Settings.lua', `local EDIT_W, EDIT_H = 112, 24`, `local EDIT_W, EDIT_H = 120, 24`],
-  'ed-frame-pill-anchor': ['Settings.lua', `pill:SetPoint("RIGHT", f.close, "LEFT", -8, 0)`, `pill:SetPoint("RIGHT", f.close, "LEFT", -4, 0)`],
-  'ed-frame-pill-label-pos': ['Settings.lua', `pill.label:SetPoint("LEFT", pill, "LEFT", 24, 0)`, `pill.label:SetPoint("LEFT", pill, "LEFT", 20, 0)`],
-  'ed-frame-pill-key': ['Settings.lua', `pill.key = "pill"`, `pill.key = "pillx"`],
   'ed-frame-card-dot': ['Settings.lua', `card.dot:SetColorName(profile.color)`, `card.dot:SetColorName("dim")`],
   'ed-summary-bottom': ['Settings.lua', `local SUMMARY_BOTTOM = 12`, `local SUMMARY_BOTTOM = 20`],
   'ed-skin-colour-everyday': ['Skin.lua', `profileEveryday = "5dcaa5"`, `profileEveryday = "5dcaa6"`],
@@ -1957,9 +1954,7 @@ end
   'page-click-ignored': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if false then`],
   'page-click-bogus': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if pageKey and not (running and pageKey ~= "test") then`],
   'page-click-locked': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if PAGE_KEYS[pageKey] and not InCombatLockdown() and not (running and pageKey ~= "test") then`],
-  'ed-pill-colour': ['Settings.lua', `color = PROFILE_COLOR[ctx.active] or "dim",
-        enabled = not running }`, `color = "dim",
-        enabled = not running }`],
+  'ed-pill-colour': ['Settings.lua', `color = PROFILE_COLOR[ctx.active] or "dim" }`, `color = "dim" }`],
   'ed-frame-edit-enabled': ['Settings.lua', `            button:SetEnabled(spec.enabled)
             button:ClearAllPoints()
             button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (EDIT_W`, `            button:SetEnabled(true)
@@ -1967,13 +1962,9 @@ end
             button:SetPoint("TOPLEFT", p.area, "TOPLEFT", (i - 1) * (EDIT_W`],
   'pg-running-not-forced': ['Settings.lua', `view.page = running and "test" or (PAGE_KEYS[st.page] and st.page or "home")`, `view.page = PAGE_KEYS[st.page] and st.page or "home"`],
   'pg-running-pages-live': ['Settings.lua', `enabled = not running or page.key == "test" }`, `enabled = true }`],
-  'pg-running-pill-live': ['Settings.lua', `color = PROFILE_COLOR[ctx.active] or "dim",
-        enabled = not running }`, `color = PROFILE_COLOR[ctx.active] or "dim",
-        enabled = true }`],
   'pg-running-savebar-live': ['Settings.lua', `            enabled = locked == nil and not running }
     end`, `            enabled = locked == nil }
     end`],
-  'pg-pill-not-greyed': ['Settings.lua', `    p.pill:SetEnabled(view.profile.enabled ~= false)`, `    p.pill:SetEnabled(true)`],
   'pg-running-click-moves': ['Settings.lua', `        if PAGE_KEYS[pageKey] and not (running and pageKey ~= "test") then`, `        if PAGE_KEYS[pageKey] then`],
   'pg-open-not-kept': ['Settings.lua', `    if ns.guide and ns.guide.running and ns.guide.running() then state.page = "test" end`, `    local _ = ns.guide`],
   'pg-escape-kept': ['Settings.lua', `    if not view.running then tinsert(UISpecialFrames, FRAME_NAME) end`, `    tinsert(UISpecialFrames, FRAME_NAME)`],
@@ -2080,7 +2071,6 @@ end
   'skin-state-disabled': ['Skin.lua', `    if not b:IsEnabled() then
         text = "textDisabled"`, `    if not b:IsEnabled() then
         text = "text"`],
-  'ed-frame-pill-dot': ['Settings.lua', `p.pill.dot:SetColorName(pillOn and view.profile.color or "textDisabled")`, `p.pill.dot:SetColorName(pillOn and "profileEveryday" or "textDisabled")`],
   'ui-refresh-off': ['Settings.lua', `            if ns.guide.refresh then guarded(ns.guide.refresh) end`, `            local _ = ns.guide`],
   'ui-refresh-every-frame': ['Settings.lua', `        if sinceRefresh < REFRESH then return end
         sinceRefresh = 0
@@ -2106,7 +2096,6 @@ end
         paintRow(self)
     end`, `        setEnabled(self, on)
     end`],
-  'fx-pill-label-lit': ['Settings.lua', `p.pill.label:SetTextColor(skin.color(pillOn and "bright" or "textDisabled"))`, `p.pill.label:SetTextColor(skin.color("bright"))`],
   'fx-running-full-redraw': ['Settings.lua', `        if ns.guide and ns.guide.running and ns.guide.running() then
             if ns.guide.refresh then guarded(ns.guide.refresh) end
             return
@@ -2150,6 +2139,26 @@ end
   'gd-tag-says-your-pick': ['Graph.lua', `                elseif p.recommended then
                     tag("recommended"`, `                elseif p.recommended and not p.picked then
                     tag("recommended"`],
+  // The Everyday | Crowded rocker replaces the profile pill (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5)
+  'rk-lit-wrong': ['Settings.lua', `view.rocker = { lit = editing, enabled = locked == nil and not running }`, `view.rocker = { lit = "everyday", enabled = locked == nil and not running }`],
+  'rk-other-missing': ['Settings.lua', `if not editing then view.rocker.other = { text = view.profile.text, color = view.profile.color } end`, `if false then view.rocker.other = { text = view.profile.text, color = view.profile.color } end`],
+  'rk-enabled-in-combat': ['Settings.lua', `view.rocker = { lit = editing, enabled = locked == nil and not running }`, `view.rocker = { lit = editing, enabled = not running }`],
+  'rk-click-not-switching': ['Settings.lua', `local editKey = key:match("^edit:(.+)$") or key:match("^rocker:(.+)$")`, `local editKey = key:match("^edit:(.+)$")`],
+  'rk-click-while-running': ['Settings.lua', `    if running and key:find("^rocker:") then return end`, ``],
+  'rk-anchor': ['Settings.lua', `rocker:SetPoint("RIGHT", f.close, "LEFT", -8, 0)`, `rocker:SetPoint("RIGHT", f.close, "LEFT", -4, 0)`],
+  'rk-keys-swapped': ['Settings.lua', `rocker.left.key, rocker.right.key = "rocker:everyday", "rocker:crowded"`, `rocker.left.key, rocker.right.key = "rocker:crowded", "rocker:everyday"`],
+  'rk-render-lit-swapped': ['Settings.lua', `rocker.lit == "everyday" and "left" or rocker.lit == "crowded" and "right" or nil`, `rocker.lit == "everyday" and "right" or rocker.lit == "crowded" and "left" or nil`],
+  'rk-render-always-enabled': ['Settings.lua', `    p.rocker:SetEnabled(rocker.enabled)`, `    p.rocker:SetEnabled(true)`],
+  'rk-other-not-shown': ['Settings.lua', `        p.rockerOther:Show()`, ``],
+  'rk-other-text': ['Settings.lua', `p.rockerOther.label:SetText(rocker.other.text)`, `p.rockerOther.label:SetText("Original")`],
+  'rk-other-dot': ['Settings.lua', `p.rockerOther.dot:SetColorName(rocker.enabled and rocker.other.color or "textDisabled")`, `p.rockerOther.dot:SetColorName("dim")`],
+  'rk-size': ['Settings.lua', `local ROCKER_W, ROCKER_H = 160, 22`, `local ROCKER_W, ROCKER_H = 150, 22`],
+  'sk-rocker-lit-colour': ['Skin.lua', `fill, text = rocker.litColor or "accent", "fill"`, `fill, text = "accent", "fill"`],
+  'sk-rocker-lit-text': ['Skin.lua', `fill, text = rocker.litColor or "accent", "fill"`, `fill, text = rocker.litColor or "accent", "bright"`],
+  'sk-rocker-disabled-text': ['Skin.lua', `            if not rocker.enabled then text = "textDisabled" end`, ``],
+  'sk-rocker-halves-enabled': ['Skin.lua', `        self.left:SetEnabled(self.enabled)`, ``],
+  'sk-rocker-half-width': ['Skin.lua', `        b:SetSize(width / 2, height)`, `        b:SetSize(width, height)`],
+  'sk-rocker-no-hover': ['Skin.lua', `            elseif rocker.enabled and b.hover then`, `            elseif false then`],
 };
 
 function main() {

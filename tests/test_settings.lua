@@ -45,6 +45,15 @@ local function byKey(f, key)
     end)
     return found
 end
+-- What the title bar says is in use (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5): the lit half of the
+-- Everyday | Crowded rocker, or on Original and Maximum the name beside it.
+local function titleInUse(f)
+    local rocker = byKey(f, "rocker")
+    if not rocker then return nil end
+    if rocker.lit == "left" then return "Everyday" elseif rocker.lit == "right" then return "Crowded" end
+    local other = byKey(f, "rocker:other")
+    return other and other.label._text or nil
+end
 local function shownTexts(f)
     local list = {}
     walk(f, function(frame)
@@ -185,17 +194,17 @@ test("S1-9 in combat or during a test every control is greyed with its reason, a
     return combat.locked == COMBAT_TEXT and busy.locked == BUSY_TEXT and greyed and inCombat and running, outText()
 end)
 
-test("S1-11 a profile switched from outside moves the pill and the highlight within the refresh interval", function()
+test("S1-11 a profile switched from outside moves the rocker's light and the highlight within the refresh interval", function()
     local e, s, db, p = boot()
     s.open("light")
     local f = window()
-    local before = byKey(f, "pill").label._text == "Everyday"
+    local before = titleInUse(f) == "Everyday"
     p.switch("crowded")
     e.pump(1, function() return 0.05 end)
-    local after = byKey(f, "pill").label._text == "Crowded"
+    local after = titleInUse(f) == "Crowded"
     local highlighted = byKey(f, "level:graphicsShadowQuality:0").skinState.selected == true
         and byKey(f, "level:graphicsShadowQuality:2").skinState.selected == false
-    return before and after and highlighted, tostring(byKey(f, "pill").label._text)
+    return before and after and highlighted, tostring(titleInUse(f))
 end)
 
 test("S1-12 the window's pages: a tick and level buttons per setting on each page, 13 levels wrap onto three lines of six, the X closes it, Escape is listed once, no raw names", function()
@@ -230,7 +239,7 @@ test("S1-12 the window's pages: a tick and level buttons per setting on each pag
     local keepBox, live = byKey(f, "keep:graphicsShadowQuality"), byKey(f, "level:graphicsShadowQuality:2")
     local keptNow = keepBox ~= nil and keepBox:GetChecked() == true
     local liveSelected = live ~= nil and live.skinState.selected == true
-    local titled = hasText(f, "Light and shadows") and hasText(f, "Shadow detail") and byKey(f, "pill").label._text == "Everyday"
+    local titled = hasText(f, "Light and shadows") and hasText(f, "Shadow detail") and titleInUse(f) == "Everyday"
     s.click("page:world")
     local worldKeeps, worldLevels = count("keep:"), count("level:")
     raw = raw or rawIn(f)
@@ -588,10 +597,10 @@ test("S2-9 the window draws the costs under the level buttons, the matters words
     s.open("everyday")
     local gone = costFor(f, "graphicsShadowQuality", "0") == nil and not hasText(f, "Everything at the highest")
         and hasText(f, COST_NONE) and not hasText(f, COST_QUIET) and hasText(f, MATTERS_NOTE) and hasText(f, "matters: some")
-    -- with Maximum in use the pill says so and the page is read-only
+    -- with Maximum in use the title bar says so and the page is read-only
     p.switch("maximum", true)
     s.open("everyday")
-    local noButton = byKey(f, "pill").label._text == "Maximum" and hasText(f, "Maximum can't be changed. To change settings, edit:")
+    local noButton = titleInUse(f) == "Maximum" and hasText(f, "Maximum can't be changed. To change settings, edit:")
     return match and drawnCosts > 0 and matters and notes and gone and noButton,
         tostring(match) .. tostring(drawnCosts) .. tostring(matters) .. tostring(notes) .. tostring(gone) .. tostring(noButton)
 end)
@@ -1287,7 +1296,7 @@ local function keysShown(f, prefix)
     return table.concat(list, ",")
 end
 
-test("ED-1 the model edits the profile in use: no tabs, no footer buttons, rows editable, the pill names the profile and its colour", function()
+test("ED-1 the model edits the profile in use: no tabs, no footer buttons, rows editable, the title bar names the profile and its colour", function()
     local e, s = boot()
     local every = s.model({ page = "light" }, ctxOf(e, {}))
     local crowd = s.model({ page = "light" }, ctxOf(e, { active = "crowded" }))
@@ -1335,31 +1344,97 @@ test("ED-3 the estimate line is for the profile in use, and only for Everyday or
         and maxi.size.where == nil and crowd.size.where == nil, tostring(crowd.yourLine) .. " / " .. tostring(maxi.size and maxi.size.note)
 end)
 
-test("ED-4 the window has no tabs and no footer; the header pill shows the profile in use in its colour and opens Home, in combat too", function()
+-- The rocker (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5) took the pill's place in the header.
+test("ED-4 the window has no tabs and no footer; the header rocker stands left of the close button and lights the profile in use", function()
     local e, s, db = bootWith(fullEntry())
     s.open("light")
     local f = window()
-    local pill = byKey(f, "pill")
-    local function dotColour(frame)
-        for _, tex in ipairs(frame.dot.textures) do
-            if tex._texture then return tex._vertex end
-        end
-    end
+    local rocker = byKey(f, "rocker")
     local bare = keysShown(f, "tab:") == "" and byKey(f, "use") == nil and byKey(f, "maximum") == nil and byKey(f, "switch") == nil
-    local shown = pill ~= nil and pill.label._text == "Everyday" and pill.dot ~= nil
-        and pill._point[1] == "RIGHT" and pill._point[2] == f.close and pill._point[3] == "LEFT" and pill._point[4] == -8
-    local r, g, b = e.ns.skin.color("profileEveryday")
-    local c = dotColour(pill)
-    local coloured = c ~= nil and c[1] == r and c[2] == g and c[3] == b
-    COMBAT = true
-    pill:Click()
-    local home = s.state().page == "home" and hasText(window(), "In use now: Everyday")
-    COMBAT = false
+        and byKey(f, "pill") == nil
+    local shown = rocker ~= nil and titleInUse(f) == "Everyday"
+        and rocker._point[1] == "RIGHT" and rocker._point[2] == f.close and rocker._point[3] == "LEFT" and rocker._point[4] == -8
     s.click("profile:crowded")
-    pill = byKey(window(), "pill")
-    local r2 = e.ns.skin.color("profileCrowded")
-    local follows = pill.label._text == "Crowded" and dotColour(pill)[1] == r2
-    return bare and shown and coloured and home and follows, tostring(bare) .. tostring(shown) .. tostring(coloured) .. tostring(home) .. tostring(follows)
+    local follows = titleInUse(window()) == "Crowded"
+    return bare and shown and follows, tostring(bare) .. tostring(shown) .. tostring(follows)
+end)
+
+-- The fill colour of one half of the rocker.
+local function halfFill(f, key)
+    local half = byKey(f, key)
+    return half and half.box.fill._color
+end
+local function isColour(c, e, name)
+    local r, g, b = e.ns.skin.color(name)
+    return c ~= nil and math.abs(c[1] - r) < 1e-9 and math.abs(c[2] - g) < 1e-9 and math.abs(c[3] - b) < 1e-9
+end
+
+test("RK-1 the model: the rocker lights the profile in use; Original and Maximum light neither and name themselves beside it", function()
+    local e, s = boot()
+    local every = s.model({ page = "light" }, ctxOf(e, {}))
+    local crowd = s.model({ page = "light" }, ctxOf(e, { active = "crowded" }))
+    local orig = s.model({ page = "light" }, ctxOf(e, { active = "original" }))
+    local maxi = s.model({ page = "light" }, ctxOf(e, { active = "maximum" }))
+    local combat = s.model({ page = "light" }, ctxOf(e, { locked = "combat" }))
+    local running = s.model({ page = "light" }, ctxOf(e, { running = true }))
+    return every.rocker.lit == "everyday" and every.rocker.other == nil and every.rocker.enabled == true
+        and crowd.rocker.lit == "crowded" and crowd.rocker.other == nil
+        and orig.rocker.lit == nil and orig.rocker.other.text == "Original" and orig.rocker.other.color == "profileOriginal"
+        and maxi.rocker.lit == nil and maxi.rocker.other.text == "Maximum" and maxi.rocker.other.color == "profileMaximum"
+        and combat.rocker.enabled == false and running.rocker.enabled == false,
+        tostring(every.rocker and every.rocker.lit)
+end)
+
+test("RK-2 the window: the lit half has its profile's colour and the other the control colour; on Original neither, with the dot and name beside", function()
+    local e, s, db, p = boot()
+    s.open("light")
+    local f = window()
+    local everyday = isColour(halfFill(f, "rocker:everyday"), e, "profileEveryday") and isColour(halfFill(f, "rocker:crowded"), e, "control")
+        and byKey(f, "rocker:everyday").label._text == "Everyday" and byKey(f, "rocker:crowded").label._text == "Crowded"
+        and byKey(f, "rocker:other") == nil
+    p.switch("original", true)
+    s.redraw()
+    local other = byKey(f, "rocker:other")
+    local original = isColour(halfFill(f, "rocker:everyday"), e, "control") and isColour(halfFill(f, "rocker:crowded"), e, "control")
+        and other ~= nil and other.label._text == "Original" and isColour(other.dot.box.fill._color, e, "profileOriginal")
+        and other._point[1] == "RIGHT" and other._point[2] == byKey(f, "rocker") and other._point[3] == "LEFT"
+    return everyday and original, tostring(everyday) .. tostring(original)
+end)
+
+test("RK-3 a click on a half switches to that profile silently and stays on the page", function()
+    local e, s, db = boot()
+    s.open("light")
+    local f = window()
+    OUT = {}
+    byKey(f, "rocker:crowded"):Click()
+    local crowded = db.active == "crowded" and titleInUse(f) == "Crowded" and s.state().page == "light" and #OUT == 0
+    byKey(f, "rocker:everyday"):Click()
+    local everyday = db.active == "everyday" and titleInUse(f) == "Everyday" and #OUT == 0
+    return crowded and everyday, tostring(db.active) .. " " .. table.concat(OUT, " | ")
+end)
+
+test("RK-4 in combat and during a test the rocker is greyed and a click does nothing; afterwards it works again", function()
+    local e, s, db = bootWith(fullEntry())
+    local running = false
+    e.ns.guide.running = function() return running end
+    s.open("light")
+    COMBAT = true
+    s.redraw()
+    local f = window()
+    s.click("rocker:crowded")
+    local combat = byKey(f, "rocker:everyday").enabled == false and byKey(f, "rocker:crowded").enabled == false and db.active == "everyday"
+    COMBAT = false
+    running = true
+    s.redraw()
+    s.click("rocker:crowded")
+    local dr = e.ns.skin.color("textDisabled")
+    local test = byKey(f, "rocker:crowded").enabled == false and db.active == "everyday"
+        and byKey(f, "rocker:everyday").label._textColor[1] == dr and byKey(f, "rocker:crowded").label._textColor[1] == dr
+    running = false
+    s.redraw()
+    s.click("rocker:crowded")
+    local after = byKey(f, "rocker:crowded").enabled == true and db.active == "crowded"
+    return combat and test and after, tostring(combat) .. tostring(test) .. tostring(after)
 end)
 
 test("ED-5 a level click, a tick and the slider change the profile in use and the game at once; with Crowded in use, Crowded", function()
@@ -1413,7 +1488,7 @@ test("ED-6 with Maximum in use the page says so with Everyday and Crowded button
     byKey(window(), "edit:crowded"):Click()
     f = window()
     local switched = db.active == "crowded" and not hasText(f, READ_ONLY_MAX) and byKey(f, "edit:crowded") == nil
-        and byKey(f, "pill").label._text == "Crowded" and byKey(f, "level:graphicsShadowQuality:3").enabled == true and #OUT == 0
+        and titleInUse(f) == "Crowded" and byKey(f, "level:graphicsShadowQuality:3").enabled == true and #OUT == 0
     return shown and sized and untouched and greyed and stays and switched,
         tostring(shown) .. tostring(sized) .. tostring(untouched) .. tostring(greyed) .. tostring(stays) .. tostring(switched)
 end)
@@ -1522,7 +1597,7 @@ test("S8-3 a profile click switches silently and the page follows; in combat the
     local switched = db.active == "crowded" and byKey(f, "profile:crowded").skinState.selected == true
         and byKey(f, "profile:everyday").skinState.selected == false and hasText(f, "In use now: Crowded") and #OUT == 0
     byKey(f, "profile:original"):Click()
-    local original = db.active == "original" and hasText(f, "In use now: Original") and byKey(f, "pill").label._text == "Original"
+    local original = db.active == "original" and hasText(f, "In use now: Original") and titleInUse(f) == "Original"
     COMBAT = true
     s.open("home")
     local greyed = byKey(f, "profile:everyday").enabled == false and byKey(f, "profile:maximum").enabled == false
@@ -1651,7 +1726,7 @@ test("P-8 each page host is one frame in the page area, under the window, the wi
         and a._point[4] == 0 and a._point[5] == 0 and s.host("light") == nil, tostring(a and a._width)
 end)
 
-test("P-RUN-1 while a test runs the window stays on Find my settings: the other pages, the pill and the save bar are greyed and do nothing", function()
+test("P-RUN-1 while a test runs the window stays on Find my settings: the other pages, the rocker and the save bar are greyed and do nothing", function()
     local e, s, db = bootWith(fullEntry())
     local running = false
     e.ns.guide.running = function() return running end
@@ -1664,36 +1739,32 @@ test("P-RUN-1 while a test runs the window stays on Find my settings: the other 
     local onTest = byKey(f, "page:test").skinState.selected == true
     s.open("about")
     s.click("page:home")
-    s.click("pill")
-    local stayed = byKey(f, "page:test").skinState.selected == true
-    local greyed = byKey(f, "pill").enabled == false and byKey(f, "save:everyday").enabled == false
+    s.click("rocker:crowded")
+    local stayed = byKey(f, "page:test").skinState.selected == true and db.active == "everyday"
+    local greyed = byKey(f, "rocker:crowded").enabled == false and byKey(f, "save:everyday").enabled == false
     running = false
     s.open()                                               -- the run is over: the window is still on its page, not on About
     stayed = stayed and byKey(f, "page:test").skinState.selected == true
     s.open("about")
-    local free = byKey(f, "page:about").skinState.selected == true and byKey(f, "page:home").enabled == true and byKey(f, "pill").enabled == true
+    local free = byKey(f, "page:about").skinState.selected == true and byKey(f, "page:home").enabled == true
+        and byKey(f, "rocker:crowded").enabled == true
     return onTest and stayed and greyed and free and table.concat(pages, ",") == "home=false,light=false,world=false,size=false,test=true,results=false,about=false",
         table.concat(pages, ",") .. " " .. tostring(onTest) .. tostring(stayed) .. tostring(greyed) .. tostring(free)
 end)
 
--- The fresh review of 2026-11-03, finding 3: the greyed pill has to look greyed.
-test("P-RUN-3 while a test runs the pill's name and dot are in the disabled colour; afterwards they are back", function()
+-- The fresh review of 2026-11-03, finding 3: the greyed title-bar control has to look greyed (the rocker since 0.11).
+test("P-RUN-3 while a test runs the rocker's names are in the disabled colour; afterwards they are back", function()
     local e, s = bootWith(fullEntry())
     local running = true
     e.ns.guide.running = function() return running end
     s.open("test")
-    local pill = byKey(window(), "pill")
+    local f = window()
     local dr = e.ns.skin.color("textDisabled")
-    local function dotRed()
-        for _, tex in ipairs(pill.dot.textures) do
-            if tex._texture then return tex._vertex[1] end
-        end
-    end
-    local greyed = pill.label._textColor[1] == dr and dotRed() == dr
+    local greyed = byKey(f, "rocker:everyday").label._textColor[1] == dr and byKey(f, "rocker:crowded").label._textColor[1] == dr
     running = false
     s.open("test")
-    local br = e.ns.skin.color("bright")
-    local back = pill.label._textColor[1] == br and dotRed() == e.ns.skin.color("profileEveryday")
+    local back = byKey(f, "rocker:everyday").label._textColor[1] ~= dr and byKey(f, "rocker:crowded").label._textColor[1] ~= dr
+        and isColour(halfFill(f, "rocker:everyday"), e, "profileEveryday")
     return greyed and back, tostring(greyed) .. tostring(back)
 end)
 
@@ -2027,7 +2098,7 @@ test("S6-5 every page fits inside the page area with a 9-pixel wrap and a long n
     return fits and clear, tostring(#buttons) .. " " .. tostring(8 + lowest) .. " < " .. tostring(summaryTop)
 end)
 
-test("S6-6 every button label is centred both ways on one line at its width; the page rows keep theirs at the left, the pill its name beside the dot", function()
+test("S6-6 every button label is centred both ways on one line at its width; the page rows keep theirs at the left", function()
     local bad = {}
     local count = 0
     local function check(f)
@@ -2036,9 +2107,6 @@ test("S6-6 every button label is centred both ways on one line at its width; the
             local label = b.label
             if b.navItem then
                 if not (label._justifyH == "LEFT" and label._justifyV == "MIDDLE") then bad[#bad + 1] = "nav:" .. tostring(b._text) end
-            elseif b.key == "pill" then
-                if not (label._point and label._point[1] == "LEFT" and label._point[4] == 24) then bad[#bad + 1] = "pill" end
-                if #(label._text or "") * 6.5 > b._width - 28 then bad[#bad + 1] = "wide:pill" end
             else
                 if not (label._point and label._point[1] == "CENTER" and label._justifyH == "CENTER" and label._justifyV == "MIDDLE"
                     and label._wordWrap == false) then bad[#bad + 1] = "centre:" .. tostring(b._text) end
@@ -2049,12 +2117,12 @@ test("S6-6 every button label is centred both ways on one line at its width; the
     local e, s = bootWith(fullEntry())
     s.open("light")
     check(window())
-    local pill = byKey(window(), "pill")
+    local rocker = byKey(window(), "rocker")
     local e2, s2 = bootWith(fullEntry(), { active = "maximum" })
     s2.open("light")
     check(window())
     local edit = byKey(window(), "edit:everyday")
-    return count >= 30 and #bad == 0 and pill._width == 104 and pill._height == 22 and edit._width == 112 and edit._height == 24,
+    return count >= 30 and #bad == 0 and rocker._width == 160 and rocker._height == 22 and edit._width == 112 and edit._height == 24,
         table.concat(bad, ",") .. " " .. count
 end)
 

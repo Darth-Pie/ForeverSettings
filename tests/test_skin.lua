@@ -387,4 +387,33 @@ test("SK-11 a disabled selected button keeps the selected fill with dim text and
         tostring(held) .. tostring(plain) .. tostring(back) .. tostring(marks) .. tostring(quiet) .. tostring(lit)
 end)
 
+-- The Everyday | Crowded rocker in the title bar (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A5).
+test("SK-14 a rocker is two halves side by side; the lit half takes a colour with dark text, the other the control fill; disabled, both names are greyed", function()
+    local _, skin = boot()
+    local parent = skin.window("SkinTestWindow14", 400, 300, "t")
+    local r = skin.rocker(parent, "Everyday", "Crowded", 160, 22)
+    local halves = r._width == 160 and r._height == 22 and r.left._width == 80 and r.right._width == 80
+        and r.left._point[1] == "LEFT" and r.right._point[1] == "RIGHT" and r.left.label._text == "Everyday" and r.right.label._text == "Crowded"
+        and r.left.label._justifyH == "CENTER" and r.left.label._wordWrap == false
+    r:SetLit("left", "profileEveryday")
+    local left = r.lit == "left" and colorIs(r.left.box.fill._color, "5dcaa5") and colorIs(r.left.label._textColor, "14161b", 0.96)
+        and colorIs(r.right.box.fill._color, "2f3440") and colorIs(r.right.label._textColor, "8b90a0")
+    r.right.scripts.OnEnter(r.right)
+    local hover = colorIs(r.right.box.fill._color, "3a3f4b")
+    r.right.scripts.OnLeave(r.right)
+    hover = hover and colorIs(r.right.box.fill._color, "2f3440")
+    r:SetLit("right", "profileCrowded")
+    local right = hover and r.lit == "right" and colorIs(r.right.box.fill._color, "ef9f27") and colorIs(r.left.box.fill._color, "2f3440")
+    r:SetLit(nil)
+    local none = r.lit == nil and colorIs(r.left.box.fill._color, "2f3440") and colorIs(r.right.box.fill._color, "2f3440")
+    r:SetLit("left", "profileEveryday")
+    r:SetEnabled(false)
+    local off = r.left.enabled == false and r.right.enabled == false and colorIs(r.left.label._textColor, "5d6170")
+        and colorIs(r.right.label._textColor, "5d6170")
+    r:SetEnabled(true)
+    local on = r.left.enabled == true and colorIs(r.left.label._textColor, "14161b", 0.96)
+    return halves and left and right and none and off and on,
+        tostring(halves) .. tostring(left) .. tostring(right) .. tostring(none) .. tostring(off) .. tostring(on)
+end)
+
 return H.results()
