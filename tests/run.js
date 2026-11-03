@@ -10,7 +10,7 @@ const path = require('path');
 // A test suite that stays green under all of them would not be telling us anything.
 const MUTATIONS = {
   nosetcvar: ['ForeverSettings.lua', 'pcall(SetCVar, name, value)', 'pcall(function() return true end)'],
-  nocombat: ['ForeverSettings.lua', 'local function applyAll(manual, silent, explicit)', 'local function applyAll(manual, silent, explicit)\n    local InCombatLockdown = function() return false end'],
+  nocombat: ['ForeverSettings.lua', 'local function applyAll(manual, silent, asked)', 'local function applyAll(manual, silent, asked)\n    local InCombatLockdown = function() return false end'],
   nonumeric: ['ForeverSettings.lua', 'return x ~= nil and y ~= nil and x == y', 'return false'],
 
   // Bench.lua (Task 9): each line is copied from the file and must occur exactly once.
@@ -241,7 +241,6 @@ const MUTATIONS = {
   'report-button-off': ['Guide.lua', `        ns.ui.showReport(state.entry)`, `        local _ = nil`],
   'route-bypasses-guide': ['Bench.lua', `        if ns.guide then ns.guide.open("run") else bench.run() end`, `        bench.run()`],
   'route-check-bypasses-guide': ['Bench.lua', `        if ns.guide then ns.guide.open("check") else bench.check() end`, `        bench.check()`],
-  'menu-bypasses-guide': ['UI.lua', `            elseif ns.guide and (name == "run" or name == "check") then`, `            elseif false then`],
   // Guide (Task 6)
   'ui-start-enabled-unticked': ['Guide.lua', `            button:SetEnabled(spec.enabled)`, `            button:SetEnabled(true)`],
   'ui-windows-constant': ['Guide.lua', `    return ns.bench.countWindows(resolved, currents)`, `    return 3`],
@@ -746,7 +745,7 @@ end
   'silent-ignored-set': ['Profiles.lua', `    speak(silent, "keeping " .. friendly(cvar) .. " at " .. value)`, `    ns.say("keeping " .. friendly(cvar) .. " at " .. value)`],
   'silent-ignored-unset': ['Profiles.lua', `    speak(silent, "no longer forcing " .. friendly(cvar) .. " (its current value is left as it is)")`, `    ns.say("no longer forcing " .. friendly(cvar) .. " (its current value is left as it is)")`],
   'silent-ignored-save': ['Profiles.lua', `    speak(silent, "Saved " .. plural(count, "setting") .. " as " .. profiles.LABEL[name])`, `    ns.say("Saved " .. plural(count, "setting") .. " as " .. profiles.LABEL[name])`],
-  'silent-not-passed-to-applyall': ['Profiles.lua', `    ns.applyAll(true, silent)`, `    ns.applyAll(true)`],
+  'silent-not-passed-to-applyall': ['Profiles.lua', `    ns.applyAll(true, silent, { [cvar:lower()] = true })`, `    ns.applyAll(true, nil, { [cvar:lower()] = true })`],
   'applyall-silent-ignored': ['ForeverSettings.lua', `    local say = silent and function() end or say`, `    local say = say`],
   'friendly-raw': ['Profiles.lua', `    if ns.names then return ns.names.label(cvar, label) end`, `    if false then return ns.names.label(cvar, label) end`],
 
@@ -1692,9 +1691,9 @@ end
   'sz-range-max': ['Settings.lua', `SIZE_SLIDER_WIDTH, SIZE_MIN, SIZE_MAX, SIZE_STEP)`, `SIZE_SLIDER_WIDTH, SIZE_MIN, 150, SIZE_STEP)`],
   'sz-step': ['Settings.lua', `SIZE_SLIDER_WIDTH, SIZE_MIN, SIZE_MAX, SIZE_STEP)`, `SIZE_SLIDER_WIDTH, SIZE_MIN, SIZE_MAX, 1)`],
   // The fix pass after the fresh review of the saved picture size
-  'sz-safe-reads-every-time': ['ForeverSettings.lua', `if safeStart and not (manual or explicit) and name:lower()`, `if (safeStart or IsShiftKeyDown()) and not (manual or explicit) and name:lower()`],
-  'sz-safe-skips-manual': ['ForeverSettings.lua', `if safeStart and not (manual or explicit) and name:lower()`, `if safeStart and name:lower()`],
-  'sz-safe-skips-explicit': ['ForeverSettings.lua', `if safeStart and not (manual or explicit) and name:lower()`, `if safeStart and not manual and name:lower()`],
+  'sz-safe-reads-every-time': ['ForeverSettings.lua', `if safeStart and not asked[name:lower()] and name:lower()`, `if (safeStart or IsShiftKeyDown()) and not asked[name:lower()] and name:lower()`],
+  'sz-safe-skips-manual': ['ForeverSettings.lua', `if safeStart and not asked[name:lower()] and name:lower()`, `if safeStart and name:lower()`],
+  'sz-safe-skips-explicit': ['ForeverSettings.lua', `if safeStart and not asked[name:lower()] and name:lower()`, `if safeStart and not next(asked) and name:lower()`],
   'sz-cmd-status-kept': ['ForeverSettings.lua', `        local kept = keptSize()
         local tail`, `        local kept = nil
         local tail`],
@@ -1706,10 +1705,10 @@ end
         warned[name] = nil`, `        warned[name] = nil`],
   'sz-own-spelling-unset-first': ['ForeverSettings.lua', `        if db.want[target] == nil then target = ownSpelling(target) end`, `        target = ownSpelling(target)`],
   'sz-own-spelling-unset-missing': ['ForeverSettings.lua', `        if db.want[target] == nil then target = ownSpelling(target) end`, `        local _ = ownSpelling`],
-  'sz-pending-manual-lost': ['ForeverSettings.lua', `            pendingManual = true`, `            pendingManual = false`],
-  'sz-pending-replay-plain': ['ForeverSettings.lua', `applyAll(false, false, pendingManual)`, `applyAll(false)`],
+  'sz-pending-manual-lost': ['ForeverSettings.lua', `        for name in pairs(asked) do pendingAsked[name] = true end`, ``],
+  'sz-pending-replay-plain': ['ForeverSettings.lua', `applyAll(false, false, pendingAsked)`, `applyAll(false)`],
   'sz-pending-manual-sticky': ['ForeverSettings.lua', `    pending = false
-    pendingManual = false`, `    pending = false`],
+    pendingAsked = {}`, `    pending = false`],
   'sz-shift-clamp-missing': ['ForeverSettings.lua', `                if size and size > 1 then`, `                if false then`],
   'sz-shift-clamp-100': ['ForeverSettings.lua', `                if size and size > 1 then`, `                if size and size >= 1 then`],
   'sz-shift-clamp-always': ['ForeverSettings.lua', `            if safeStart then
@@ -2107,7 +2106,8 @@ end
   'ctl-renderscale-only': ['Bench.lua', `            value = cheaperTier(entry, current[entry.cvar])`, `            value = nil`],
   'ctl-renderscale-unchanged': ['Bench.lua', `if now then value = string.format("%.4g", now * K.CONTROL_FACTOR) end`, `if now then value = string.format("%.4g", now) end`],
   'ctl-empty-not-nil': ['Bench.lua', `    if #changes == 0 then return nil end`, `    if false then return nil end`],
-  'ctl-not-restored': ['Bench.lua', `                restoreControl(before)`, ``],
+  'ctl-not-restored': ['Bench.lua', `                pcall(restore.putBack, originals)
+                if not c1.ok then return abort(c1.reason) end`, `                if not c1.ok then return abort(c1.reason) end`],
   'ctl-refusal-stops': ['Bench.lua', `    if #before == 0 then return nil, refused end`, `    if #refused > 0 then return nil, refused end`],
   'ctl-refused-left-set': ['Bench.lua', `            pcall(SetCVar, c.cvar, was)`, ``],
   'ctl-check-words': ['Bench.lua', `ns.say(string.format("control (%s): frame time dropped %.1f%%: ok", control.label, drop * 100))`, `ns.say(string.format("control: frame time dropped %.1f%%: ok", drop * 100))`],
@@ -2171,8 +2171,8 @@ end
   'safe-logout-safe-game-set': ['ForeverSettings.lua', `if entry and now ~= nil and not same(now, entry.safe) then`, `if entry and now ~= nil then`],
   'risky-entry-kept-safe': ['ForeverSettings.lua', `    if entry and entry.risky and not same(value, entry.safe) then return entry end`, `    if entry and entry.risky then return entry end`],
   'risky-entry-any': ['ForeverSettings.lua', `    if entry and entry.risky and not same(value, entry.safe) then return entry end`, `    if entry and not same(value, entry.safe) then return entry end`],
-  'shift-risky-off': ['ForeverSettings.lua', `        elseif safeStart and not (manual or explicit) and riskyEntry(name, value) then`, `        elseif false then`],
-  'shift-risky-manual': ['ForeverSettings.lua', `        elseif safeStart and not (manual or explicit) and riskyEntry(name, value) then`, `        elseif safeStart and riskyEntry(name, value) then`],
+  'shift-risky-off': ['ForeverSettings.lua', `        elseif safeStart and not asked[name:lower()] and riskyEntry(name, value) then`, `        elseif false then`],
+  'shift-risky-manual': ['ForeverSettings.lua', `        elseif safeStart and not asked[name:lower()] and riskyEntry(name, value) then`, `        elseif safeStart and riskyEntry(name, value) then`],
   'shift-risky-said-each': ['ForeverSettings.lua', `            if not riskySaid then`, `            if true then`],
   'orig-other-not-recorded': ['Profiles.lua', `    -- As setValue does: a setting Original has no value for (an Advanced one) is recorded there first.
     if db.original.values[cvar] == nil then`, `    if false then`],
@@ -2197,7 +2197,7 @@ end
   'adv-readonly-off': ['Settings.lua', `    if (onSettings or onAdvanced) and view.readOnly then`, `    if onSettings and view.readOnly then`],
   'adv-cards-enabled': ['Settings.lua', `            enabled = locked == nil and editing ~= nil, noCosts = true,`, `            enabled = true, noCosts = true,`],
   'adv-level-word': ['Settings.lua', `            local text = ns.advanced.levelText(entry, value)`, `            local text = value`],
-  'adv-tools-everywhere': ['Settings.lua', `    if view.page == (settings.ADVANCED_PAGES[1] and settings.ADVANCED_PAGES[1].key) then`, `    if onAdvanced then`],
+  'adv-tools-everywhere': ['Settings.lua', `    if lastAdvanced and view.page == lastAdvanced.key then`, `    if onAdvanced then`],
   'adv-raid-always-on': ['Settings.lua', `ns.command("profile raid " .. ((fsdb and fsdb.raidToo) and "off" or "on"))`, `ns.command("profile raid on")`],
   'adv-home-kept-missing': ['Settings.lua', `        if n > 0 then
             view.home.advancedKept`, `        if false then
@@ -2231,6 +2231,18 @@ end
   'mn-new-hint-title': ['UI.lua', `        tooltip:SetText(item.text)`, `        tooltip:SetText("")`],
   'mn-old-hint-missing': ['UI.lua', `                if item.hint then info.tooltipTitle, info.tooltipText, info.tooltipOnButton = item.text, item.hint, true end`, ``],
   'adv-raid-note-always': ['Settings.lua', `        if tools.raidOff then placeText(p.advRaidOff, tools.raidOff, 22) else hideText(p.advRaidOff) end`, `        placeText(p.advRaidOff, RAID_SWITCH_OFF, 22)`],
+  // The fix pass after the fresh review of 2026-11-03
+  'fx-asked-not-passed': ['Profiles.lua', `    ns.applyAll(true, silent, { [cvar:lower()] = true })`, `    ns.applyAll(true, silent)`],
+  'fx-asked-opens-all': ['ForeverSettings.lua', `        elseif safeStart and not asked[name:lower()] and riskyEntry(name, value) then`, `        elseif safeStart and not next(asked) and riskyEntry(name, value) then`],
+  'fx-unset-risky-left': ['Profiles.lua', `        if now ~= nil and not sameValue(now, back) then pcall(SetCVar, cvar, back) end`, ``],
+  'fx-unset-not-original': ['Profiles.lua', `        local back = db.original.values[cvar] or entry.safe`, `        local back = entry.safe`],
+  'fx-unset-any-advanced': ['Profiles.lua', `    if entry and entry.risky then
+        local back`, `    if entry then
+        local back`],
+  'fx-spelling-catalogue': ['ForeverSettings.lua', `        if entry.cvar:lower() == lower then return entry.cvar end`, ``],
+  'fx-clamp-kept': ['Settings.lua', `            ns.profiles.unsetProfileValue(profile, pickedCvar, true)`, ``],
+  'fx-clamp-silent': ['Settings.lua', `            state.notice = "The game would not take " .. entry.name`, `            local _ = "The game would not take " .. entry.name`],
+  'fx-name-narrow': ['Settings.lua', `        if row.noCosts then corner = row.tag and 50 or 0 end`, ``],
 };
 
 function main() {

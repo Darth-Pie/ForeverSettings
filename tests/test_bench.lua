@@ -898,6 +898,25 @@ test("B7-24 a control change the game turns into another value is put back at on
         and has("did not accept the control graphicsShadowQuality = 0"), outText()
 end)
 
+-- The fresh review of 2026-11-03, finding 1: a menu-level setting rewrites the raw settings under it, so putting back only what
+-- the control changed leaves those at the menu's values; the run has to start from the whole snapshot.
+test("B7-25 after the control the run starts from every setting as it was, a raw one under a menu-level setting included", function()
+    local cv = runCvars()
+    cv.shadowTextureSize = "4096"                          -- kept above what Shadow detail's preset gives
+    local e, b = newRun(cv)
+    DERIVED.graphicsShadowQuality = function(v, c) c.shadowTextureSize = "1024" end
+    local function cost(c)
+        return 0.004 + 0.0005 * tonumber(c.graphicsShadowQuality) + (c.shadowTextureSize == "4096" and 0.003 or 0)
+    end
+    local entry = doRun(e, b, cost)[1]
+    local moved = 0
+    for _, row in ipairs(entry and entry.rows or {}) do
+        if row.reason and row.reason:find("since the start", 1, true) then moved = moved + 1 end
+    end
+    return entry ~= nil and entry.valid and near(entry.baselineMs, 8.0, 0.05) and moved == 0 and CVARS.shadowTextureSize == "4096",
+        tostring(entry and entry.baselineMs) .. " " .. moved .. " " .. tostring(CVARS.shadowTextureSize)
+end)
+
 -- Spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1: 256 grass where the client draws it.
 test("BN-3 grass and plants (exact amount) offers 256; a run where the game refuses it records it rejected and it is not offered again", function()
     local e, b = newRun()

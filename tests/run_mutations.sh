@@ -65,7 +65,7 @@ bracket-restores-one|test_bench|B7-18|killed
 snapshot-extras-off|test_bench|B7-20|killed
 rerun-reference-off|test_bench|B7-17|killed
 concluded-off|test_bench|B7-19|killed
-ui-active-unlocked|test_ui|B10-3,P7-3|killed
+ui-active-unlocked|test_ui|P7-3,UM-4|killed
 ui-check-enabled|test_ui|B10-8c|killed
 ui-combat-enabled|test_ui|B10-3,B10-8b|killed
 ui-report-no-escape|test_ui|B10-13|killed
@@ -179,7 +179,6 @@ stop-button-off|test_guide|G5-8|killed
 report-button-off|test_guide|G5-4|killed
 route-bypasses-guide|test_guide|G5-1|killed
 route-check-bypasses-guide|test_guide|G5-1|killed
-menu-bypasses-guide|test_guide|G5-1|killed
 ui-start-enabled-unticked|test_guide|G6-1|killed
 ui-windows-constant|test_guide|G6-6|killed
 ui-button-key-fixed|test_guide|G6-9|killed
@@ -1367,6 +1366,15 @@ mn-new-button-hint-missing|test_ui|B10-8|killed
 mn-new-hint-title|test_ui|B10-8|killed
 mn-old-hint-missing|test_ui|B10-9,UM-5|killed
 adv-raid-note-always|test_settings|AD-6b|killed
+fx-asked-not-passed|test_advanced|AV-SAFE-5,AV-SAFE-6|killed
+fx-asked-opens-all|test_advanced|AV-SAFE-6|killed
+fx-unset-risky-left|test_advanced|AV-SAFE-7|killed
+fx-unset-not-original|test_advanced|AV-SAFE-7|killed
+fx-unset-any-advanced|test_advanced|AV-SAFE-7|killed
+fx-spelling-catalogue|test_advanced|AV-SPELL-1|killed
+fx-clamp-kept|test_settings|AD-8|killed
+fx-clamp-silent|test_settings|AD-8|killed
+fx-name-narrow|test_settings|AD-7b|killed
 control-comment|test_bench||survive
 control-missing|test_bench||error
 control-syntax|test_bench||error'

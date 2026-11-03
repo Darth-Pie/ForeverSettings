@@ -34,7 +34,7 @@ local warned = {}
 local safeStart = false            -- Shift was held when the session's first loading screen came: no saved size above 100% this session
 local safeSaid = false
 local riskySaid = false             -- the same for the risky Advanced settings
-local pendingManual = false        -- what waited for combat was asked for by the player (a command, a click), so Shift does not skip it
+local pendingAsked = {}            -- the settings the player asked for while in combat (a command, a click): Shift does not skip them
 
 local function say(msg)
     print(PREFIX .. msg)
@@ -181,6 +181,10 @@ local function ownSpelling(name)
     for _, known in ipairs(ns.profiles and ns.profiles.MANAGED or {}) do
         if known:lower() == lower then return known end
     end
+    -- the Advanced pages' spelling next, before the client's or the built-in list (which spells sunShafts, weatherDensity)
+    for _, entry in ipairs(ns.advanced and ns.advanced.CATALOG or {}) do
+        if entry.cvar:lower() == lower then return entry.cvar end
+    end
     for _, known in ipairs((ns.cvarNames())) do
         if known:lower() == lower then return known end
     end
@@ -188,35 +192,35 @@ local function ownSpelling(name)
 end
 
 -- manual: the user asked for it, so say something even when nothing changed. silent: say nothing at all (the My settings
--- window shows the result in its rows). explicit: not a manual call, but what it applies was asked for by the player (a size that
--- waited for combat), so a Shift session does not skip it.
-local function applyAll(manual, silent, explicit)
+-- window shows the result in its rows). asked: the settings the player asked for ({lower-case name = true}: a command, a click,
+-- or one that waited for combat). A Shift session skips every other saved size above 100% and kept risky Advanced value, so
+-- setting one thing never brings the others back (the fresh review of 2026-11-03, finding 2).
+local function applyAll(manual, silent, asked)
     local say = silent and function() end or say
+    asked = asked or {}
     if ns.suspended then
         if manual then say("benchmark running; try again afterwards") end
         return
     end
     if InCombatLockdown() then
         pending = true
-        if manual then
-            pendingManual = true
-            say("in combat; will apply when combat ends")
-        end
+        for name in pairs(asked) do pendingAsked[name] = true end
+        if manual then say("in combat; will apply when combat ends") end
         return
     end
     pending = false
-    pendingManual = false
+    pendingAsked = {}
     local changed = 0
     for _, name in ipairs(orderedKeys(db.want)) do
         local value = db.want[name]
         local current = GetCVar(name)
-        if safeStart and not (manual or explicit) and name:lower() == "renderscale" and (tonumber(value) or 0) > 1 then
+        if safeStart and not asked[name:lower()] and name:lower() == "renderscale" and (tonumber(value) or 0) > 1 then
             -- Shift was held at login (spec 2026-11-02-one-saved-picture-size-design.md S9): a saved size above 100% waits
             if not safeSaid then
                 safeSaid = true
                 say("Shift is held: picture sharpness above 100% is not applied this session.")
             end
-        elseif safeStart and not (manual or explicit) and riskyEntry(name, value) then
+        elseif safeStart and not asked[name:lower()] and riskyEntry(name, value) then
             -- and so does a kept risky Advanced value (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A4)
             if not riskySaid then
                 riskySaid = true
@@ -502,7 +506,7 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         end
         applyAll(false)
     elseif event == "PLAYER_REGEN_ENABLED" then
-        if pending then applyAll(false, false, pendingManual) end
+        if pending then applyAll(false, false, pendingAsked) end
     elseif event == "PLAYER_LOGOUT" then
         -- The game writes its own settings on this exit and loads them at its next start, before any addon runs. A picture size
         -- above 100% that the addon keeps goes back to 100% first, so the game always starts at a safe size; the addon applies the

@@ -367,7 +367,7 @@ function profiles.setValue(cvar, value, silent)
     db.profiles[db.active].values[cvar] = value
     db.want = profiles.plan(db.active).want
     speak(silent, "keeping " .. friendly(cvar) .. " at " .. value)
-    ns.applyAll(true, silent)
+    ns.applyAll(true, silent, { [cvar:lower()] = true })
     return true
 end
 
@@ -384,6 +384,16 @@ function profiles.unsetValue(cvar, silent)
     end
     profile.values[cvar] = nil
     db.want = profiles.plan(db.active).want
+    -- A risky Advanced value the addon put in the game goes back to the player's own (Original's), else to the safe one: nothing
+    -- keeps it now, so the logout safety net would leave it in the game's saved settings (the fresh review of 2026-11-03, finding 3).
+    local entry = ns.advanced and ns.advanced.entry and ns.advanced.entry(cvar)
+    if entry and entry.risky then
+        local back = db.original.values[cvar] or entry.safe
+        local now = GetCVar(cvar)
+        if now ~= nil and not sameValue(now, back) then pcall(SetCVar, cvar, back) end
+        speak(silent, "no longer forcing " .. friendly(cvar) .. " (put back to " .. back .. ")")
+        return true
+    end
     speak(silent, "no longer forcing " .. friendly(cvar) .. " (its current value is left as it is)")
     return true
 end

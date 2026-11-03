@@ -2275,7 +2275,7 @@ test("AD-1 the model: with Advanced off no Advanced page is listed and one asked
     local off = s.model({ page = "adv-effects" }, ctxOf(e, { advanced = { on = false, entries = entries } }))
     local on = s.model({ page = "adv-effects" }, ctxOf(e, { advanced = { on = true, entries = entries } }))
     return pageKeys(off) == "home,light,effects,world,size,test,results,about" and off.page == "home"
-        and pageKeys(on) == "home,light,effects,world,size,test,results,adv-effects,adv-distance,adv-shadows,about" and on.page == "adv-effects",
+        and pageKeys(on) == "home,light,effects,world,size,test,results,adv-effects,adv-distance,adv-detail,adv-shadows,about" and on.page == "adv-effects",
         pageKeys(off) .. " / " .. pageKeys(on)
 end)
 
@@ -2339,13 +2339,13 @@ test("AD-5 on Original and Maximum the Advanced cards are read-only with the Eve
     return readOnly and combat and free, tostring(readOnly) .. tostring(combat) .. tostring(free)
 end)
 
-test("AD-6 the tools of the old Advanced menu sit under the effects cards and do what the menu did; the raid tick follows the option", function()
+test("AD-6 the tools of the old Advanced menu sit under the shadows cards and do what the menu did; the raid tick follows the option", function()
     local e, s, db = advBoot()
     local opened, reported = {}, 0
     e.ns.guide.open = function(kind) opened[#opened + 1] = kind end
     e.ns.ui.showReport = function() reported = reported + 1 end
     e.ns.bench.state().history[1] = { kind = "run", ok = true, valid = true, rows = {}, time = 1 }
-    s.open("adv-effects")
+    s.open("adv-shadows")
     local f = window()
     local buttons = byKey(f, "adv:check") ~= nil and byKey(f, "adv:run") ~= nil and byKey(f, "adv:report") ~= nil and byKey(f, "adv:apply") ~= nil
     byKey(f, "adv:check"):Click()
@@ -2366,7 +2366,7 @@ end)
 test("AD-6b under the raid option a note says it needs the game's raid graphics, only while those are switched off", function()
     local e, s = advBoot()
     CVARS.RAIDsettingsEnabled = "0"
-    s.open("adv-effects")
+    s.open("adv-shadows")
     local off = hasText(window(), "Needs the game's raid graphics turned on.")
     CVARS.RAIDsettingsEnabled = "1"
     s.redraw()
@@ -2378,7 +2378,7 @@ test("AD-7 nothing scrolls: on every Advanced page the lowest button stands insi
     local e, s = advBoot()
     for _, entry in ipairs(e.ns.advanced.CATALOG) do CVARS[entry.cvar] = entry.levels[1] end
     local bad = {}
-    for _, key in ipairs({ "adv-effects", "adv-distance", "adv-shadows" }) do
+    for _, key in ipairs({ "adv-effects", "adv-distance", "adv-detail", "adv-shadows" }) do
         s.open(key)
         local lowest = 0
         walk(window(), function(frame)
@@ -2390,6 +2390,45 @@ test("AD-7 nothing scrolls: on every Advanced page the lowest button stands insi
         if 26 + lowest + 8 > PAGE_H then bad[#bad + 1] = key .. "=" .. lowest end
     end
     return #bad == 0, table.concat(bad, ",")
+end)
+
+-- The fresh review of 2026-11-03: the harness counts every string as one line; with wrapping at 7 pixels a letter, the read-only
+-- line of Maximum and a combat banner over the warning, every Advanced page still fits.
+test("AD-7b with wrapped text, Maximum's read-only line and a combat banner, every Advanced page fits inside the page", function()
+    local e, s = advBoot({ active = "maximum" })
+    for _, entry in ipairs(e.ns.advanced.CATALOG) do CVARS[entry.cvar] = entry.levels[1] end
+    STRINGHEIGHT = function(fs)
+        local text = fs._text or ""
+        local perLine = math.max(1, math.floor((fs._width or AREA_W) / 7))
+        return 14 * math.max(1, math.ceil(#text / perLine))
+    end
+    COMBAT = true
+    local bad = {}
+    for _, key in ipairs({ "adv-effects", "adv-distance", "adv-detail", "adv-shadows" }) do
+        s.open(key)
+        local lowest = 0
+        walk(window(), function(frame)
+            if frame.shown and frame.key and frame._point and (frame.key:find("^level:") or frame.key:find("^adv:")) then
+                local bottom = -frame._point[5] + (frame._height or 0)
+                if bottom > lowest then lowest = bottom end
+            end
+        end)
+        if 26 + lowest + 8 > PAGE_H then bad[#bad + 1] = key .. "=" .. (26 + lowest + 8) end
+    end
+    COMBAT = false
+    STRINGHEIGHT = nil
+    return #bad == 0, table.concat(bad, ",")
+end)
+
+-- The fresh review of 2026-11-03, finding 5: a level the client clamps was kept silently, and every loading screen said so in chat.
+test("AD-8 a level the game will not take is not kept: the card shows what the game holds and the window says so", function()
+    local e, s, db = advBoot()
+    SETFAIL.farclip = { ask = "10000", to = "8000" }
+    s.open("adv-distance")
+    byKey(window(), "level:farclip:10000"):Click()
+    local f = window()
+    return db.profiles.everyday.values.farclip == nil and byKey(f, "keep:farclip"):GetChecked() == false
+        and hasText(f, "The game would not take View distance (further) at 10000: it kept 8000."), allText(f)
 end)
 
 test("SW-1 the Advanced switch is off by default; the first turn on shows the warning with I understand and Cancel, then it switches at once", function()

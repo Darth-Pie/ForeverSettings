@@ -42,16 +42,17 @@ advanced.CATALOG = {
       levels = { "800", "1600", "2400", "3200", "4000" }, risky = true, safe = "800", page = "adv-distance" },
     { cvar = "horizonClip", name = "Distant land end", line = "How far away the distant land stops.",
       levels = { "1600", "3200", "5000", "7500", "10000" }, risky = true, safe = "1600", page = "adv-distance" },
+    -- Detail in the distance
     { cvar = "terrainLodDist", name = "Ground detail distance", line = "How far away the ground keeps its full detail.",
-      levels = { "200", "300", "400", "500", "650", "800" }, risky = true, safe = "400", page = "adv-distance" },
+      levels = { "200", "300", "400", "500", "650", "800" }, risky = true, safe = "400", page = "adv-detail" },
     { cvar = "wmoLodDist", name = "Building detail distance", line = "How far away buildings keep their full detail.",
-      levels = { "150", "300", "400", "500", "650" }, risky = true, safe = "300", page = "adv-distance" },
+      levels = { "150", "300", "400", "500", "650" }, risky = true, safe = "300", page = "adv-detail" },
     { cvar = "entityLodDist", name = "Character detail distance", line = "How far away characters keep their full detail.",
-      levels = { "5", "10", "15", "20", "25" }, risky = true, safe = "10", page = "adv-distance" },
+      levels = { "5", "10", "15", "20", "25" }, risky = true, safe = "10", page = "adv-detail" },
     { cvar = "lodObjectCullSize", name = "Small object cutoff", line = "Objects smaller than this vanish in the distance; lower draws more.",
-      levels = { "5", "10", "15", "20", "25" }, risky = true, safe = "15", page = "adv-distance" },
+      levels = { "5", "10", "15", "20", "25" }, risky = true, safe = "15", page = "adv-detail" },
     { cvar = "lodObjectMinSize", name = "Smallest object drawn", line = "Objects smaller than this are never drawn; lower draws more.",
-      levels = { "0", "10", "20", "30" }, risky = true, safe = "20", page = "adv-distance" },
+      levels = { "0", "10", "20", "30" }, risky = true, safe = "20", page = "adv-detail" },
     -- Shadows
     { cvar = "shadowTextureSize", name = "Shadow map size", line = "How sharp shadow edges can be. Higher uses more graphics memory.",
       levels = { "1024", "2048", "4096" }, risky = true, safe = "1024", page = "adv-shadows" },
@@ -67,6 +68,7 @@ advanced.CATALOG = {
 advanced.PAGES = {
     { key = "adv-effects", text = "Advanced: effects" },
     { key = "adv-distance", text = "Advanced: distance" },
+    { key = "adv-detail", text = "Advanced: detail" },
     { key = "adv-shadows", text = "Advanced: shadows" },
 }
 

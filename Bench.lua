@@ -781,10 +781,6 @@ local function applyControl(control)
     return before, refused
 end
 
-local function restoreControl(before)
-    for i = #before, 1, -1 do pcall(SetCVar, before[i].cvar, before[i].value) end
-end
-
 local function currentsOf(resolved)
     local current = {}
     for _, entry in ipairs(resolved) do current[entry.cvar] = GetCVar(entry.cvar) end
@@ -1217,7 +1213,9 @@ function bench.run(onDone, opts)
             for _, c in ipairs(refused) do say("the game did not accept the control " .. c.cvar .. " = " .. c.value) end
             if not before then return abort("control rejected") end
             window("control", control.label, function(c1)
-                restoreControl(before)
+                -- The whole snapshot, not only the changes: a menu-level setting rewrote the raw ones under it (the fresh
+                -- review of 2026-11-03, finding 1), and the start baseline must see every setting as it was.
+                pcall(restore.putBack, originals)
                 if not c1.ok then return abort(c1.reason) end
                 if not guard.responds(c0.summary.meanMs, c1.summary.meanMs) then
                     say("even every setting at its cheapest did not cut the frame time: a frame-rate limit, another program "

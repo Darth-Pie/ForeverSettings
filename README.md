@@ -47,7 +47,7 @@ The **Home** page switches profile and starts the tests. The test itself runs on
 
 ## Advanced settings
 
-Turn on **Advanced** in the title bar of My settings (you accept a warning the first time) for three more pages with 21 settings the game's own menu doesn't offer: how far grass and the world are drawn, sun rays, fog, glow, water reflections, shadow map size and more. They are finicky: some can make the game look wrong, run badly or crash, so change them only if you know what they do. **Return to Original** puts every setting back. The ones marked risky go back to a safe value when you log out and are put back after you enter the world; hold Shift while you enter the world to skip them for that session. The first Advanced page also has the raid option and the tools: Check this spot, Run benchmark, Show last report and Apply all now.
+Turn on **Advanced** in the title bar of My settings (you accept a warning the first time) for four more pages with 21 settings the game's own menu doesn't offer: how far grass and the world are drawn, sun rays, fog, glow, water reflections, shadow map size and more. They are finicky: some can make the game look wrong, run badly or crash, so change them only if you know what they do. **Return to Original** puts every setting back. The ones marked risky go back to a safe value when you log out and are put back after you enter the world; hold Shift while you enter the world to skip them for that session. The last Advanced page (shadows) also has the raid option and the tools: Check this spot, Run benchmark, Show last report and Apply all now. Taking a risky setting out of a profile puts your own value back in the game.
 
 ## Profiles
 

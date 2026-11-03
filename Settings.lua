@@ -787,6 +787,15 @@ function settings.click(key)
     local pickedCvar, value = key:match("^level:([^:]+):(.+)$")
     if pickedCvar then
         ns.profiles.setProfileValue(profile, pickedCvar, value, true)
+        -- An Advanced level the game will not take is not kept, or every loading screen would say so in chat: the card shows what the
+        -- game holds, and the window says what it kept (the fresh review of 2026-11-03, finding 5).
+        local entry = ns.advanced and ns.advanced.entry(pickedCvar)
+        local held = GetCVar(pickedCvar)
+        if entry and held ~= nil and not sameValue(held, value) then
+            ns.profiles.unsetProfileValue(profile, pickedCvar, true)
+            state.notice = "The game would not take " .. entry.name .. " at " .. ns.advanced.levelText(entry, value) .. ": it kept "
+                .. ns.advanced.levelText(entry, held) .. "."
+        end
         draw()
     end
 end
@@ -1271,7 +1280,10 @@ function settings.render()
         box:SetPoint("TOPLEFT", p.area, "TOPLEFT", x, -(top + 1))
         local name = take(p.names)
         name:SetText(row.name)
-        name:SetWidth(cardW - 22 - 100)
+        -- Room for the corner text: "matters: some" on a measured card, the shorter "risky" or nothing on an Advanced one.
+        local corner = 100
+        if row.noCosts then corner = row.tag and 50 or 0 end
+        name:SetWidth(cardW - 22 - corner)
         name:ClearAllPoints()
         name:SetPoint("TOPLEFT", p.area, "TOPLEFT", x + 22, -top)
         -- The corner of a card: how much it matters to the picture, or on an Advanced card that it is risky.
@@ -1279,7 +1291,7 @@ function settings.render()
             local worth = take(p.matters)
             worth:SetText(row.tag or ("matters: " .. row.mattersWords))
             worth:SetTextColor(skin.color(row.tag and "warning" or "dim"))
-            worth:SetWidth(96)
+            worth:SetWidth(row.tag and 46 or 96)
             worth:ClearAllPoints()
             worth:SetPoint("TOPRIGHT", p.area, "TOPLEFT", x + cardW, -(top + 2))
         end
@@ -1351,8 +1363,10 @@ function settings.render()
     release(p.levels)
     release(p.costs, true)
 
-    -- Under the effects cards: the raid option and the tools that were the minimap menu's Advanced submenu (spec A2, A5).
-    if view.page == (settings.ADVANCED_PAGES[1] and settings.ADVANCED_PAGES[1].key) then
+    -- Under the cards of the last Advanced page (shadows, the one with room): the raid option and the tools that were the minimap
+    -- menu's Advanced submenu (spec A2, A5).
+    local lastAdvanced = settings.ADVANCED_PAGES[#settings.ADVANCED_PAGES]
+    if lastAdvanced and view.page == lastAdvanced.key then
         local tools = view.advanced.tools
         y = y + 6
         p.advRaid:SetChecked(tools.raid.checked)

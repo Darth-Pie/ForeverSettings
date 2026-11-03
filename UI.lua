@@ -122,18 +122,8 @@ function ui.menuModel(ctx)
     -- While a run is active it owns the settings: nothing that changes the list or a setting may be clicked.
     local locked = ctx.active and true or false
     local function command(msg) return function() ns.command(msg) end end
-    local function bench(name)
-        return function()
-            if not ns.bench then
-                ns.say("bench module not loaded")
-            elseif ns.guide and (name == "run" or name == "check") then
-                ns.guide.open(name)
-            elseif name == "run" or name == "check" then
-                ns.say("guide module not loaded")
-            else
-                ns.bench[name]()
-            end
-        end
+    local function stop()
+        if ns.bench then ns.bench.stop() else ns.say("bench module not loaded") end
     end
 
     add({ text = "Settings", kind = "button", prominent = true, run = function()
@@ -166,7 +156,7 @@ function ui.menuModel(ctx)
         run = function() ui.openSaved("best") end })
     add({ text = "Find my crowded settings", kind = "button", disabled = busy, done = saved.crowded == true,
         run = function() ui.openSaved("crowded") end })
-    if ctx.active then add({ text = "Stop", kind = "button", disabled = false, run = bench("stop") }) end
+    if ctx.active then add({ text = "Stop", kind = "button", disabled = false, run = stop }) end
     local progress = ctx.progress
     if progress then
         add({ text = string.format("A test is running: step %d of %d (%s)", progress.done, progress.total,

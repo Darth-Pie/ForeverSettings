@@ -30,8 +30,8 @@ local WANT = {
     { "volumeFogLevel", "adv-effects" }, { "reflectionMode", "adv-effects" }, { "refraction", "adv-effects" },
     { "ResampleSharpness", "adv-effects" }, { "groundEffectDist", "adv-distance" },
     { "farclip", "adv-distance", "1000" }, { "horizonStart", "adv-distance", "800" }, { "horizonClip", "adv-distance", "1600" },
-    { "terrainLodDist", "adv-distance", "400" }, { "wmoLodDist", "adv-distance", "300" }, { "entityLodDist", "adv-distance", "10" },
-    { "lodObjectCullSize", "adv-distance", "15" }, { "lodObjectMinSize", "adv-distance", "20" },
+    { "terrainLodDist", "adv-detail", "400" }, { "wmoLodDist", "adv-detail", "300" }, { "entityLodDist", "adv-detail", "10" },
+    { "lodObjectCullSize", "adv-detail", "15" }, { "lodObjectMinSize", "adv-detail", "20" },
     { "shadowTextureSize", "adv-shadows", "1024" }, { "shadowNumCascades", "adv-shadows", "1" }, { "shadowSoft", "adv-shadows", "0" },
     { "shadowBlendCascades", "adv-shadows", "0" },
 }
@@ -48,7 +48,7 @@ test("AV-1 the catalogue is the ledgered list, in page order, each with its page
     end
     local pages = {}
     for _, page in ipairs(a.PAGES) do pages[#pages + 1] = page.key .. ":" .. page.text end
-    return #bad == 0 and table.concat(pages, "|") == "adv-effects:Advanced: effects|adv-distance:Advanced: distance|adv-shadows:Advanced: shadows",
+    return #bad == 0 and table.concat(pages, "|") == "adv-effects:Advanced: effects|adv-distance:Advanced: distance|adv-detail:Advanced: detail|adv-shadows:Advanced: shadows",
         table.concat(bad, ",")
 end)
 
@@ -217,6 +217,64 @@ test("AV-SAFE-5 Shift held at the first loading screen skips every kept risky va
     e2.slash("set farclip 8000")
     local manual = CVARS.farclip == "8000"
     return skipped and said == 1 and quiet and manual, tostring(skipped) .. " " .. said .. " " .. tostring(quiet) .. " " .. tostring(manual)
+end)
+
+-- The fresh review of 2026-11-03, finding 2: in a Shift session a click or a command that sets one setting applied every kept
+-- risky value with it.
+test("AV-SAFE-6 in a Shift session setting one setting applies that one only; the other risky values and Apply all now stay skipped", function()
+    local e = game({ graphicsSSAO = "1" })
+    e.slash("set farclip 10000")
+    e.slash("set shadowTextureSize 4096")
+    logout(e)
+    local carried = {}
+    for k, v in pairs(CVARS) do carried[k] = v end
+    local e2 = H.boot(carried, { fresh = false, defaults = false })
+    CVARS.farclip, CVARS.shadowTextureSize = "1000", "1024"
+    SHIFT = true
+    e2.fire("PLAYER_ENTERING_WORLD")
+    SHIFT = false
+    e2.slash("set graphicsSSAO 0")
+    local other = CVARS.graphicsSSAO == "0" and CVARS.farclip == "1000" and CVARS.shadowTextureSize == "1024"
+    e2.slash("apply")
+    local apply = CVARS.farclip == "1000" and CVARS.shadowTextureSize == "1024"
+    e2.slash("set farclip 8000")
+    local asked = CVARS.farclip == "8000" and CVARS.shadowTextureSize == "1024"
+    COMBAT = true
+    e2.slash("set shadowTextureSize 2048")
+    COMBAT = false
+    e2.fire("PLAYER_REGEN_ENABLED")
+    local waited = CVARS.shadowTextureSize == "2048"
+    return other and apply and asked and waited, tostring(other) .. tostring(apply) .. tostring(asked) .. tostring(waited)
+end)
+
+-- The fresh review of 2026-11-03, finding 3: taking a risky value out of the profile left the addon's value in the game, and the
+-- logout net no longer saw it.
+test("AV-SAFE-7 unticking a kept risky value puts the player's own value back in the game, so nothing risky is left behind", function()
+    local e, p = game({ farclip = "3000" })
+    e.slash("set farclip 10000")
+    e.slash("unset farclip")
+    local own = CVARS.farclip == "3000" and ForeverSettingsDB.want.farclip == nil
+    p.setProfileValue("everyday", "shadowTextureSize", "4096", true)
+    p.unsetProfileValue("everyday", "shadowTextureSize", true)
+    local safe = CVARS.shadowTextureSize == "1024"
+    e.slash("set groundEffectDist 500")
+    e.slash("unset groundEffectDist")
+    return own and safe and CVARS.groundEffectDist == "500", tostring(CVARS.farclip) .. " " .. tostring(CVARS.shadowTextureSize)
+end)
+
+-- The fresh review of 2026-11-03, finding 4: on a client with no list of its own settings /fset set stored the built-in list's
+-- spelling (sunShafts) beside the window's (sunshafts).
+test("AV-SPELL-1 /fset set keeps an Advanced setting under the catalogue's spelling, whatever was typed, on a client with no list", function()
+    local e = H.boot(cvarsWith(), { fresh = true, defaults = false, console = "none" })
+    e.slash("profile everyday")
+    e.slash("set SunShafts 2")
+    e.slash("set weatherdensity 1")
+    local values = ForeverSettingsDB.profiles.everyday.values
+    local keys = {}
+    for k in pairs(values) do keys[#keys + 1] = k end
+    table.sort(keys)
+    return table.concat(keys, ",") == "WeatherDensity,sunshafts" and ForeverSettingsDB.original.values.sunshafts == "0",
+        table.concat(keys, ",") .. " " .. tostring(ForeverSettingsDB.original.values.sunshafts)
 end)
 
 -- Review Focus 3: the first change of an Advanced setting is recorded in Original first.
