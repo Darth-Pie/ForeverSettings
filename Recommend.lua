@@ -501,12 +501,20 @@ function recommend.chartModel(result, verify)
         lines = {}, checkLines = {}, graphs = {}, notMeasured = {}, footer = crowd and CROWD_FOOTER or FOOTER,
         title = crowd and "Your crowded settings" or "Your best settings",
     }
-    local measuredFps
+    -- Picks (withPicks) make the result an estimate: the check measured the recommendation from before them.
+    local picked = result.picked or 0
+    model.picked = picked
+    local measuredFps, checkedBefore
     if result.status == "change" and type(verify) == "table" and verify.ok == true
         and type(verify.appliedMs) == "number" and verify.appliedMs > 0
         and type(verify.baselineMs) == "number" and verify.baselineMs > 0 then
         measuredFps = 1000 / (result.nowMs * verify.appliedMs / verify.baselineMs)
     end
+    if picked > 0 and type(verify) == "table" and verify.ok == true and type(verify.appliedMs) == "number" and verify.appliedMs > 0
+        and type(verify.baselineMs) == "number" and verify.baselineMs > 0 then
+        checkedBefore = 1000 / (result.nowMs * verify.appliedMs / verify.baselineMs)
+    end
+    if picked > 0 then measuredFps = nil end
     if not crowd and (result.status == "change" or result.status == "nochange" or result.status == "unreachable") then
         model.hint = HINT
     end
@@ -533,15 +541,19 @@ function recommend.chartModel(result, verify)
         end
     elseif result.status == "change" then
         model.headline.after = {
-            label = "With these changes: about " .. whole(result.afterFps) .. " fps",
+            label = "With these changes: about " .. whole(result.afterFps) .. " fps" .. (picked > 0 and " (estimate)" or ""),
             fps = result.afterFps, fraction = result.afterFps / scaleFps,
         }
+    end
+    if checkedBefore then
+        model.checkLines[1] = "Checked before your changes: about " .. whole(checkedBefore) .. " fps. Run the test again to measure your picks."
     end
 
     if result.status == "change" then
         local n = #result.changes
         model.verdict = (n == 1 and "This change" or ("These " .. n .. " changes")) .. " should take you from about "
-            .. whole(result.nowFps) .. " fps to about " .. whole(measuredFps or result.afterFps) .. " fps."
+            .. whole(result.nowFps) .. " fps to about " .. whole(measuredFps or result.afterFps) .. " fps"
+            .. (picked > 0 and " (an estimate)." or ".")
     end
 
     local function fpsAt(deltaMs) return fpsFor(result.nowMs, deltaMs) end
@@ -563,12 +575,16 @@ function recommend.chartModel(result, verify)
     local lowest, highest
     for position, s in ipairs(result.settings) do
         local points, deltas = {}, {}
+        -- The recommendation's own level (withPicks keeps it apart from a pick); a picked level is marked as the player's.
+        local recommendedLevel = s.recommended
+        if recommendedLevel == nil then recommendedLevel = s.chosen end
         for _, level in ipairs(s.levels) do
             if level.counted then
                 local fps = fpsAt(level.deltaMs)
                 points[#points + 1] = {
                     value = level.value, text = levelText(s.cvar, level.value), fps = fps, current = level.current == true,
-                    recommended = changing and level.value == s.chosen and not level.current, doubtful = false,
+                    recommended = changing and level.value == recommendedLevel and not level.current, doubtful = false,
+                    picked = s.picked == true and level.value == s.chosen,
                 }
                 deltas[#deltas + 1] = level.deltaMs
                 if not lowest or fps < lowest then lowest = fps end
@@ -620,4 +636,66 @@ function recommend.chartModel(result, verify)
     if not model.selected and model.graphs[1] then model.selected = model.graphs[1].cvar end
     if lowest then model.axis = recommend.axisFor(lowest, highest) end
     return model
+end
+
+-- Picks (spec 2026-11-03-tests-and-results-in-my-settings-design.md M5) ---------------------------------------------------
+
+-- A result of `choose` with the levels the player clicked on the graph ({cvar = level}): a new table, the result itself is not
+-- changed. Every setting gets `recommended` (the level `choose` picked, or the level in use when nothing was recommended),
+-- `chosen` (the pick when it is a measured level of that setting, else the recommended one) and `picked`. The changes, the
+-- estimate and the status follow the chosen levels as in `choose`; `picked` counts the picked settings. With no picks the
+-- result keeps its own status, sentence and estimate.
+function recommend.withPicks(result, picks)
+    picks = picks or {}
+    local view = {}
+    for k, v in pairs(result) do view[k] = v end
+    view.picked = 0
+    if result.status == "invalid" or result.status == "nodata" then return view end
+    local recommending = result.status == "change"
+    view.settings = {}
+    for i, s in ipairs(result.settings or {}) do
+        local copy = {}
+        for k, v in pairs(s) do copy[k] = v end
+        copy.recommended = recommending and s.chosen or s.current
+        copy.chosen, copy.picked = copy.recommended, false
+        local pick = picks[s.cvar]
+        if pick ~= nil then
+            for _, level in ipairs(s.levels) do
+                if level.counted and sameValue(level.value, pick) and not sameValue(level.value, copy.recommended) then
+                    copy.chosen, copy.picked = level.value, true
+                    view.picked = view.picked + 1
+                    break
+                elseif level.counted and sameValue(level.value, pick) then
+                    copy.chosen = copy.recommended
+                    break
+                end
+            end
+        end
+        view.settings[i] = copy
+    end
+    if view.picked == 0 then return view end
+    view.changes, view.unchanged = {}, {}
+    local total = 0
+    for _, s in ipairs(view.settings) do
+        local from, to
+        for _, level in ipairs(s.levels) do
+            if level.current then from = level end
+            if sameValue(level.value, s.chosen) and level.counted then to = level end
+        end
+        total = total + (to and to.deltaMs or 0)
+        if from and to and not sameValue(from.value, to.value) then
+            view.changes[#view.changes + 1] = { cvar = s.cvar, setting = s.setting, from = from.value, to = to.value,
+                fromDelta = from.deltaMs, toDelta = to.deltaMs }
+        else
+            view.unchanged[#view.unchanged + 1] = { cvar = s.cvar, setting = s.setting }
+        end
+    end
+    view.afterMs = math.max(result.nowMs + total, result.nowMs / recommend.MAX_SPEEDUP)
+    view.afterFps = 1000 / view.afterMs
+    if #view.changes > 0 then
+        view.status, view.summary = "change", nil
+    else
+        view.status, view.summary = "nochange", "With your picks, nothing changes."
+    end
+    return view
 end

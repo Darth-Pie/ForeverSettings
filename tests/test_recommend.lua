@@ -1186,4 +1186,105 @@ test("EF-7 a crowd entry gives an estimate on the crowd's numbers", function()
     return est ~= nil and #est.missing == 0 and near(est.ms, 7.0, 1e-9) and near(est.fps, 1000 / 7.0, 1e-6), tostring(est and est.ms)
 end)
 
+-- Picks: a level chosen on the graph, staged until Save (spec 2026-11-03-tests-and-results-in-my-settings-design.md M5)
+local function settingOf(res, cvar)
+    for _, s in ipairs(res.settings) do
+        if s.cvar == cvar then return s end
+    end
+end
+
+test("W-1 no picks: the recommendation as it is, every setting marked not picked and recommending its chosen level", function()
+    local _, r = boot()
+    local res = r.choose(T1(), 250)
+    local v = r.withPicks(res, {})
+    local by = byCvar(v.changes)
+    local s = settingOf(v, "graphicsShadowQuality")
+    local same = r.withPicks(res, { graphicsShadowQuality = "1" })            -- picking the recommended level is no pick
+    return v ~= res and v.status == "change" and #v.changes == 2 and by.graphicsShadowQuality.to == "1" and by.graphicsSSAO.to == "0"
+        and near(v.afterMs, 3.0) and v.picked == 0 and s.picked == false and s.recommended == "1" and s.chosen == "1"
+        and settingOf(v, "graphicsSSAO").picked == false and same.picked == 0 and settingOf(same, "graphicsShadowQuality").picked == false,
+        tostring(v.status) .. " " .. tostring(v.picked) .. " " .. tostring(same.picked)
+end)
+
+test("W-2 a pick of another measured level changes that setting to it and the estimate adds the measured levels, never changing the original", function()
+    local _, r = boot()
+    local res = r.choose(T1(), 250)
+    local v = r.withPicks(res, { graphicsShadowQuality = "0" })
+    local by = byCvar(v.changes)
+    local s = settingOf(v, "graphicsShadowQuality")
+    return v.status == "change" and #v.changes == 2 and by.graphicsShadowQuality.from == "2" and by.graphicsShadowQuality.to == "0"
+        and near(by.graphicsShadowQuality.toDelta, -1.0) and by.graphicsSSAO.to == "0" and near(v.afterMs, 2.4) and near(v.afterFps, 1000 / 2.4)
+        and v.picked == 1 and s.picked == true and s.recommended == "1" and s.chosen == "0"
+        and #res.changes == 2 and settingOf(res, "graphicsShadowQuality").chosen == "1" and near(res.afterMs, 3.0),
+        tostring(v.afterMs) .. " " .. tostring(by.graphicsShadowQuality and by.graphicsShadowQuality.to)
+end)
+
+test("W-3 picking the level in use keeps that setting as it is; picking both levels in use changes nothing; no picks give the recommendation back", function()
+    local _, r = boot()
+    local res = r.choose(T1(), 250)
+    local keep = r.withPicks(res, { graphicsShadowQuality = "2" })
+    local none = r.withPicks(res, { graphicsShadowQuality = "2", graphicsSSAO = "2" })
+    local back = r.withPicks(res, {})
+    return keep.status == "change" and #keep.changes == 1 and keep.changes[1].cvar == "graphicsSSAO" and names(keep.unchanged) == "Shadows"
+        and near(keep.afterMs, 3.4) and keep.picked == 1
+        and none.status == "nochange" and #none.changes == 0 and near(none.afterMs, 4.0) and none.picked == 2
+        and none.summary == "With your picks, nothing changes."
+        and back.status == "change" and #back.changes == 2 and near(back.afterMs, 3.0) and back.picked == 0,
+        tostring(keep.afterMs) .. " " .. tostring(none.status) .. " " .. tostring(none.summary)
+end)
+
+test("W-4 a pick that is not a measured level of that setting, or for a setting the result does not have, is ignored", function()
+    local _, r = boot()
+    local res = r.choose(T1(), 250)
+    local v = r.withPicks(res, { graphicsShadowQuality = "7", noSuchSetting = "1" })
+    -- a level the test has no usable reading for is not on the graph, so it cannot be picked either
+    local e = entry(4.0, rows("graphicsShadowQuality", 4.0, { { "0", -1.0 }, { "1", status = "inconclusive" }, { "2", 0, current = true } }))
+    local u = r.withPicks(r.choose(e, 100), { graphicsShadowQuality = "1" })
+    return v.status == "change" and #v.changes == 2 and near(v.afterMs, 3.0) and v.picked == 0
+        and settingOf(v, "graphicsShadowQuality").chosen == "1" and u.picked == 0 and u.status == "nochange",
+        tostring(v.picked) .. " " .. tostring(u.picked)
+end)
+
+test("W-5 with nothing recommended (out of reach, or nothing to change) each setting recommends its level in use, and a pick makes it a change", function()
+    local _, r = boot()
+    local out = r.choose(T1(), 500)
+    local held = r.choose(T1(), 100)
+    local outNone, outPick = r.withPicks(out, {}), r.withPicks(out, { graphicsSSAO = "1" })
+    local heldPick = r.withPicks(held, { graphicsShadowQuality = "1" })
+    return out.status == "unreachable" and outNone.status == "unreachable" and outNone.summary == out.summary and near(outNone.afterMs, out.afterMs)
+        and settingOf(outNone, "graphicsSSAO").recommended == "2" and settingOf(outNone, "graphicsShadowQuality").recommended == "2"
+        and outPick.status == "change" and #outPick.changes == 1 and outPick.changes[1].cvar == "graphicsSSAO" and outPick.changes[1].to == "1"
+        and near(outPick.afterMs, 3.7) and outPick.summary == nil and outPick.picked == 1
+        and heldPick.status == "change" and #heldPick.changes == 1 and heldPick.changes[1].to == "1" and near(heldPick.afterMs, 3.6),
+        tostring(outNone.status) .. " " .. tostring(outPick.afterMs) .. " " .. tostring(heldPick.status)
+end)
+
+test("W-6 the estimate with picks never claims more than the four-fold speed-up", function()
+    local _, r = boot()
+    local e = entry(4.0,
+        rows("graphicsShadowQuality", 4.0, { { "0", -3.5 }, { "1", 0, current = true } }),
+        rows("graphicsSSAO", 4.0, { { "0", -0.6 }, { "1", 0, current = true } }))
+    local v = r.withPicks(r.choose(e, 100), { graphicsShadowQuality = "0", graphicsSSAO = "0" })
+    return v.status == "change" and near(v.afterMs, 1.0) and near(v.afterFps, 1000), tostring(v.afterMs)
+end)
+
+test("W-7 the graphs and lines with picks: the picked point marked, the recommended one kept, the after bar and verdict an estimate, the check from before", function()
+    local _, r = boot()
+    local res = r.choose(T1(), 250)
+    local verify = { ok = true, appliedMs = 3.1, baselineMs = 4.0 }
+    local m = r.chartModel(r.withPicks(res, { graphicsShadowQuality = "0" }), verify)
+    local m0 = r.chartModel(r.withPicks(res, {}), verify)
+    local points = graphOf(m, "graphicsShadowQuality").points
+    local marks = {}
+    for i, p in ipairs(points) do marks[i] = (p.picked and "picked" or "") .. (p.recommended and "recommended" or "") .. (p.current and "now" or "") end
+    return table.concat(marks, ",") == "picked,recommended,now" and m.picked == 1
+        and m.headline.after.label == "With these changes: about 417 fps (estimate)"
+        and m.checkLines[1] == "Checked before your changes: about 323 fps. Run the test again to measure your picks." and m.checkLines[2] == nil
+        and m.verdict == "These 2 changes should take you from about 250 fps to about 417 fps (an estimate)."
+        and m0.picked == 0 and m0.headline.after.label == "With these changes: about 323 fps (measured)"
+        and m0.checkLines[1] == "Checked: expected about 333 fps, measured about 323 fps." and m0.verdict == "These 2 changes should take you from about 250 fps to about 323 fps."
+        and marksOf(graphOf(m0, "graphicsShadowQuality")) == ",recommended,now",
+        table.concat(marks, ",") .. " | " .. tostring(m.headline.after.label) .. " | " .. tostring(m.checkLines[1]) .. " | " .. tostring(m.verdict)
+end)
+
 return H.results()

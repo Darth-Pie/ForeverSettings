@@ -615,7 +615,6 @@ end
   'check-scale-ignores-measured': ['Recommend.lua', `    if result.status == "change" then biggest = math.max(biggest, measuredFps or result.afterFps) end`, `    if result.status == "change" then biggest = math.max(biggest, result.afterFps) end`],
   'check-shown-without-change': ['Recommend.lua', `    if result.status == "change" and type(verify) == "table" and verify.ok == true`, `    if type(verify) == "table" and verify.ok == true`],
   'check-expected-uses-now': ['Recommend.lua', `        model.checkLines[1] = "Checked: expected about " .. whole(result.afterFps) .. " fps, measured about "`, `        model.checkLines[1] = "Checked: expected about " .. whole(result.nowFps) .. " fps, measured about "`],
-  'check-zero-baseline-accepted': ['Recommend.lua', `        and type(verify.baselineMs) == "number" and verify.baselineMs > 0 then`, `        and type(verify.baselineMs) == "number" then`],
 
   // Quick or Thorough in the guided window (crowd test, Task 6)
   'mode-default-thorough': ['Guide.lua', `            state.mode = mode == "thorough" and "thorough" or "quick"`, `            state.mode = mode == "quick" and "quick" or "thorough"`],
@@ -996,8 +995,6 @@ end
   'graph-fps-wrong-base': ['Recommend.lua', `    return 1000 / math.max(nowMs + deltaMs, nowMs / recommend.MAX_SPEEDUP)`, `    return 1000 / math.max(nowMs - deltaMs, nowMs / recommend.MAX_SPEEDUP)`],
   'graph-no-clamp': ['Recommend.lua', `    return 1000 / math.max(nowMs + deltaMs, nowMs / recommend.MAX_SPEEDUP)`, `    return 1000 / (nowMs + deltaMs)`],
   'graph-current-not-marked': ['Recommend.lua', `fps = fps, current = level.current == true,`, `fps = fps, current = false,`],
-  'graph-recommended-on-current': ['Recommend.lua', `recommended = changing and level.value == s.chosen and not level.current, doubtful = false,`, `recommended = changing and level.value == s.chosen, doubtful = false,`],
-  'graph-recommended-always': ['Recommend.lua', `recommended = changing and level.value == s.chosen and not level.current, doubtful = false,`, `recommended = level.value == s.chosen and not level.current, doubtful = false,`],
   'graph-order-by-position': ['Recommend.lua', `        if a.swing ~= b.swing then return a.swing > b.swing end
         return a.position < b.position`, `        if false then return a.swing > b.swing end
         return a.position < b.position`],
@@ -1981,6 +1978,33 @@ end
   'skin-title-icon-size': ['Skin.lua', `    f.icon:SetSize(20, 20)`, `    f.icon:SetSize(24, 24)`],
   'skin-title-icon-place': ['Skin.lua', `f.icon:SetPoint("LEFT", header, "LEFT", 12, 0)`, `f.icon:SetPoint("LEFT", header, "LEFT", 14, 0)`],
   'skin-title-not-after-icon': ['Skin.lua', `f.titleText:SetPoint("LEFT", f.icon, "RIGHT", 8, 0)`, `f.titleText:SetPoint("LEFT", header, "LEFT", 14, 0)`],
+  // Picks on the graph (spec 2026-11-03-tests-and-results-in-my-settings-design.md M5): recommend.withPicks and chartModel's marks
+  'pk-original-changed': ['Recommend.lua', `    local view = {}
+    for k, v in pairs(result) do view[k] = v end`, `    local view = result`],
+  'pk-settings-shared': ['Recommend.lua', `        local copy = {}
+        for k, v in pairs(s) do copy[k] = v end`, `        local copy = s`],
+  'pk-recommend-unreachable': ['Recommend.lua', `copy.recommended = recommending and s.chosen or s.current`, `copy.recommended = s.chosen`],
+  'pk-pick-unmeasured': ['Recommend.lua', `if level.counted and sameValue(level.value, pick) and not sameValue(level.value, copy.recommended) then`, `if sameValue(level.value, pick) and not sameValue(level.value, copy.recommended) then`],
+  'pk-pick-recommended-counts': ['Recommend.lua', `if level.counted and sameValue(level.value, pick) and not sameValue(level.value, copy.recommended) then`, `if level.counted and sameValue(level.value, pick) then`],
+  'pk-no-picks-recomputed': ['Recommend.lua', `    if view.picked == 0 then return view end`, `    local _ = view`],
+  'pk-cap-missing': ['Recommend.lua', `view.afterMs = math.max(result.nowMs + total, result.nowMs / recommend.MAX_SPEEDUP)`, `view.afterMs = result.nowMs + total`],
+  'pk-delta-ignored': ['Recommend.lua', `total = total + (to and to.deltaMs or 0)`, `total = total + 0`],
+  'pk-same-level-a-change': ['Recommend.lua', `if from and to and not sameValue(from.value, to.value) then`, `if from and to then`],
+  'pk-nochange-sentence': ['Recommend.lua', `view.status, view.summary = "nochange", "With your picks, nothing changes."`, `view.status, view.summary = "nochange", result.summary`],
+  'pk-old-sentence-kept': ['Recommend.lua', `view.status, view.summary = "change", nil`, `view.status = "change"`],
+  'pk-picked-mark': ['Recommend.lua', `picked = s.picked == true and level.value == s.chosen,`, `picked = false,`],
+  'pk-recommended-follows-pick': ['Recommend.lua', `        local recommendedLevel = s.recommended
+`, `        local recommendedLevel = nil
+`],
+  'pk-estimate-label': ['Recommend.lua', `" fps" .. (picked > 0 and " (estimate)" or ""),`, `" fps",`],
+  'pk-check-before-missing': ['Recommend.lua', `    if checkedBefore then`, `    if false then`],
+  'pk-measured-kept': ['Recommend.lua', `    if picked > 0 then measuredFps = nil end`, `    local _ = picked`],
+  'pk-verdict-estimate': ['Recommend.lua', `(picked > 0 and " (an estimate)." or ".")`, `"."`],
+  'check-zero-baseline-accepted': ['Recommend.lua', `        and type(verify.baselineMs) == "number" and verify.baselineMs > 0 then
+        measuredFps =`, `        and type(verify.baselineMs) == "number" then
+        measuredFps =`],
+  'graph-recommended-on-current': ['Recommend.lua', `recommended = changing and level.value == recommendedLevel and not level.current, doubtful = false,`, `recommended = changing and level.value == recommendedLevel, doubtful = false,`],
+  'graph-recommended-always': ['Recommend.lua', `recommended = changing and level.value == recommendedLevel and not level.current, doubtful = false,`, `recommended = level.value == recommendedLevel and not level.current, doubtful = false,`],
 };
 
 function main() {
