@@ -350,6 +350,31 @@ test("B10-13 showReport fills a movable window, shows it, and registers it for E
         and registered == 1, tostring(box and box._text)
 end)
 
+-- Launch night on Forever (2026-11-04): "Show report brings up an old screen". It is now a flat window like My settings.
+test("B10-13c the report window is a flat window titled Test report, with no stock frame, and a new report starts at the top", function()
+    local e, ui = newUi()
+    local entry = { label = "menu-high", valid = true, rows = { { setting = "menu-high", value = "current", meanMs = 7, fps = 142.9, low1Fps = 120, hitches = 0, flags = {} } } }
+    ui.showReport(entry)
+    local f = findFrame("ForeverSettingsReport")
+    local stock, scroll, box = false, nil, nil
+    for _, fr in ipairs(H.frames()) do
+        if fr.template == "BasicFrameTemplateWithInset" or fr.template == "UIPanelScrollFrameTemplate" then stock = true end
+        if fr.kind == "ScrollFrame" then scroll = fr end
+        if fr.kind == "EditBox" then box = fr end
+    end
+    local flat = f ~= nil and f.box ~= nil and f.titleText ~= nil and f.titleText._text == "Test report" and not stock
+        and scroll ~= nil and scroll.bar ~= nil and box ~= nil and box.parent == scroll
+    if not flat then return false, "flat " .. tostring(f and f.titleText and f.titleText._text) .. " stock " .. tostring(stock) end
+    scroll.SetVerticalScroll = function(self, v) self._v = v end
+    scroll.scripts.OnScrollRangeChanged(scroll, 0, 500)
+    scroll.scripts.OnMouseWheel(scroll, -1)
+    local moved = scroll._v == 40
+    box.scripts.OnEscapePressed(box)
+    local closed = not f:IsShown()
+    ui.showReport(entry)
+    return moved and closed and scroll._v == 0 and f:IsShown(), tostring(moved) .. tostring(closed) .. " v=" .. tostring(scroll._v)
+end)
+
 test("B10-13b the report window opens by itself when a valid run ends, unless switched off", function()
     local e, ui = newUi()
     ui.runFinished({ label = "x", valid = true, rows = { { setting = "x", value = "current", meanMs = 7, fps = 142.9, low1Fps = 120, hitches = 0, flags = {} } } })

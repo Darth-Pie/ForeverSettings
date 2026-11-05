@@ -126,6 +126,27 @@ test("AV-6 levelText gives the entry's word for a level, else the number", funct
         and a.levelText(sharp, "0.5") == "50%"
 end)
 
+-- Launch night on Forever (2026-11-04): "Medium" was cut to "Medi..." on a four-level card, and Forever holds Fog detail at 4.
+-- Only words: digits are narrower, and the five-digit distances were seen whole on the owner's screenshots.
+test("AV-7 every level word is four letters or fewer, so it fits a level button; Weather reads Off/Low/Mid/High", function()
+    local _, a = boot()
+    local long = {}
+    for _, entry in ipairs(a.CATALOG) do
+        for _, word in pairs(entry.levelWords or {}) do
+            if #word > 4 then long[#long + 1] = entry.cvar .. ":" .. word end
+        end
+    end
+    local weather = a.entry("WeatherDensity")
+    local words = {}
+    for _, value in ipairs(weather.levels) do words[#words + 1] = a.levelText(weather, value) end
+    return #long == 0 and table.concat(words, "/") == "Off/Low/Mid/High", table.concat(long, ",") .. " " .. table.concat(words, "/")
+end)
+
+test("AV-8 Fog detail offers 0 to 4 (Forever holds 4)", function()
+    local _, a = boot()
+    return table.concat(a.entry("volumeFogLevel").levels, ",") == "0,1,2,3,4", table.concat(a.entry("volumeFogLevel").levels, ",")
+end)
+
 -- Task 3: the profiles and the safety net (spec A4). A game on Everyday with every catalogue setting at its default.
 local function game(extra)
     local e = H.boot(cvarsWith(extra), { fresh = true, defaults = false })

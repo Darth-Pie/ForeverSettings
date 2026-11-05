@@ -70,7 +70,7 @@ Switch from the minimap menu (hover a profile to see what it is for; **Return to
 - It never changes a setting during combat or while a test is running.
 - It doesn't collect or send anything.
 - `/fset reset` puts back everything the addon changed. `/fset settings` opens My settings, `/fset size 50` to `/fset size 200` sets and keeps the picture sharpness, and `/fset minimap` hides or shows the button.
-- Built for WoW Forever. So far it has been tested mostly on the live game with the same code; it hasn't had a full run on Forever itself yet, so reports from Forever are welcome.
+- Built for WoW Forever, and tested on it since its launch on 4 November 2026. It runs on the live game too. Reports from other PCs are welcome.
 
 ## Known issues and things to know
 

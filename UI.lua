@@ -304,36 +304,29 @@ end
 
 -- the report window --------------------------------------------------------------------------------------
 
-local reportFrame, reportBox
+local reportFrame, reportBox, reportScroll
+local REPORT_WIDTH, REPORT_HEIGHT = 640, 460
 
+-- The report window has the flat look of My settings (Skin.lua, loaded after this file, so it is reached when the window is first
+-- opened): the same window and a flat scroll area holding the text.
 local function ensureReport()
     if reportFrame then return end
-    local ok, f = pcall(CreateFrame, "Frame", REPORT_NAME, UIParent, "BasicFrameTemplateWithInset")
-    if not ok or not f then f = CreateFrame("Frame", REPORT_NAME, UIParent) end
-    f:SetSize(620, 420)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-    local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 12, -32)
-    scroll:SetPoint("BOTTOMRIGHT", -32, 12)
+    local skin = ns.skin
+    local f = skin.window(REPORT_NAME, REPORT_WIDTH, REPORT_HEIGHT, "Test report")
+    f:SetToplevel(true)
+    local scroll = skin.scroll(f.page)
     local box = CreateFrame("EditBox", nil, scroll)
     box:SetMultiLine(true)
     box:SetFontObject(ChatFontNormal)
-    box:SetWidth(570)
+    box:SetTextColor(skin.color("text"))
+    box:SetWidth(REPORT_WIDTH - 2 - 12 - 22)
     box:SetAutoFocus(false)
     box:SetScript("OnEscapePressed", function() f:Hide() end)
     scroll:SetScrollChild(box)
-    if f.SetTitle then f:SetTitle("ForeverSettings report") end
-    tinsert(UISpecialFrames, REPORT_NAME)
-    reportFrame, reportBox = f, box
+    reportFrame, reportBox, reportScroll = f, box, scroll
 end
 
--- Shows a history entry's report in a small movable window; the text is selectable, so it can be copied.
+-- Shows a history entry's report in a movable window, from the top; the text is selectable, so it can be copied.
 function ui.showReport(entry)
     if not entry then
         ns.say("no saved benchmark to show")
@@ -341,7 +334,9 @@ function ui.showReport(entry)
     end
     ensureReport()
     reportBox:SetText(table.concat(ns.bench.report(entry), "\n"))
+    reportScroll.moveTo(0)
     reportFrame:Show()
+    reportFrame:Raise()
 end
 
 -- Called by Bench.lua when a full run has ended: valid runs open the window unless db.ui.autoReport is false.

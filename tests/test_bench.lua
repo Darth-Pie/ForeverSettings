@@ -141,7 +141,7 @@ test("BN-1 the new menu settings resolve on a client that has them, with explici
     for _, s in ipairs(skipped) do why[s.key] = s.reason end
     local function tiers(key) return by[key] and table.concat(by[key].tiers, ",") end
     return by.viewdistance ~= nil and by.viewdistance.cvar == "graphicsViewDistance" and tiers("filtering") == "0,1,2,3,4,5"
-        and tiers("antialias") == "0,1,2,3" and tiers("msaa") == "0,1,2,3"
+        and tiers("antialias") == "0,1,2,3,4" and tiers("msaa") == "0,1,2,3"
         and why.environment ~= nil and why.environment:find("not found", 1, true) ~= nil
         and why.particles ~= nil and why.spells ~= nil and why.projected ~= nil and why.depth ~= nil and why.outline ~= nil,
         tostring(tiers("filtering")) .. " " .. tostring(why.environment)

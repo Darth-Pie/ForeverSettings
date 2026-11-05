@@ -8,6 +8,8 @@
 - **Everyday | Crowded switch** in the title bar, in place of the pill: click a half to switch. On Original or Maximum neither half is lit and that profile's name stands beside it.
 - **A shorter minimap menu:** Settings at the top, Everyday, Crowded and Maximum by name (hover one to see what it is for), the two tests, and **Return to Original**. The raid option and the old Advanced items (Check this spot, Run benchmark, Show last report, Apply all now) are on the last Advanced page.
 - On My results, a click on the recommended point marks it in the pick colour too.
+- **Show report** (and Show last report) opens a window in the same flat look as My settings, with a thin scroll bar, starting at the top of the report.
+- Forever's own levels are offered: **Edge smoothing** 4 (Forever's default) and **Fog detail** 4.
 
 The rest of this release was written as 0.10.1, which was never published:
 

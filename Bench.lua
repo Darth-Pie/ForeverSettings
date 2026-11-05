@@ -193,7 +193,8 @@ bench.SETTINGS = {
     { key = "outline", label = "Outline mode", cvars = { "graphicsOutlineMode" }, confirmed = true },
     { key = "filtering", label = "Texture filtering", cvars = { "textureFilteringMode" },
       tiers = { "0", "1", "2", "3", "4", "5" }, confirmed = true },
-    { key = "antialias", label = "Anti-aliasing", cvars = { "ffxAntiAliasingMode" }, tiers = { "0", "1", "2", "3" }, confirmed = true },
+    { key = "antialias", label = "Anti-aliasing", cvars = { "ffxAntiAliasingMode" }, tiers = { "0", "1", "2", "3", "4" },
+      confirmed = true },
     { key = "msaa", label = "Multisampling", cvars = { "MSAAQuality" }, tiers = { "0", "1", "2", "3" }, confirmed = true },
 }
 

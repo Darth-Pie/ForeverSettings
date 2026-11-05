@@ -416,4 +416,37 @@ test("SK-14 a rocker is two halves side by side; the lit half takes a colour wit
         tostring(halves) .. tostring(left) .. tostring(right) .. tostring(none) .. tostring(off) .. tostring(on)
 end)
 
+-- Launch night on Forever (2026-11-04): Show report opened the stock scroll frame. The flat scroll area replaces it.
+test("SK-15 a scroll area is a plain scroll frame with a thin flat bar: the wheel moves 40 pixels within the range, and the bar hides when nothing scrolls", function()
+    local _, skin = boot()
+    local parent = skin.window("SkinTestWindow15", 400, 300, "t")
+    local s = skin.scroll(parent.page)
+    local stock = false
+    for _, fr in ipairs(H.frames()) do
+        if fr.template then stock = true end
+    end
+    s.SetVerticalScroll = function(self, v) self._v = v end
+    local bar = s.bar
+    local plain = s.kind == "ScrollFrame" and bar ~= nil and bar.kind == "Slider" and not stock and colorIs(bar.thumb._color, "9a9cff")
+        and colorIs(bar.track._color, "2f3440")
+    s.scripts.OnScrollRangeChanged(s, 0, 300)
+    local ranged = bar._min == 0 and bar._max == 300 and bar:IsShown()
+    s.scripts.OnMouseWheel(s, -1)
+    local down = s._v == 40 and bar:GetValue() == 40
+    for _ = 1, 10 do s.scripts.OnMouseWheel(s, -1) end
+    local bottom = s._v == 300
+    s.scripts.OnMouseWheel(s, 1)
+    local up = s._v == 260
+    for _ = 1, 10 do s.scripts.OnMouseWheel(s, 1) end
+    local top = s._v == 0
+    s.scripts.OnMouseWheel(s, -1)
+    s.scripts.OnScrollRangeChanged(s, 0, 20)
+    local shrunk = s._v == 20 and bar._max == 20
+    s.scripts.OnScrollRangeChanged(s, 0, 0)
+    local none = s._v == 0 and not bar:IsShown()
+    return plain and ranged and down and bottom and up and top and shrunk and none,
+        tostring(plain) .. tostring(ranged) .. tostring(down) .. tostring(bottom) .. tostring(up) .. tostring(top) .. tostring(shrunk)
+            .. tostring(none) .. " v=" .. tostring(s._v)
+end)
+
 return H.results()

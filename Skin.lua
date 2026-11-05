@@ -347,6 +347,54 @@ function skin.slider(parent, name, width, min, max, step)
     return slider
 end
 
+-- A scroll area filling `parent`: a plain scroll frame (no stock template) and, at its right, a thin flat bar (`.bar`, with
+-- `.bar.track` and `.bar.thumb`). The mouse wheel moves SCROLL_STEP pixels; the bar follows the scroll range the client reports
+-- and hides when there is nothing to scroll. Give it a child with SetScrollChild.
+local SCROLL_STEP = 40
+function skin.scroll(parent)
+    local scroll = CreateFrame("ScrollFrame", nil, parent)
+    scroll:SetPoint("TOPLEFT", parent, "TOPLEFT", 12, -10)
+    scroll:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -22, 10)
+    local bar = CreateFrame("Slider", nil, parent)
+    bar:SetOrientation("VERTICAL")
+    bar:SetWidth(6)
+    bar:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -8, -10)
+    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -8, 10)
+    bar:SetMinMaxValues(0, 0)
+    bar:SetValueStep(1)
+    bar.track = bar:CreateTexture(nil, "BACKGROUND")
+    bar.track:SetColorTexture(skin.color("control"))
+    bar.track:SetWidth(2)
+    bar.track:SetPoint("TOP", bar, "TOP", 0, 0)
+    bar.track:SetPoint("BOTTOM", bar, "BOTTOM", 0, 0)
+    bar.thumb = bar:CreateTexture(nil, "OVERLAY")
+    bar.thumb:SetColorTexture(skin.color("accent"))
+    bar.thumb:SetSize(6, 40)
+    bar:SetThumbTexture(bar.thumb)
+    bar:SetScript("OnValueChanged", function(_, value) scroll:SetVerticalScroll(value) end)
+    bar:Hide()
+    scroll.bar = bar
+
+    local top = 0           -- the scroll range: how far down the text can go
+    -- The client clamps a slider's value to its range; it is clamped here too, so the bar and the text never disagree.
+    local function moveTo(value)
+        value = math.max(0, math.min(top, value))
+        bar:SetValue(value)
+        scroll:SetVerticalScroll(value)
+    end
+    scroll.moveTo = moveTo
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", function(_, delta) moveTo((tonumber(bar:GetValue()) or 0) - delta * SCROLL_STEP) end)
+    scroll:SetScript("OnScrollRangeChanged", function(self, _, yrange)
+        top = math.max(0, tonumber(yrange) or tonumber(self:GetVerticalScrollRange()) or 0)
+        bar:SetMinMaxValues(0, top)
+        if top > 0 then bar:Show() else bar:Hide() end
+        moveTo(tonumber(bar:GetValue()) or 0)
+    end)
+    bar:SetValue(0)
+    return scroll
+end
+
 -- A window: a flat fill, a one-pixel border, a header (title, version, close button) that drags it, and `.page`, the area
 -- under the header. Escape closes it. Hidden until shown.
 function skin.window(name, width, height, title)
