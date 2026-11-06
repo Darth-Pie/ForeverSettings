@@ -479,6 +479,8 @@ frame:SetScript("OnEvent", function(_, event, arg1)
         if ns.profiles then
             local ok, err = pcall(ns.profiles.migrate)
             if not ok then say("profiles could not start: " .. tostring(err)) end
+            local okFix, errFix = pcall(ns.profiles.repairLevels)
+            if not okFix then say("could not check the saved levels: " .. tostring(errFix)) end
         end
     elseif not db then
         return

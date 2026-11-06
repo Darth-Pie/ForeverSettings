@@ -212,6 +212,54 @@ local function speak(silent, msg)
     if not silent then ns.say(msg) end
 end
 
+-- Once, at load: a saved level that is not one of a closed list (Bench.lua, SETTINGS `closed`) goes to the nearest level. 0.11.0
+-- learned Light bounce as 0 to 12 where the game has 1 to 4, recommended 12 and 0, and kept them in Everyday and Crowded and in
+-- the enforced list (issue 1). The same goes for the saved test results: a result's levels outside the list are dropped, and
+-- so is the level a setting started at when it is outside, so an old result can no longer recommend one. Original is the
+-- player's own record of the game and stays. Says what it moved. Later values are the player's own choice and are not touched.
+function profiles.repairLevels()
+    local db = profiles.state()
+    if not db or db.levelsRepaired or not (ns.bench and ns.bench.closedLevel) then return end
+    local sameValue = ns.bench.sameValue
+    local moved = {}
+    -- `owner` names the profile in the line that says what moved; the enforced list repeats the profile in use and says nothing.
+    local function fix(values, owner)
+        for cvar, value in pairs(values or {}) do
+            local level = ns.bench.closedLevel(cvar, value)
+            if level ~= nil and owner and not sameValue(level, value) then
+                moved[#moved + 1] = friendly(cvar) .. ": the saved level " .. tostring(value) .. " in " .. owner
+                    .. " is not one the game has, so it is now " .. level .. "."
+            end
+            if level ~= nil then values[cvar] = level end
+        end
+    end
+    for _, key in ipairs({ "everyday", "crowded" }) do
+        if db.profiles[key] then fix(db.profiles[key].values, profiles.LABEL[key]) end
+    end
+    fix(db.want)
+    local st = ns.bench.state and ns.bench.state()
+    for _, entry in ipairs(st and st.history or {}) do
+        local rows = {}
+        for _, row in ipairs(entry.rows or {}) do
+            local level = ns.bench.closedLevel(row.cvar, row.value)
+            if level == nil or sameValue(level, row.value) then rows[#rows + 1] = row end
+        end
+        entry.rows = rows
+        for cvar, value in pairs(entry.starts or {}) do
+            local level = ns.bench.closedLevel(cvar, value)
+            if level ~= nil and not sameValue(level, value) then entry.starts[cvar] = nil end
+        end
+        local settings = {}
+        for _, item in ipairs(entry.settings or {}) do
+            local level = ns.bench.closedLevel(item.cvar, item.lowValue)
+            if level == nil or sameValue(level, item.lowValue) then settings[#settings + 1] = item end
+        end
+        if entry.settings then entry.settings = settings end
+    end
+    db.levelsRepaired = true
+    for _, line in ipairs(moved) do ns.say(line) end
+end
+
 local function unknownProfile(silent, name)
     speak(silent, "unknown profile '" .. tostring(name) .. "' (original, everyday, crowded or maximum)")
 end
@@ -360,6 +408,14 @@ function profiles.setValue(cvar, value, silent)
         return false, "original"
     end
     if db.active == "maximum" then return false, maximumRefusal(silent) end
+    -- A number the game reads back but does not have as a level (Light bounce 12 or 0: a nearly black picture) is not kept.
+    local level = ns.bench and ns.bench.closedLevel and ns.bench.closedLevel(cvar, value)
+    if level ~= nil and not sameValue(level, value) then
+        local levels = ns.bench.closedLevels(cvar)
+        speak(silent, friendly(cvar) .. " has the levels " .. levels[1] .. " to " .. levels[#levels] .. "; " .. tostring(value)
+            .. " is not one of them")
+        return false, "level"
+    end
     if db.original.values[cvar] == nil then
         local live = GetCVar(cvar)
         if live ~= nil then db.original.values[cvar] = live end

@@ -184,6 +184,53 @@ test("B3-2b resolve uses tiers saved by probe, and the first candidate CVar that
     return keys1.shadows == "graphicsShadowQuality" and keys1.lighting == "graphicsLightMode" and keys2.lighting == "giQuality"
 end)
 
+-- Light bounce (giQuality) reads back every number up to 12 but the game has four levels, 1 to 4 (issue 1): a closed list.
+local LEARNED_0_12 = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }      -- what 0.11.0 saved
+local function lightingOf(b)
+    for _, entry in ipairs((b.resolve())) do
+        if entry.key == "lighting" then return entry end
+    end
+    return nil
+end
+
+test("LB-1 Light bounce has the game's four levels, 1 to 4, whatever an earlier test saved", function()
+    local _, b = newBench({ giQuality = "4" })
+    b.state().tiers.giQuality = LEARNED_0_12
+    local light = lightingOf(b)
+    return light ~= nil and light.cvar == "giQuality" and table.concat(light.tiers, ",") == "1,2,3,4",
+        light and table.concat(light.tiers, ",")
+end)
+
+test("LB-2 Light bounce needs no test to know its levels", function()
+    local _, b = newBench({ giQuality = "1" })
+    local light = lightingOf(b)
+    return light ~= nil and table.concat(light.tiers, ",") == "1,2,3,4"
+end)
+
+test("LB-3 on a client with only graphicsLightMode the levels a probe learned still count", function()
+    local _, b = newBench({ graphicsLightMode = "1" })
+    b.state().tiers.graphicsLightMode = { "0", "1" }
+    local light = lightingOf(b)
+    return light ~= nil and light.cvar == "graphicsLightMode" and table.concat(light.tiers, ",") == "0,1"
+end)
+
+test("LB-4 the probe will not learn giQuality's levels", function()
+    local _, b = newBench({ giQuality = "4" })
+    local tiers, reason = b.probe("giQuality")
+    return tiers == nil and reason == "raw CVar: tiers are an explicit list" and CVARS.giQuality == "4"
+        and b.state().tiers.giQuality == nil and #SETLOG == 0
+end)
+
+test("LB-5 closedLevel gives the nearest level of a closed list, and nothing for a setting without one", function()
+    local _, b = newBench({})
+    return b.closedLevel("giQuality", "12") == "4" and b.closedLevel("giQuality", "5") == "4"
+        and b.closedLevel("giQuality", "0") == "1" and b.closedLevel("giQuality", "3") == "3"
+        and b.closedLevel("giQuality", "2.0") == "2" and b.closedLevel("GIQUALITY", "9") == "4"
+        and b.closedLevel("giQuality", "-3") == "1" and b.closedLevel("giQuality", "abc") == nil
+        and b.closedLevel("giQuality", nil) == nil and b.closedLevel("graphicsShadowQuality", "12") == nil
+        and b.closedLevel("graphicsLightMode", "12") == nil and b.closedLevel("RenderScale", "1.5") == nil
+end)
+
 test("B3-3 a read-back such as 0.750000 equals 0.75 (Review Focus 4)", function()
     local _, b = newBench({ RenderScale = "1.000000" })
     DERIVED.RenderScale = function(v, cv) cv.RenderScale = string.format("%.6f", tonumber(v)) end
@@ -222,10 +269,20 @@ test("B3-5 probe finds the accepted range when the game clamps above it, and res
         and table.concat(b.state().tiers.graphicsSSAO, ",") == "0,1,2,3", tostring(reason)
 end)
 
-test("B3-6 probe stops at the ceiling of 12 (13 values) and restores the value", function()
+-- A setting that reads back every number up to the ceiling has shown no refusal, so its levels are not known: 0.11.0 learned
+-- Light bounce as 0 to 12 this way and wrote 12 and 0 into profiles (issue 1).
+test("B3-6 a probe that reads back every number up to the ceiling of 12 learns nothing and restores the value", function()
     local _, b = newBench({ graphicsSSAO = "5" })
+    local tiers, reason = b.probe("graphicsSSAO")
+    return tiers == nil and type(reason) == "string" and reason:find("every number up to 12", 1, true) ~= nil
+        and CVARS.graphicsSSAO == "5" and b.state().tiers.graphicsSSAO == nil, tostring(reason)
+end)
+
+test("B3-6b a probe that is refused at the last number it tries (12) still learns the levels below", function()
+    local _, b = newBench({ graphicsSSAO = "5" })
+    DERIVED.graphicsSSAO = function(v, cv) if tonumber(v) > 11 then cv.graphicsSSAO = "11" end end
     local tiers = b.probe("graphicsSSAO")
-    return tiers and #tiers == 13 and tiers[1] == "0" and tiers[13] == "12" and CVARS.graphicsSSAO == "5"
+    return tiers ~= nil and #tiers == 12 and tiers[12] == "11" and b.state().tiers.graphicsSSAO ~= nil
 end)
 
 test("B3-7 probe of a CVar that never reads back returns nil and leaves it alone", function()
@@ -1380,7 +1437,10 @@ end)
 
 test("B3-14 probe puts back raw CVars that a menu-level CVar rewrites, not only the probed one", function()
     local _, b = newBench({ graphicsGroundClutter = "5", groundEffectDensity = "64" })
-    DERIVED.graphicsGroundClutter = function(v, cv) cv.groundEffectDensity = "100" end
+    DERIVED.graphicsGroundClutter = function(v, cv)
+        cv.groundEffectDensity = "100"
+        if tonumber(v) > 9 then cv.graphicsGroundClutter = "9" end       -- the game refuses above 9, so the probe finds a range
+    end
     local tiers = b.probe("graphicsGroundClutter")
     return tiers ~= nil and CVARS.graphicsGroundClutter == "5" and CVARS.groundEffectDensity == "64", tostring(CVARS.groundEffectDensity)
 end)
@@ -1557,7 +1617,10 @@ end)
 
 test("T12-4 probe with no console list still puts back a raw CVar that the write rewrote", function()
     local _, b = newBench({ graphicsShadowQuality = "2", shadowTextureSize = "2048", vsync = "0" }, { console = "none" })
-    DERIVED.graphicsShadowQuality = function(_, all) all.shadowTextureSize = "512" end
+    DERIVED.graphicsShadowQuality = function(v, all)
+        all.shadowTextureSize = "512"
+        if tonumber(v) > 5 then all.graphicsShadowQuality = "5" end      -- the game refuses above 5, so the probe finds a range
+    end
     local tiers = b.probe("graphicsShadowQuality")
     return tiers ~= nil and CVARS.graphicsShadowQuality == "2" and CVARS.shadowTextureSize == "2048", outText()
 end)
@@ -1773,6 +1836,8 @@ test("BL-2 learn probes the settings whose levels are unknown, in table order, a
     local _, b = newBench({ graphicsSSAO = "2", graphicsShadowQuality = "4", graphicsLiquidDetail = "1", RenderScale = "1",
         groundEffectDensity = "64" })
     DERIVED.graphicsSSAO = function(v, cv) if tonumber(v) > 3 then cv.graphicsSSAO = "3" end end
+    DERIVED.graphicsShadowQuality = function(v, cv) if tonumber(v) > 5 then cv.graphicsShadowQuality = "5" end end
+    DERIVED.graphicsLiquidDetail = function(v, cv) if tonumber(v) > 3 then cv.graphicsLiquidDetail = "3" end end
     SETLOG = {}
     local result, why = b.learn()
     local allowed = { graphicsShadowQuality = true, graphicsSSAO = true, graphicsLiquidDetail = true }
@@ -1788,6 +1853,7 @@ end)
 test("BL-3 a setting that cannot be learned is reported and the rest are still learned; known levels are not probed again", function()
     local _, b = newBench({ graphicsSSAO = "99", graphicsShadowQuality = "4", graphicsLiquidDetail = "1" })
     SETFAIL.graphicsSSAO = "clamp"
+    DERIVED.graphicsShadowQuality = function(v, cv) if tonumber(v) > 5 then cv.graphicsShadowQuality = "5" end end
     b.state().tiers.graphicsLiquidDetail = { "0", "1", "2" }
     SETLOG = {}
     local result = b.learn()

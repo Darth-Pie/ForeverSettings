@@ -175,8 +175,10 @@ const MUTATIONS = {
   // Profiles (Task 6)
   'set-allowed-on-original': ['Profiles.lua', `    if db.active == "original" then`, `    if false then`],
   'set-skips-profile-save': ['Profiles.lua', `    db.profiles[db.active].values[cvar] = value`, `    local _ = value`],
-  'extra-not-recorded': ['Profiles.lua', `    if db.active == "maximum" then return false, maximumRefusal(silent) end
-    if db.original.values[cvar] == nil then`, `    if db.active == "maximum" then return false, maximumRefusal(silent) end
+  'extra-not-recorded': ['Profiles.lua', `        return false, "level"
+    end
+    if db.original.values[cvar] == nil then`, `        return false, "level"
+    end
     if false then`],
   'unset-keeps-profile-value': ['Profiles.lua', `    profile.values[cvar] = nil
     db.want = profiles.plan(db.active).want`, `    local _ = profile
@@ -1181,7 +1183,7 @@ end`],
     local leftOut`],
   'mx-back-keeps-maximum': ['Profiles.lua', `    if db.active == "original" and name ~= "original" then`, `    if name ~= "original" then`],
   'mx-setvalue-edits-maximum': ['Profiles.lua', `    if db.active == "maximum" then return false, maximumRefusal(silent) end
-    if db.original.values[cvar] == nil then`, `    if db.original.values[cvar] == nil then`],
+    -- A number the game reads back`, `    -- A number the game reads back`],
   'mx-unsetvalue-edits-maximum': ['Profiles.lua', `    if db.active == "maximum" then return false, maximumRefusal(silent) end
     local profile = db.profiles[db.active]`, `    local profile = db.profiles[db.active]`],
   'mx-save-maximum-stores': ['Profiles.lua', `    if name == "maximum" then return nil, maximumRefusal(silent) end`, `    local _ = name`],
@@ -2141,7 +2143,7 @@ end
   'sk-rocker-no-hover': ['Skin.lua', `            elseif rocker.enabled and b.hover then`, `            elseif false then`],
   // The game-menu settings measured since 0.11, and 256 grass (spec 2026-11-03-advanced-page-title-switch-and-menu-design.md A1)
   't2-refused-not-remembered': ['Bench.lua', `                    if isRaw(setting.cvar) then rememberRefused(setting.cvar, value) end`, ``],
-  't2-refused-not-filtered': ['Bench.lua', `        if not refused then return row.tiers end`, `        do return row.tiers end`],
+  't2-refused-not-filtered': ['Bench.lua', `        if not refused then return fixed end`, `        do return fixed end`],
   't2-256-missing': ['Bench.lua', `tiers = { "48", "64", "128", "256" }`, `tiers = { "48", "64", "128" }`],
   't2-filtering-tiers': ['Bench.lua', `tiers = { "0", "1", "2", "3", "4", "5" }, confirmed = true },`, `tiers = { "0", "1", "2", "3", "4" }, confirmed = true },`],
   't2-view-row-missing': ['Bench.lua', `    { key = "viewdistance", label = "View distance", cvars = { "graphicsViewDistance" }, confirmed = true },`, ``],
@@ -2265,6 +2267,50 @@ end
   'adv-weather-medium': ['Advanced.lua', `["2"] = "Mid"`, `["2"] = "Medium"`],
   'adv-fog-three': ['Advanced.lua', `line = "How detailed fog and mist look.", levels = { "0", "1", "2", "3", "4" }`, `line = "How detailed fog and mist look.", levels = { "0", "1", "2", "3" }`],
   'bench-aa-three': ['Bench.lua', `cvars = { "ffxAntiAliasingMode" }, tiers = { "0", "1", "2", "3", "4" },`, `cvars = { "ffxAntiAliasingMode" }, tiers = { "0", "1", "2", "3" },`],
+
+  // Light bounce reads back every number up to 12 but has four levels (issue 1, 0.11.1).
+  'lb-closed-list-gone': ['Bench.lua', `      closed = { giQuality = { "1", "2", "3", "4" } } },`, `      },`],
+  'lb-closed-list-three': ['Bench.lua', `      closed = { giQuality = { "1", "2", "3", "4" } } },`, `      closed = { giQuality = { "1", "2", "3" } } },`],
+  'lb-closed-list-zero': ['Bench.lua', `      closed = { giQuality = { "1", "2", "3", "4" } } },`, `      closed = { giQuality = { "0", "1", "2", "3", "4" } } },`],
+  'lb-tiers-ignore-closed': ['Bench.lua', `    local fixed = fixedTiers(row, cvar)`, `    local fixed = row.tiers`],
+  'lb-closed-not-raw': ['Bench.lua', `    return closedList(cvar) ~= nil
+end`, `    return false
+end`],
+  'lb-nearest-farthest': ['Bench.lua', `        if bestDistance == nil or distance < bestDistance then best, bestDistance = level, distance end`, `        if bestDistance == nil or distance > bestDistance then best, bestDistance = level, distance end`],
+  'lb-nearest-case': ['Bench.lua', `        for name, list in pairs(row.closed or {}) do
+            if name:lower() == cvar:lower() then return list end`, `        for name, list in pairs(row.closed or {}) do
+            if name == cvar then return list end`],
+  'lb-nearest-nonnumber': ['Bench.lua', `    if not list or not n then return nil end
+    local best, bestDistance`, `    if not list then return nil end
+    local best, bestDistance`],
+  'lb-probe-ceiling-off': ['Bench.lua', `    if sameValue(tiers[#tiers], K.PROBE_CEILING) then`, `    if false then`],
+  'lb-probe-ceiling-early': ['Bench.lua', `    if sameValue(tiers[#tiers], K.PROBE_CEILING) then`, `    if #tiers > 3 then`],
+  'lb-repair-flag-ignored': ['Profiles.lua', `    if not db or db.levelsRepaired or not (ns.bench and ns.bench.closedLevel) then return end`, `    if not db or not (ns.bench and ns.bench.closedLevel) then return end`],
+  'lb-repair-flag-unset': ['Profiles.lua', `    db.levelsRepaired = true`, `    db.levelsRepaired = nil`],
+  'lb-repair-everyday-only': ['Profiles.lua', `    for _, key in ipairs({ "everyday", "crowded" }) do
+        if db.profiles[key] then fix(`, `    for _, key in ipairs({ "everyday" }) do
+        if db.profiles[key] then fix(`],
+  'lb-repair-want-skipped': ['Profiles.lua', `    fix(db.want)`, `    local _ = db.want`],
+  'lb-repair-original-touched': ['Profiles.lua', `    fix(db.want)`, `    fix(db.want)
+    fix(db.original.values)`],
+  'lb-repair-rows-kept': ['Profiles.lua', `            if level == nil or sameValue(level, row.value) then rows[#rows + 1] = row end`, `            rows[#rows + 1] = row`],
+  'lb-repair-rows-others-dropped': ['Profiles.lua', `            if level == nil or sameValue(level, row.value) then rows[#rows + 1] = row end`, `            if level ~= nil and sameValue(level, row.value) then rows[#rows + 1] = row end`],
+  'lb-repair-starts-kept': ['Profiles.lua', `            if level ~= nil and not sameValue(level, value) then entry.starts[cvar] = nil end`, `            local _ = level`],
+  'lb-repair-starts-all-dropped': ['Profiles.lua', `            if level ~= nil and not sameValue(level, value) then entry.starts[cvar] = nil end`, `            if level ~= nil then entry.starts[cvar] = nil end`],
+  'lb-repair-crowd-kept': ['Profiles.lua', `            if level == nil or sameValue(level, item.lowValue) then settings[#settings + 1] = item end`, `            settings[#settings + 1] = item`],
+  'lb-repair-silent': ['Profiles.lua', `    for _, line in ipairs(moved) do ns.say(line) end`, `    local _ = moved`],
+  'lb-repair-says-want': ['Profiles.lua', `            if level ~= nil and owner and not sameValue(level, value) then`, `            if level ~= nil and not sameValue(level, value) then`],
+  'lb-repair-says-unmoved': ['Profiles.lua', `            if level ~= nil and owner and not sameValue(level, value) then`, `            if level ~= nil and owner then`],
+  'lb-repair-not-called': ['ForeverSettings.lua', `            local okFix, errFix = pcall(ns.profiles.repairLevels)`, `            local okFix, errFix = true, nil`],
+  'lb-set-unchecked': ['Profiles.lua', `    if level ~= nil and not sameValue(level, value) then
+        local levels`, `    if false then
+        local levels`],
+  'lb-set-refuses-levels': ['Profiles.lua', `    if level ~= nil and not sameValue(level, value) then
+        local levels`, `    if level ~= nil then
+        local levels`],
+  'lb-set-text-range': ['Profiles.lua', `levels[1] .. " to " .. levels[#levels]`, `levels[1] .. " to " .. levels[1]`],
+  'lb-set-reason': ['Profiles.lua', `        return false, "level"`, `        return false, "refused"`],
+  'lb-repair-error-silent':['ForeverSettings.lua', `            if not okFix then say("could not check the saved levels: " .. tostring(errFix)) end`, `            local _ = errFix`],
 };
 
 function main() {

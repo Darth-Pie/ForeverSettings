@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.1
+
+- **Light bounce no longer offers levels the game doesn't have.** The game takes any number from 0 to 12 for Light bounce, but only 1 to 4 are real levels, and 0 or 5 to 12 make the picture so dark that night is nearly unplayable. The addon had learned all thirteen as levels, so the recommendation, Maximum and the lowest-level choice could pick 12 or 0. It now offers 1 to 4.
+- A saved 0 or 5 to 12 in Everyday or Crowded is moved to the nearest level (12 becomes 4, 0 becomes 1) the first time you log in, and a chat line says what moved. Your Original settings are not touched. Older test results lose their readings for the other levels, so run **Find my best settings** again to measure Light bounce.
+- `/fset set` refuses a number that isn't one of Light bounce's levels.
+- The test no longer learns a setting's levels from a game that accepts every number it tries, up to 12: such a setting is left out instead of being given thirteen levels.
+- The test takes fewer steps: Light bounce was being measured at twelve levels.
+
 ## 0.11.0
 
 - **The test works on more PCs.** It used to check itself by lowering only the picture size, so on a PC whose processor sets the pace it stopped with "Graphics settings make no difference here" even where shadows cost 15% of the frame time. It now lowers every setting it measures at once for that check, and leaves out a setting the game refuses.

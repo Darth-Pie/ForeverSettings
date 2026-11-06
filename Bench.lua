@@ -170,11 +170,15 @@ local sameValue = bench.sameValue
 
 -- The settings under test (spec section 9). `cvars` lists candidates in order; a row with `tiers` is a raw
 -- CVar with an explicit list (never probed). `confirmed = false`: which CVar the menu slider drives is unknown.
+-- `closed = {cvar = list}`: the game reads back every number up to the probe's ceiling for that CVar but only the listed
+-- ones are levels (Light bounce on Forever: 1 to 4, issue 1). Like `tiers` it is never probed, and a saved value outside it is
+-- not a level (`bench.closedLevel`).
 bench.SETTINGS = {
     { key = "shadows", label = "Shadows", cvars = { "graphicsShadowQuality" }, confirmed = true },
     { key = "ssao", label = "SSAO", cvars = { "graphicsSSAO" }, confirmed = true },
     { key = "compute", label = "Compute effects", cvars = { "graphicsComputeEffects" }, confirmed = true },
-    { key = "lighting", label = "Secondary lighting", cvars = { "giQuality", "graphicsLightMode" }, confirmed = false },
+    { key = "lighting", label = "Secondary lighting", cvars = { "giQuality", "graphicsLightMode" }, confirmed = false,
+      closed = { giQuality = { "1", "2", "3", "4" } } },
     { key = "liquid", label = "Liquid detail", cvars = { "graphicsLiquidDetail" }, confirmed = true },
     { key = "texture", label = "Texture resolution", cvars = { "graphicsTextureResolution" }, confirmed = true },
     { key = "clutter", label = "Ground clutter", cvars = { "graphicsGroundClutter" }, confirmed = true },
@@ -205,15 +209,57 @@ local function firstExisting(row)
     return nil
 end
 
+-- The closed list of a CVar (SETTINGS, `closed`), matched without regard to case; nil for a CVar without one.
+local function closedList(cvar)
+    if type(cvar) ~= "string" then return nil end
+    for _, row in ipairs(bench.SETTINGS) do
+        for name, list in pairs(row.closed or {}) do
+            if name:lower() == cvar:lower() then return list end
+        end
+    end
+    return nil
+end
+
+-- A copy of the closed list of a CVar, or nil: the levels the game really has (Profiles.lua names them when it refuses another).
+function bench.closedLevels(cvar)
+    local list = closedList(cvar)
+    if not list then return nil end
+    local copy = {}
+    for i, level in ipairs(list) do copy[i] = level end
+    return copy
+end
+
+-- The explicit list a row holds for a CVar: its own `tiers`, or the closed list of that CVar. nil when its levels are learned.
+local function fixedTiers(row, cvar)
+    if row.tiers then return row.tiers end
+    return row.closed and row.closed[cvar] or nil
+end
+
+-- The level of a closed list nearest to `value` (the lower one on a tie), as the list spells it. nil for a CVar without a
+-- closed list and for a value that is not a number. A saved 12 or 0 for Light bounce is not a level: this says which one it was
+-- meant as (the top and the bottom).
+function bench.closedLevel(cvar, value)
+    local list = closedList(cvar)
+    local n = tonumber(value)
+    if not list or not n then return nil end
+    local best, bestDistance
+    for _, level in ipairs(list) do
+        local distance = math.abs(tonumber(level) - n)
+        if bestDistance == nil or distance < bestDistance then best, bestDistance = level, distance end
+    end
+    return best
+end
+
 -- A level of an explicit list the game refused in a test (256 grass on a client that will not draw it, spec A1) is left out of
 -- the list from then on: the page, Maximum and the next test offer only what the client holds.
 local function tiersFor(row, cvar)
     local st = bench.state()
-    if row.tiers then
+    local fixed = fixedTiers(row, cvar)
+    if fixed then
         local refused = st and st.refused and st.refused[cvar:lower()]
-        if not refused then return row.tiers end
+        if not refused then return fixed end
         local list = {}
-        for _, tier in ipairs(row.tiers) do
+        for _, tier in ipairs(fixed) do
             if not refused[tier] then list[#list + 1] = tier end
         end
         return list
@@ -300,7 +346,7 @@ local function isRaw(cvar)
             end
         end
     end
-    return false
+    return closedList(cvar) ~= nil
 end
 
 -- Finds the integer tiers a CVar accepts: sets 0 up to K.PROBE_CEILING, keeps the values that read back equal,
@@ -328,6 +374,11 @@ function bench.probe(cvar)
     for _, issue in ipairs(bench.restore.verify(originals)) do ns.say("could not restore " .. issue) end
     if #tiers == 0 then return nil, "no value read back" end
     if #tiers == 1 then return nil, "fewer than two values read back" end
+    -- Reading back every number up to the ceiling shows no refusal, so it shows no range either: Light bounce read back 0 to 12
+    -- on Forever and was learned as thirteen levels, where the game has four (issue 1).
+    if sameValue(tiers[#tiers], K.PROBE_CEILING) then
+        return nil, "reads back every number up to " .. K.PROBE_CEILING .. ", so its levels cannot be told"
+    end
     local st = bench.state()
     if st then st.tiers[cvar] = tiers end
     return tiers

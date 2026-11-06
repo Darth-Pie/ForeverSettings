@@ -2486,4 +2486,17 @@ test("SW-2 with Advanced off the kept Advanced values still apply, and Home says
         tostring(CVARS.sunshafts)
 end)
 
+-- Light bounce reads back every number to 12 but has four levels (issue 1): the page offers 1 to 4 and nothing else.
+test("LB-12 the Light bounce row offers the game's four levels, 1 to 4, and lights the one the game holds", function()
+    local e, s = boot()
+    CVARS.giQuality = "3"
+    e.ns.bench.state().tiers.giQuality = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }      -- what 0.11.0 saved
+    local view = s.model({ page = "light" }, ctxOf(e))
+    local row = rowOf(view, "giQuality")
+    local values = {}
+    for _, level in ipairs(row and row.levels or {}) do values[#values + 1] = level.value end
+    return row ~= nil and table.concat(values, ",") == "1,2,3,4" and selectedOf(row) == "3",
+        table.concat(values, ",") .. " / " .. (row and selectedOf(row) or "no row")
+end)
+
 return H.results()

@@ -1034,14 +1034,19 @@ test("MX-1 maxValues is the last level of each setting whose levels are known, a
 end)
 
 test("MX-11 Secondary lighting counts once when the client has it under two names", function()
+    -- giQuality's levels are the game's four (1 to 4) whatever a test saved, so it is never left out and never highest at 12.
     local _, p, _, b = maxGame({ giQuality = "1", graphicsLightMode = "1" })
-    b.state().tiers.giQuality = { "0", "1", "2" }
+    b.state().tiers.giQuality = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }      -- what 0.11.0 saved
     local values, leftOut = p.maxValues()
-    local learned = values.giQuality == "2" and values.graphicsLightMode == nil
+    local learned = values.giQuality == "4" and values.graphicsLightMode == nil
         and table.concat(leftOut, ",") == "graphicsComputeEffects,graphicsTextureResolution"
-    local _, p2 = maxGame({ giQuality = "1", graphicsLightMode = "1" })        -- the same row, levels unlearned
+    -- A client with the other name only: its levels come from a test, and are left out until one has run.
+    local _, p2, _, b2 = maxGame({ graphicsLightMode = "1" })
     local _, leftOut2 = p2.maxValues()
-    return learned and table.concat(leftOut2, ",") == "graphicsComputeEffects,giQuality,graphicsTextureResolution",
+    b2.state().tiers.graphicsLightMode = { "0", "1", "2" }
+    local values3, leftOut3 = p2.maxValues()
+    return learned and table.concat(leftOut2, ",") == "graphicsComputeEffects,graphicsLightMode,graphicsTextureResolution"
+        and values3.graphicsLightMode == "2" and #leftOut3 == 2,
         table.concat(leftOut, ",") .. " / " .. table.concat(leftOut2, ",")
 end)
 
@@ -1356,6 +1361,133 @@ test("SZ-3 Maximum never goes above 100%: it takes the highest level the test me
     local db = p.state()
     local ok = p.switch("maximum", true)
     return ok and CVARS.RenderScale == "1" and db.want.RenderScale == "1", tostring(ok) .. tostring(CVARS.RenderScale) .. tostring(db.want.RenderScale)
+end)
+
+-- Light bounce (giQuality) takes every number up to 12 but has four levels, 1 to 4. 0.11.0 learned 0 to 12, recommended 12 and
+-- 0 into profiles and enforced them (issue 1). One repair at load moves a saved value to the nearest level (profiles, the
+-- enforced list, the test results); Original is the player's own and stays.
+local ALL13 = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12" }
+local function darkSaved()
+    return {
+        want = { giQuality = "12", graphicsSSAO = "3" }, active = "everyday", profilesMigrated = true,
+        profiles = { everyday = { values = { giQuality = "12", graphicsSSAO = "3" } },
+            crowded = { values = { giQuality = "0", graphicsSSAO = "1" } } },
+        original = { values = { giQuality = "12", graphicsSSAO = "4" } },
+        bench = { tiers = { giQuality = ALL13 }, history = {} },
+    }
+end
+
+test("LB-6 a saved Everyday of 12 and Crowded of 0 for Light bounce move to the nearest level, 4 and 1, and the enforced list follows", function()
+    local _, _, db = bootWith(darkSaved(), { giQuality = "12", graphicsSSAO = "3" })
+    return db.profiles.everyday.values.giQuality == "4" and db.profiles.crowded.values.giQuality == "1"
+        and db.want.giQuality == "4" and db.want.graphicsSSAO == "3"
+        and db.profiles.everyday.values.graphicsSSAO == "3" and db.profiles.crowded.values.graphicsSSAO == "1",
+        tostring(db.profiles.everyday.values.giQuality) .. "/" .. tostring(db.profiles.crowded.values.giQuality)
+            .. "/" .. tostring(db.want.giQuality)
+end)
+
+test("LB-6b the repair says once what it moved, by profile, and nothing when nothing moved", function()
+    bootWith(darkSaved(), { giQuality = "12", graphicsSSAO = "3" })
+    local said = outText()
+    local first = said:find("Light bounce: the saved level 12 in Everyday is not one the game has, so it is now 4.", 1, true)
+    local second = said:find("Light bounce: the saved level 0 in Crowded is not one the game has, so it is now 1.", 1, true)
+    local clean = darkSaved()
+    clean.profiles.everyday.values.giQuality = "3"
+    clean.profiles.crowded.values.giQuality = "1"
+    clean.want.giQuality = "3"
+    OUT = {}
+    bootWith(clean, { giQuality = "3", graphicsSSAO = "3" })
+    return first and second and first < second and select(2, said:gsub("is not one the game has", "")) == 2
+        and not outText():find("is not one the game has", 1, true), said .. " || " .. outText()
+end)
+
+test("LB-7 the repair leaves Original, values that are levels, and profiles without Light bounce alone", function()
+    local saved = darkSaved()
+    saved.profiles.everyday.values.giQuality = "2"
+    saved.profiles.crowded.values.giQuality = nil
+    saved.want.giQuality = "2"
+    local _, _, db = bootWith(saved, { giQuality = "2", graphicsSSAO = "3" })
+    return db.original.values.giQuality == "12" and db.profiles.everyday.values.giQuality == "2"
+        and db.profiles.crowded.values.giQuality == nil and db.want.giQuality == "2"
+end)
+
+test("LB-8 the repair runs once: a value stored afterwards is the player's own choice", function()
+    local _, p, db = bootWith(darkSaved(), { giQuality = "12", graphicsSSAO = "3" })
+    db.profiles.everyday.values.giQuality = "12"
+    p.repairLevels()
+    return db.profiles.everyday.values.giQuality == "12"
+end)
+
+test("LB-9 the game is brought to a level at the first loading screen after the repair", function()
+    local e = bootWith(darkSaved(), { giQuality = "12", graphicsSSAO = "3" })
+    e.fire("PLAYER_ENTERING_WORLD")
+    return CVARS.giQuality == "4", tostring(CVARS.giQuality)
+end)
+
+test("LB-10 on a client without Light bounce the repair changes nothing and does not fail", function()
+    local saved = { want = {}, active = "original", profilesMigrated = true, profiles = {}, original = { values = {} } }
+    local e, _, db = bootWith(saved, { graphicsSSAO = "3" })
+    return db.want ~= nil and CVARS.giQuality == nil and not outText():find("could not", 1, true), outText() .. tostring(e)
+end)
+
+local function lightRow(value, delta, current)
+    return { cvar = "giQuality", setting = "Secondary lighting", value = value, deltaMs = delta, meanMs = 5 + delta,
+        baseMs = 5, flags = {}, current = current or nil }
+end
+
+test("LB-11 a saved test result loses the levels that are not Light bounce's, so it can no longer recommend 12", function()
+    local rows = {}
+    for i = 0, 12 do rows[#rows + 1] = lightRow(tostring(i), i * 0.1, i == 1) end
+    for i = 1, 2 do
+        rows[#rows + 1] = { cvar = "graphicsSSAO", setting = "SSAO", value = tostring(i), deltaMs = i * 0.2, meanMs = 5 + i * 0.2,
+            baseMs = 5, flags = {}, current = i == 1 or nil }
+    end
+    local quiet = { ok = true, valid = true, kind = "run", mode = "all", baselineMs = 5, rows = rows, starts = { giQuality = "1" },
+        windows = 1, reruns = 0 }
+    local crowd = { ok = true, valid = true, kind = "crowd", baselineMs = 5, rows = {}, starts = { giQuality = "12" }, windows = 1,
+        reruns = 0, settings = { { cvar = "giQuality", setting = "Secondary lighting", lowValue = "0", flags = {}, meanMs = 6, deltaMs = 1 },
+            { cvar = "graphicsSSAO", setting = "SSAO", lowValue = "0", flags = {}, meanMs = 6, deltaMs = 1 } } }
+    local saved = darkSaved()
+    saved.bench.history = { quiet, crowd }
+    local e, _, db = bootWith(saved, { giQuality = "1", graphicsSSAO = "3" })
+    local history = db.bench.history
+    local kept, ssao = {}, 0
+    for _, row in ipairs(history[1].rows) do
+        if row.cvar == "giQuality" then kept[#kept + 1] = row.value else ssao = ssao + 1 end
+    end
+    local crowdLeft = {}
+    for _, item in ipairs(history[2].settings) do crowdLeft[#crowdLeft + 1] = item.cvar end
+    local result = e.ns.recommend.choose(history[1], 60)
+    local chosen
+    for _, s in ipairs(result.settings) do if s.cvar == "giQuality" then chosen = s.chosen end end
+    return table.concat(kept, ",") == "1,2,3,4" and ssao == 2 and history[2].starts.giQuality == nil
+        and table.concat(crowdLeft, ",") == "graphicsSSAO" and history[1].starts.giQuality == "1" and chosen == "4",
+        table.concat(kept, ",") .. " | " .. table.concat(crowdLeft, ",") .. " | " .. tostring(chosen)
+end)
+
+test("LB-14 /fset set refuses a number that is not one of Light bounce's four levels, and takes the levels", function()
+    local _, p, db = clean({ giQuality = "4", graphicsSSAO = "3" })
+    p.switch("everyday")
+    SETLOG, OUT = {}, {}
+    local ok12, why12 = p.setValue("giQuality", "12")
+    local ok0, why0 = p.setValue("giQuality", "0")
+    local refusedText = outText()
+    local untouched = db.profiles.everyday.values.giQuality == nil and CVARS.giQuality == "4" and #SETLOG == 0
+    OUT = {}
+    local ok3 = p.setValue("giQuality", "3")
+    local ok2 = p.setValue("giQuality", "2")
+    return ok12 == false and why12 == "level" and ok0 == false and why0 == "level" and untouched
+        and refusedText:find("Light bounce has the levels 1 to 4; 12 is not one of them", 1, true) ~= nil
+        and ok3 == true and ok2 == true and db.profiles.everyday.values.giQuality == "2" and CVARS.giQuality == "2",
+        refusedText .. " || " .. outText()
+end)
+
+test("LB-13 a repair that fails is reported and does not stop the addon from loading", function()
+    local saved = darkSaved()
+    saved.profiles.everyday.values = 5               -- not a table: the repair cannot read it
+    local _, _, db = bootWith(saved, { giQuality = "12", graphicsSSAO = "3" })
+    return outText():find("could not check the saved levels", 1, true) ~= nil and db ~= nil and db.active == "everyday"
+        and db.levelsRepaired == nil, outText()
 end)
 
 return H.results()

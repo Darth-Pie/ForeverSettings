@@ -790,6 +790,7 @@ end)
 
 test("G7-4 Start learns the unlearned settings before the run begins, saves the target and sets the watch", function()
     local e, g, b = newSetup()
+    DERIVED.graphicsLiquidDetail = function(v, cv) if tonumber(v) > 3 then cv.graphicsLiquidDetail = "3" end end     -- a range the game refuses beyond
     startSetup(g, 165)
     local others = {}
     for _, name in ipairs(SETLOG) do
@@ -797,7 +798,7 @@ test("G7-4 Start learns the unlearned settings before the run begins, saves the 
     end
     return g.state().view == "running" and g.state().started == true and b.active() == true and b.watch == g.panelReason
         and #SETLOG > 0 and #others == 0 and b.state().tiers.graphicsLiquidDetail ~= nil
-        and #b.state().tiers.graphicsLiquidDetail == 13 and e.ns.ui.state().target == 165, table.concat(others, ",")
+        and #b.state().tiers.graphicsLiquidDetail == 4 and e.ns.ui.state().target == 165, table.concat(others, ",")
 end)
 
 test("G7-5 with a forbidden window open nothing is learned, nothing starts and the target is not saved", function()
