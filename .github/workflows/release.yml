@@ -1,6 +1,6 @@
 name: Release
 
-# Pushing a version tag (for example v0.9.1) packages the addon and uploads it to Wago and to a GitHub release.
+# Pushing a version tag (for example v0.9.1) packages the addon and uploads it to Wago, to a GitHub release and to CurseForge.
 # Running the workflow by hand is a dry run: it packages the addon, uploads nothing, and keeps the zip as a download.
 on:
   push:
@@ -50,3 +50,15 @@ jobs:
           path: .release/*.zip
           include-hidden-files: true    # .release is a hidden folder
           retention-days: 7
+
+      # CurseForge goes last and in a run of its own. The packager uploads to CurseForge first, and when that fails it
+      # skips every other upload; with its own step, a CurseForge problem turns this run red but leaves Wago, the
+      # GitHub release and the kept zip done. The step above gets no CF_API_TOKEN, so it never touches CurseForge, and
+      # this one gets no WAGO_API_TOKEN, so it never uploads to Wago twice. Without the CF_API_TOKEN secret it does nothing.
+      - name: Upload to CurseForge
+        if: github.event_name == 'push'
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -u -g forever
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}

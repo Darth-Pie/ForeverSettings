@@ -4,6 +4,7 @@
 ## IconTexture: Interface/AddOns/ForeverSettings/Media/icon.tga
 ## Version: 0.11.2
 ## X-Wago-ID: BKpEVPGE
+## X-Curse-Project-ID: 1808021
 ## SavedVariables: ForeverSettingsDB
 
 ForeverSettings.lua
