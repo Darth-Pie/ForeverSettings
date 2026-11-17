@@ -320,6 +320,10 @@ function settings.model(st, ctx)
             local tab = TAB_TEXT[editing]
             if keptSize == nil then
                 note = "Not kept in " .. tab .. " yet: drag the slider or click a size to keep it."
+            elseif differs and size.refused and keptPercent > percent then
+                -- The game would not take the kept size this session (spec 2026-11-16-refused-picture-size-design.md D4).
+                note = "Kept in " .. tab .. " at " .. keptPercent .. "%. The game is holding " .. percent
+                    .. "% right now and is not taking larger sizes."
             elseif differs then
                 note = "Kept in " .. tab .. " at " .. keptPercent .. "%: the game has " .. percent .. "% now."
             else
@@ -484,11 +488,12 @@ local function costsAndMaximum(tab)
     return { kind = source.kind, measuredLine = source.measuredLine, fps = fps }, maximum, mine
 end
 
--- The game's picture sharpness now, in percent, for the slider; nil when the client has no such setting.
+-- The game's picture sharpness now, in percent, for the slider, and whether the game refused the kept size this session; nil when the
+-- client has no such setting.
 local function sizeContext()
     local live = tonumber(GetCVar("RenderScale"))
     if live == nil then return nil end
-    return { live = math.floor(live * 100 + 0.5) }
+    return { live = math.floor(live * 100 + 0.5), refused = ns.sizeRefused ~= nil and ns.sizeRefused() ~= nil }
 end
 
 -- Whether the game's dynamic render scale (CVar dynamicRenderScale) is on, for the Picture size page; nil when the client lacks it.

@@ -1021,6 +1021,43 @@ test("S4-10 a size the game will not take is said in the window, in plain words,
         and byKey(f, "size")._value == 100 and #OUT == 0, outText()
 end)
 
+-- A kept size above 100% that the game would not take this session (spec 2026-11-16-refused-picture-size-design.md D4).
+local NOTE_REFUSED = "Kept in Everyday at 125%. The game is holding 100% right now and is not taking larger sizes."
+
+test("S4-12 while the game refuses the kept size the note says so; any other difference keeps its own words", function()
+    local e, s = boot()
+    local function size(over) return s.model({ page = "size" }, ctxOf(e, over)).size end
+    local keeps = function(everyday) return { everyday = everyday or {}, crowded = {} } end
+    local refused = size({ size = { live = 100, refused = true }, saved = keeps({ RenderScale = "1.25" }) })
+    local other = size({ size = { live = 100, refused = false }, saved = keeps({ RenderScale = "1.25" }) })
+    local below = size({ size = { live = 150, refused = true }, saved = keeps({ RenderScale = "0.8" }) })
+    return refused.note == NOTE_REFUSED and other.note == "Kept in Everyday at 125%: the game has 100% now."
+        and below.note == "Kept in Everyday at 80%: the game has 150% now.", tostring(refused.note) .. " / " .. tostring(below.note)
+end)
+
+test("S4-13 a loading screen the game refused shows the refusal note on the Picture size page", function()
+    local e, s = bootWith(fullEntry())
+    e.slash("set RenderScale 1.25")
+    CVARS.RenderScale = "1"
+    SETFAIL.RenderScale = "clamp"
+    e.fire("PLAYER_ENTERING_WORLD")
+    s.open("size")
+    local f = window()
+    return hasText(f, NOTE_REFUSED) and hasText(f, "Picture sharpness right now: 100%"), allText(f)
+end)
+
+test("S4-14 a size lowered in the game's own menu after a refusal keeps the ordinary note", function()
+    local e, s = bootWith(fullEntry())
+    e.slash("set RenderScale 1.25")
+    CVARS.RenderScale = "1"
+    SETFAIL.RenderScale = "clamp"
+    e.fire("PLAYER_ENTERING_WORLD")
+    CVARS.RenderScale = "0.75"
+    s.open("size")
+    local f = window()
+    return hasText(f, "Kept in Everyday at 125%: the game has 75% now.") and not hasText(f, "is not taking larger sizes"), allText(f)
+end)
+
 test("S4-11 the keep tick and Save as Everyday keep the size the game has, above 100% too", function()
     local e, s, db = bootWith(fullEntry())
     s.open("size")

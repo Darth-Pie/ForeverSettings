@@ -35,9 +35,18 @@ local safeStart = false            -- Shift was held when the session's first lo
 local safeSaid = false
 local riskySaid = false             -- the same for the risky Advanced settings
 local pendingAsked = {}            -- the settings the player asked for while in combat (a command, a click): Shift does not skip them
+-- A kept picture size above 100% that the game would not take (spec 2026-11-16-refused-picture-size-design.md): the size it held at
+-- the last refused write this session, or nil once a write takes or the game already holds the kept size; and whether a loading
+-- screen has said so this session. Nothing of this is saved.
+local sizeHeld = nil
+local sizeSaid = false
 
 local function say(msg)
     print(PREFIX .. msg)
+end
+
+local function percentOf(value)
+    return string.format("%.0f%%", tonumber(value) * 100)
 end
 
 -- Shared with the other files of this addon (Bench.lua, UI.lua).
@@ -165,6 +174,16 @@ local function keptSize()
     return nil
 end
 
+-- The picture size the game holds (a number, 1 for 100%) while the last write of a kept size above 100% this session was refused and
+-- the game still holds that same size, below what the profile in use keeps; nil otherwise (a size moved in the game's own menu since
+-- is the player's, not a refusal). The Picture size page reads this too.
+function ns.sizeRefused()
+    if sizeHeld == nil or not db then return nil end
+    local kept, live = keptSize(), tonumber(GetCVar("RenderScale"))
+    if kept and kept > 1 and live == sizeHeld then return live end      -- sizeHeld was below the size refused, so below kept
+    return nil
+end
+
 -- The Advanced entry of a risky setting kept at another value than its safe one (spec
 -- 2026-11-03-advanced-page-title-switch-and-menu-design.md A4), or nil.
 local function riskyEntry(name, value)
@@ -210,7 +229,7 @@ local function applyAll(manual, silent, asked)
     end
     pending = false
     pendingAsked = {}
-    local changed = 0
+    local changed, refused = 0, 0
     for _, name in ipairs(orderedKeys(db.want)) do
         local value = db.want[name]
         local current = GetCVar(name)
@@ -234,17 +253,34 @@ local function applyAll(manual, silent, asked)
         elseif not same(current, value) then
             local ok, result = pcall(SetCVar, name, value)
             local after = GetCVar(name)
+            local held, wanted = tonumber(after), tonumber(value)
             if ok and result ~= false and same(after, value) then
                 changed = changed + 1
+                if name:lower() == "renderscale" then sizeHeld = nil end
                 say(name .. " " .. tostring(current) .. " -> " .. value)
+            elseif ok and result ~= false and name:lower() == "renderscale" and wanted and wanted > 1 and held and held < wanted then
+                -- The game holds a smaller picture than the kept size above 100% (Forever after its 13 November 2026 update): said once a
+                -- session in plain words, and every time the player asks for the size (/fset apply, a size typed, also in combat); not
+                -- for a command about another setting. The size stays kept and is asked for at every loading screen.
+                refused = refused + 1
+                sizeHeld = held
+                if asked[name:lower()] or (manual and next(asked) == nil) or not sizeSaid then
+                    say("the game is holding picture sharpness at " .. percentOf(held) .. " right now, so your saved " .. percentOf(wanted)
+                        .. " is not applied. It stays saved and comes back by itself when the game takes it again.")
+                    if not silent then sizeSaid = true end
+                end
             elseif ok and result ~= false then
+                refused = refused + 1
                 say("game kept " .. name .. " at " .. tostring(after) .. " (wanted " .. value .. ")")
             else
+                refused = refused + 1
                 say("could not set " .. name .. " to " .. value)
             end
+        elseif name:lower() == "renderscale" then
+            sizeHeld = nil                                -- the game already holds the kept size
         end
     end
-    if changed == 0 and manual then say("everything already matches") end
+    if changed == 0 and refused == 0 and manual then say("everything already matches") end
 end
 
 ns.applyAll = applyAll
@@ -354,10 +390,6 @@ local function probe(rest)
     if #missing > 0 then sayPacked("not here:", missing, ", ") end
 end
 
-local function percentOf(value)
-    return string.format("%.0f%%", tonumber(value) * 100)
-end
-
 -- /fset size [percent | off]: the picture sharpness, kept in the profile in use like the slider in My settings does (it is
 -- /fset set RenderScale <fraction>); off, normal and back mean 100%.
 local function size(rest)
@@ -378,6 +410,8 @@ local function size(rest)
         local tail = " (not kept by the profile in use)"
         if kept ~= nil and same(live, kept) then
             tail = " (kept: the addon puts it back at every loading screen)"
+        elseif kept ~= nil and ns.sizeRefused() then
+            tail = " (kept at " .. percentOf(kept) .. "; the game is not taking sizes above " .. percentOf(live) .. " right now)"
         elseif kept ~= nil then
             tail = " (kept at " .. percentOf(kept) .. ", but the game has " .. percentOf(live) .. " now)"
         end

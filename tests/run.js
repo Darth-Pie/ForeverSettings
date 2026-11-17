@@ -1642,7 +1642,7 @@ end
   'sz-logout-off': ['ForeverSettings.lua', `if kept and kept > 1 and live and live > 1 then pcall(SetCVar, "RenderScale", "1") end`, `local _ = kept`],
   'sz-logout-no-kept': ['ForeverSettings.lua', `kept and kept > 1 and live and live > 1`, `live and live > 1`],
   'sz-logout-no-live': ['ForeverSettings.lua', `kept and kept > 1 and live and live > 1`, `kept and kept > 1`],
-  'sz-logout-100': ['ForeverSettings.lua', `kept and kept > 1 and live`, `kept and kept >= 1 and live`],
+  'sz-logout-100': ['ForeverSettings.lua', `kept and kept > 1 and live and live > 1`, `kept and kept >= 1 and live and live > 1`],
   'sz-logout-value': ['ForeverSettings.lua', `pcall(SetCVar, "RenderScale", "1") end`, `pcall(SetCVar, "RenderScale", "1.5") end`],
   'sz-logout-unguarded': ['ForeverSettings.lua', `pcall(SetCVar, "RenderScale", "1") end`, `SetCVar("RenderScale", "1") end`],
   'sz-cmd-range-low': ['ForeverSettings.lua', `if number < 50 or number > 200 then`, `if number < 49 or number > 200 then`],
@@ -1670,7 +1670,7 @@ end
   'sz-no-setting': ['Settings.lua', `    local live = tonumber(GetCVar("RenderScale"))
     if live == nil then return nil end`, `    local live = tonumber(GetCVar("RenderScale"))
     live = live or 1`],
-  'sz-context-rounding': ['Settings.lua', `return { live = math.floor(live * 100 + 0.5) }`, `return { live = math.floor(live * 100) }`],
+  'sz-context-rounding': ['Settings.lua', `return { live = math.floor(live * 100 + 0.5),`, `return { live = math.floor(live * 100),`],
   'sz-round-down': ['Settings.lua', `math.floor((tonumber(value) or SIZE_MIN) / SIZE_STEP + 0.5) * SIZE_STEP`, `math.floor((tonumber(value) or SIZE_MIN) / SIZE_STEP) * SIZE_STEP`],
   'sz-applies-while-dragging': ['Settings.lua', `p.sizeLabel:SetText(settings.sizeLabel(roundToStep(value)))`, `settings.click("size:" .. roundToStep(value))`],
   'sz-save-range-low': ['Settings.lua', `if percent < SIZE_MIN or percent > SIZE_MAX then return end`, `if percent < 0 or percent > SIZE_MAX then return end`],
@@ -2311,6 +2311,29 @@ end`],
   'lb-set-text-range': ['Profiles.lua', `levels[1] .. " to " .. levels[#levels]`, `levels[1] .. " to " .. levels[1]`],
   'lb-set-reason': ['Profiles.lua', `        return false, "level"`, `        return false, "refused"`],
   'lb-repair-error-silent':['ForeverSettings.lua', `            if not okFix then say("could not check the saved levels: " .. tostring(errFix)) end`, `            local _ = errFix`],
+
+  // A kept picture size above 100% that the game refuses (spec 2026-11-16-refused-picture-size-design.md).
+  'rs-said-every-screen': ['ForeverSettings.lua', `                if asked[name:lower()] or (manual and next(asked) == nil) or not sizeSaid then`, `                if true then`],
+  'rs-manual-not-repeated': ['ForeverSettings.lua', `                if asked[name:lower()] or (manual and next(asked) == nil) or not sizeSaid then`,
+    `                if asked[name:lower()] or not sizeSaid then`],
+  'rs-asked-not-repeated': ['ForeverSettings.lua', `                if asked[name:lower()] or (manual and next(asked) == nil) or not sizeSaid then`,
+    `                if (manual and next(asked) == nil) or not sizeSaid then`],
+  'rs-other-command-repeats': ['ForeverSettings.lua', `                if asked[name:lower()] or (manual and next(asked) == nil) or not sizeSaid then`,
+    `                if asked[name:lower()] or manual or not sizeSaid then`],
+  'rs-silent-marks-said': ['ForeverSettings.lua', `                    if not silent then sizeSaid = true end`, `                    sizeSaid = true`],
+  'rs-small-sizes-too': ['ForeverSettings.lua', `name:lower() == "renderscale" and wanted and wanted > 1 and held and held < wanted then`,
+    `name:lower() == "renderscale" and wanted and held and held < wanted then`],
+  'rs-held-as-100': ['ForeverSettings.lua', `say("the game is holding picture sharpness at " .. percentOf(held)`, `say("the game is holding picture sharpness at " .. "100%"`],
+  'rs-take-not-cleared': ['ForeverSettings.lua', `                if name:lower() == "renderscale" then sizeHeld = nil end`, `                local _ = name`],
+  'rs-match-not-cleared': ['ForeverSettings.lua', `            sizeHeld = nil                                -- the game already holds the kept size`, `            local _ = nil`],
+  'rs-matches-after-refusal': ['ForeverSettings.lua', `    if changed == 0 and refused == 0 and manual then`, `    if changed == 0 and manual then`],
+  'rs-size-tail-off': ['ForeverSettings.lua', `        elseif kept ~= nil and ns.sizeRefused() then`, `        elseif false then`],
+  'rs-refused-ignores-held': ['ForeverSettings.lua', `    if kept and kept > 1 and live == sizeHeld then return live end`,
+    `    if kept and kept > 1 and live and live < kept then return live end`],
+  'rs-refused-ignores-kept': ['ForeverSettings.lua', `    if kept and kept > 1 and live == sizeHeld then return live end`, `    if live == sizeHeld then return live end`],
+  'rs-note-ignores-refused': ['Settings.lua', `            elseif differs and size.refused and keptPercent > percent then`, `            elseif differs and keptPercent > percent then`],
+  'rs-note-ignores-direction': ['Settings.lua', `            elseif differs and size.refused and keptPercent > percent then`, `            elseif differs and size.refused then`],
+  'rs-context-never-refused': ['Settings.lua', `refused = ns.sizeRefused ~= nil and ns.sizeRefused() ~= nil }`, `refused = false }`],
 };
 
 function main() {

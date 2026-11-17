@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.2
+
+- **A picture size the game won't take is said once, in plain words.** Since its 13 November 2026 update Forever holds picture sharpness at 100%. A profile that keeps a larger size used to print `game kept RenderScale at 1 (wanted 1.25)` at every loading screen. Now one line says the game is holding 100% and that your saved size stays saved and comes back by itself when the game takes it again. `/fset size` and the Picture size page say the same.
+- Your saved size is not changed or dropped; the addon still asks for it at every loading screen.
+- `/fset apply` no longer ends with "everything already matches" when the game refused a setting.
+
 ## 0.11.1
 
 - **Light bounce no longer offers levels the game doesn't have.** The game takes any number from 0 to 12 for Light bounce, but only 1 to 4 are real levels, and 0 or 5 to 12 make the picture so dark that night is nearly unplayable. The addon had learned all thirteen as levels, so the recommendation, Maximum and the lowest-level choice could pick 12 or 0. It now offers 1 to 4.

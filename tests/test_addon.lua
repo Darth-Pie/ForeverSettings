@@ -82,6 +82,10 @@ SETFAIL.groundEffectDensity = "clamp"
 OUT = {}
 e.fire("PLAYER_ENTERING_WORLD")
 check("T12 a value the game refuses to keep is reported as kept at the old value", count("game kept groundEffectDensity at 48") == 1, out())
+OUT = {}
+e.slash("apply")
+check("T12b /fset apply does not end a refusal with 'everything already matches'",
+    count("game kept groundEffectDensity at 48") == 1 and count("everything already matches") == 0, out())
 SETFAIL = {}
 CVARS.groundEffectDensity = "64"
 
@@ -747,5 +751,149 @@ CVARS.RenderScale = "1"
 OUT = {}
 ex2.slash("size")
 check("TS-8 /fset size names the kept size when the game holds another", count("picture sharpness is 100% (kept at 150%, but the game has 100% now)") == 1, out())
+
+-- TS-9: a kept size above 100% that the game refuses (spec 2026-11-16-refused-picture-size-design.md): one plain line per session, the
+-- size stays kept, and /fset size says why the game holds less. SETFAIL "clamp" is the game accepting the write and keeping its value.
+local HOLD_125 = "the game is holding picture sharpness at 100% right now, so your saved 125% is not applied. "
+    .. "It stays saved and comes back by itself when the game takes it again."
+local function refusedGame(kept)
+    local g = tsGame()
+    g.slash("profile everyday")
+    g.slash("set RenderScale " .. kept)
+    CVARS.RenderScale = "1"
+    SETFAIL.RenderScale = "clamp"
+    OUT = {}
+    return g
+end
+
+local r1 = refusedGame("1.25")
+r1.fire("PLAYER_ENTERING_WORLD")
+check("TS-9a a refused size above 100% is said once in plain words, not as a console line",
+    count(HOLD_125) == 1 and count("game kept RenderScale") == 0, out())
+check("TS-9b the size stays kept in the profile and the enforced list while the game holds 100%",
+    ForeverSettingsDB.want.RenderScale == "1.25" and ForeverSettingsDB.profiles.everyday.values.RenderScale == "1.25" and CVARS.RenderScale == "1",
+    tostring(ForeverSettingsDB.want.RenderScale) .. " " .. tostring(CVARS.RenderScale))
+OUT = {}
+r1.fire("PLAYER_ENTERING_WORLD")
+check("TS-9b a later loading screen in the session says nothing", #OUT == 0, out())
+r1.fire("PLAYER_LOGOUT")
+r1.fire("PLAYER_ENTERING_WORLD")
+check("TS-9b a logout and the next loading screen still keep the size", ForeverSettingsDB.want.RenderScale == "1.25"
+    and ForeverSettingsDB.profiles.everyday.values.RenderScale == "1.25" and #OUT == 0, tostring(ForeverSettingsDB.want.RenderScale) .. " " .. out())
+OUT = {}
+r1.slash("size")
+check("TS-9c /fset size says the game is not taking larger sizes",
+    count("picture sharpness is 100% (kept at 125%; the game is not taking sizes above 100% right now)") == 1, out())
+OUT = {}
+r1.slash("apply")
+check("TS-9c /fset apply says the line again, because the player asked, and not 'everything already matches'",
+    count(HOLD_125) == 1 and count("everything already matches") == 0, out())
+
+local r2 = refusedGame("1.25")
+SHIFT = true
+r2.fire("PLAYER_ENTERING_WORLD")
+SHIFT = false
+local shiftQuiet = count("the game is holding") == 0
+OUT = {}
+r2.slash("size")
+check("TS-9d a Shift session is not a refusal: no line, and /fset size keeps its own wording",
+    shiftQuiet and count("picture sharpness is 100% (kept at 125%, but the game has 100% now)") == 1, out())
+
+local r3 = refusedGame("1.25")
+r3.fire("PLAYER_ENTERING_WORLD")
+SETFAIL.RenderScale = nil
+r3.fire("PLAYER_ENTERING_WORLD")
+local took = CVARS.RenderScale == "1.25"
+CVARS.RenderScale = "1"                                    -- moved in the game's own menu since: not a refusal
+OUT = {}
+r3.slash("size")
+check("TS-9e once the game takes the size again, a later difference is not called a refusal",
+    took and count("picture sharpness is 100% (kept at 125%, but the game has 100% now)") == 1, tostring(took) .. " " .. out())
+
+local r4 = refusedGame("1.25")
+SETFAIL.RenderScale = { ask = "1.25", to = "0.5" }
+r4.fire("PLAYER_ENTERING_WORLD")                            -- refused, held at 50%
+SETFAIL.RenderScale = { ask = "0.8", to = "0.5" }
+r4.slash("size 80")                                         -- the game keeps 50% again: the size it held is unchanged
+OUT = {}
+r4.slash("size")
+check("TS-9f a kept size of 100% or less is never called a refusal", count("picture sharpness is 50% (kept at 80%, but the game has 50% now)") == 1, out())
+
+local r5 = tsGame()
+r5.slash("profile everyday")
+CVARS.RenderScale = "1"
+SETFAIL.RenderScale = "clamp"
+OUT = {}
+r5.ns.profiles.setValue("RenderScale", "1.25", true)       -- the window's size buttons: silent
+local windowQuiet = #OUT == 0
+r5.fire("PLAYER_ENTERING_WORLD")
+check("TS-9g a refusal met through the window says nothing in chat, and the next loading screen still says it once",
+    windowQuiet and count(HOLD_125) == 1 and ForeverSettingsDB.want.RenderScale == "1.25", tostring(windowQuiet) .. " " .. out())
+
+local r6 = refusedGame("2")
+SETFAIL.RenderScale = { ask = "2", to = "1.5" }
+r6.fire("PLAYER_ENTERING_WORLD")
+local said = count("the game is holding picture sharpness at 150% right now, so your saved 200% is not applied.") == 1
+OUT = {}
+r6.slash("size")
+check("TS-9h a size moved part of the way names the size the game holds",
+    said and count("picture sharpness is 150% (kept at 200%; the game is not taking sizes above 150% right now)") == 1, tostring(said) .. " " .. out())
+
+local r7 = refusedGame("0.8")
+SETFAIL.RenderScale = { ask = "0.8", to = "0.5" }          -- held below a kept size that is not above 100%
+r7.fire("PLAYER_ENTERING_WORLD")
+check("TS-9i a kept size of 100% or less that the game refuses keeps the console line",
+    count("game kept RenderScale at 0.5 (wanted 0.8)") == 1 and count("the game is holding") == 0, out())
+
+local r9 = refusedGame("1.25")
+r9.fire("PLAYER_ENTERING_WORLD")
+SETFAIL.RenderScale = nil
+CVARS.RenderScale = "1.25"                                 -- set in the game's own menu: the next loading screen finds it in place
+r9.fire("PLAYER_ENTERING_WORLD")
+CVARS.RenderScale = "1"
+OUT = {}
+r9.slash("size")
+check("TS-9k a loading screen that finds the kept size in place ends the refusal",
+    count("picture sharpness is 100% (kept at 125%, but the game has 100% now)") == 1, out())
+
+local r10 = refusedGame("1.25")
+r10.fire("PLAYER_ENTERING_WORLD")
+CVARS.RenderScale = "1.5"                                  -- the game's own menu, above the kept size
+OUT = {}
+r10.slash("size")
+check("TS-9l the game holding more than the kept size is not called a refusal",
+    count("picture sharpness is 150% (kept at 125%, but the game has 150% now)") == 1, out())
+
+local r11 = refusedGame("1.25")
+r11.fire("PLAYER_ENTERING_WORLD")
+CVARS.RenderScale = "0.75"                                 -- lowered in the game's own menu after the refusal
+OUT = {}
+r11.slash("size")
+check("TS-9m a size lowered in the game's own menu after a refusal is the player's, not the game's refusal",
+    count("picture sharpness is 75% (kept at 125%, but the game has 75% now)") == 1, out())
+
+local r12 = refusedGame("1.25")
+r12.fire("PLAYER_ENTERING_WORLD")                           -- the line is said here
+COMBAT = true
+r12.slash("size 150")
+COMBAT = false
+OUT = {}
+r12.fire("PLAYER_REGEN_ENABLED")
+check("TS-9n a size typed in combat still says the refusal when combat ends, though a loading screen said it already",
+    count("the game is holding picture sharpness at 100% right now, so your saved 150% is not applied.") == 1, out())
+
+local r13 = refusedGame("1.25")
+r13.fire("PLAYER_ENTERING_WORLD")
+OUT = {}
+r13.slash("set graphicsSSAO 2")
+check("TS-9o a command for another setting does not repeat the size line", count("the game is holding") == 0 and CVARS.graphicsSSAO == "2", out())
+
+local r8 = refusedGame("1.25")
+COMBAT = true
+r8.fire("PLAYER_ENTERING_WORLD")
+local combatQuiet = #OUT == 0
+COMBAT = false
+r8.fire("PLAYER_REGEN_ENABLED")
+check("TS-9j a loading screen that waited for combat says the line once combat ends", combatQuiet and count(HOLD_125) == 1, out())
 
 return H.results()

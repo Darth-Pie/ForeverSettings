@@ -75,6 +75,7 @@ Switch from the minimap menu (hover a profile to see what it is for; **Return to
 ## Known issues and things to know
 
 - **Picture sharpness above 100% can crash some graphics cards.** The slider and the size buttons go up to 200%. Above 100% the game draws more pixels than your screen has, which costs a lot of frame rate and graphics memory. Some cards can crash (AMD drivers have been reported to). Try 125% first.
+- **Since the 13 November 2026 update, Forever often won't take picture sharpness above 100%.** When it doesn't, the addon keeps your saved size, says so once in chat after you enter the world (and again when you ask for the size), and applies it as soon as the game takes it again.
 - **If the game crashes when you enter the world at a saved size above 100%,** hold Shift while you enter. The addon then skips that size for the session. Afterwards lower it on the Picture size page of My settings.
 - **If the game won't even start,** close it, open `WTF\Config.wtf` in Notepad, change the line `SET RenderScale "..."` to `SET RenderScale "1"`, save, and start again. The addon puts a kept size above 100% back to 100% at a normal logout, but a crash or a forced close can leave the big value in the game's own settings.
 - **Test it properly.** Stand still in a quiet spot with vsync off, no frame-rate limit and dynamic render scale off. Costs are measured one setting at a time, so "about N fps" for your combined choices is an estimate. Run the test again after a driver or hardware change. Sizes above 100% are never measured and show "?".
